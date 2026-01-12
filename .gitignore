@@ -1,0 +1,24 @@
+# Node.js
+node_modules/
+dist/
+
+# Python
+__pycache__/
+*.pyc
+
+# Pastas temporárias do App
+uploads/
+public/samples/
+
+# Arquivos de configuração e dados locais
+user_data.json
+config_*.json
+token.json
+credentials.json
+
+# Instaladores e executáveis gerados
+*.exe
+*.lnk
+
+# Logs
+npm-debug.log*
