@@ -1,0 +1,92 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+
+  --color-winblue: #0086F0;
+  --color-success: #438E44;
+  --color-error: #B83232;
+  --color-warning: #FFB900;
+}
+
+@layer base {
+  :root {
+    --bg-mica: #F0F2F5;
+    --bg-card: #FFFFFF;
+    --card-hover: #F8F9FA;
+    --text-main: #1A1A1A;
+    --text-muted: #4B5563;
+    --button-secondary-bg: rgba(0, 0, 0, 0.1);
+    --button-secondary-hover: rgba(0, 0, 0, 0.15);
+    --dropzone-border: rgba(0, 0, 0, 0.2);
+    --toggle-bg-off: #9CA3AF;
+    --status-btn-bg: rgba(0, 0, 0, 0.1);
+    --status-btn-text: #1A1A1A;
+    --button-light-bg: #E5E7EB;
+    --button-light-text: #1F2937;
+  }
+
+  .dark {
+    --bg-mica: #161616;
+    --bg-card: #242424;
+    --card-hover: #2A2A2A;
+    --text-main: #F2F2F2;
+    --text-muted: #9CA3AF;
+    --button-secondary-bg: rgba(255, 255, 255, 0.08);
+    --button-secondary-hover: rgba(255, 255, 255, 0.12);
+    --dropzone-border: rgba(255, 255, 255, 0.15);
+    --toggle-bg-off: #4B5563;
+    --status-btn-bg: rgba(255, 255, 255, 0.1);
+    --status-btn-text: #F2F2F2;
+  }
+}
+
+@layer utilities {
+  .bg-mica { background-color: var(--bg-mica); }
+  .bg-card { background-color: var(--bg-card); }
+  .text-main { color: var(--text-main); }
+  .text-winblue { color: var(--color-winblue); }
+  .bg-winblue { background-color: var(--color-winblue); }
+  .text-success { color: var(--color-success); }
+  .bg-success { background-color: var(--color-success); }
+  .text-error { color: var(--color-error); }
+  .bg-error { background-color: var(--color-error); }
+  .text-warning { color: var(--color-warning); }
+  .bg-warning { background-color: var(--color-warning); }
+  .font-fluent { font-family: var(--font-sans); }
+}
+
+body {
+  font-family: var(--font-sans);
+  background-color: var(--bg-mica);
+  color: var(--text-main);
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 10px;
+}
+.dark ::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.3);
+}
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 4px;
+}
+
