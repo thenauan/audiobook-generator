@@ -120,7 +120,7 @@ namespace AudiobookInstaller
             }
             Process p = new Process();
             p.StartInfo.FileName = outFile.EndsWith(".msi") ? "msiexec.exe" : outFile;
-            p.StartInfo.Arguments = outFile.EndsWith(".msi") ? $"/i {outFile} {args}" : args;
+            p.StartInfo.Arguments = outFile.EndsWith(".msi") ? string.Format("/i {0} {1}", outFile, args) : args;
             p.StartInfo.CreateNoWindow = true;
             p.StartInfo.UseShellExecute = false;
             p.Start();

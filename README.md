@@ -44,9 +44,15 @@ The application includes an integrated **auto-update system**. It actively queri
 The program features facilitated installation routines that automatically download and configure Node.js and Python behind the scenes if you do not have them installed.
 
 ### 🪟 Windows
-1. You can download the **`Installer.exe`** file from the Releases tab or run the `instalar_e_rodar.bat` script directly from the project folder.
-2. If using the installer, simply run it! It will silently verify, download, and install Node.js and Python (if missing), install the app's dependencies, and create a shortcut on your Desktop.
-3. A shortcut will be created on your Desktop. Just open and use!
+**Option A: Using the compiled installer (Recommended)**
+1. Download the **`Installer.exe`** file from the **Releases** tab on GitHub.
+2. Simply run it! It will silently verify, download, and install Node.js and Python (if missing), install the app's dependencies, and create a shortcut on your Desktop.
+
+**Option B: Using the source code**
+1. If you downloaded the source code instead of the Release, you can compile the installer yourself. Open the Command Prompt in the project folder and run: `C:\Windows\Microsoft.NET\Framework64\v4.0.30319\csc.exe /target:winexe /out:Installer.exe Installer.cs`
+2. Alternatively, run the `instalar_e_rodar.bat` script directly from the project folder.
+
+A shortcut will be created on your Desktop. Just open and use!
 
 ### 🍎 macOS and 🐧 Linux
 On Unix systems, installation is via a terminal script, but **the final execution will open an independent application window** without browser tabs:
