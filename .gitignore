@@ -1,24 +1,26 @@
-# Node.js
+# Node / JS
 node_modules/
 dist/
+.env
 
 # Python
 __pycache__/
 *.pyc
+*.pyo
+venv/
+.venv/
 
-# Pastas temporárias do App
+# Audio / User Data
 uploads/
 public/samples/
-
-# Arquivos de configuração e dados locais
 user_data.json
 config_*.json
-token.json
-credentials.json
 
-# Instaladores e executáveis gerados
+# Executables (Belong in GitHub Releases, not the source code repo)
 *.exe
+*.msi
 *.lnk
 
-# Logs
-npm-debug.log*
+# OS generated files
+.DS_Store
+Thumbs.db

@@ -1,0 +1,11 @@
+#!/bin/bash
+# Get the root directory of the project (3 levels up from Contents/MacOS)
+APP_DIR="$(cd "$(dirname "$0")/../../.." && pwd)"
+cd "$APP_DIR"
+
+# Ensure common paths are available (like node/npm)
+export PATH="/usr/local/bin:/opt/homebrew/bin:$PATH"
+
+# Run the electron app
+npx electron electron-main.cjs
+

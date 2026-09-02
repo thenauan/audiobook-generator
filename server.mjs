@@ -476,8 +476,19 @@ async function startServer() {
   app.listen(PORT, "0.0.0.0", async () => {
     console.log(`Server running on http://localhost:${PORT}`);
     const url = `http://localhost:${PORT}`;
-    const start = process.platform == "darwin" ? "open" : process.platform == "win32" ? "start" : "xdg-open";
-    import("child_process").then(({ exec }) => exec(`${start} ${url}`));
+    if (!process.env.ELECTRON_MODE) {
+      import("child_process").then(({ exec }) => {
+        let command = "";
+        if (process.platform === "win32") {
+          command = `start msedge --app="${url}" || start chrome --app="${url}" || start "" "${url}"`;
+        } else if (process.platform === "darwin") {
+          command = `open -n -a "Google Chrome" --args --app="${url}" || open -n -a "Microsoft Edge" --args --app="${url}" || open "${url}"`;
+        } else {
+          command = `google-chrome --app="${url}" || microsoft-edge --app="${url}" || chromium-browser --app="${url}" || xdg-open "${url}"`;
+        }
+        exec(command);
+      });
+    }
   });
 }
 startServer();

@@ -1,0 +1,7 @@
+#!/bin/bash
+# Get the root directory of the project
+cd "$(dirname "$0")"
+
+# Run the electron app
+npx electron electron-main.cjs
+

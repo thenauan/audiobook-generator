@@ -51,7 +51,7 @@ async function startServer() {
   } catch (err) {
     console.error("Uploads directory is NOT writable:", err);
   }
- do pop up de a  
+
   // Clean up residual audio snippets on server startup to prevent public folder bloating
   const samplesDir = path.join(process.cwd(), 'public', 'samples');
   if (fs.existsSync(samplesDir)) {
