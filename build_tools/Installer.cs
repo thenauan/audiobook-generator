@@ -6,14 +6,14 @@ using System.Windows.Forms;
 using System.Net;
 using System.Reflection;
 
-// Define Assembly Information for the executable (Version 1.0)
+// Define Assembly Information for the executable (Version 1.1)
 [assembly: AssemblyTitle("Audiobook Generator with AI Installer")]
 [assembly: AssemblyDescription("Installer for Audiobook Generator with AI")]
 [assembly: AssemblyCompany("Audiobook Generator")]
 [assembly: AssemblyProduct("Audiobook Generator with AI")]
 [assembly: AssemblyCopyright("Copyright © 2026")]
-[assembly: AssemblyVersion("1.0.0.0")]
-[assembly: AssemblyFileVersion("1.0.0.0")]
+[assembly: AssemblyVersion("1.1.0.0")]
+[assembly: AssemblyFileVersion("1.1.0.0")]
 
 namespace AudiobookInstaller
 {
@@ -111,7 +111,7 @@ namespace AudiobookInstaller
                 await RunCommand("npm", "install");
 
                 lblStatus.Text = "Installing Python dependencies (This may take a while)...";
-                await RunCommand("python", "-m pip install ebooklib beautifulsoup4 pypdf mobi deep-translator langdetect mutagen edge-tts tqdm colorama");
+                await RunCommand("python", "-m pip install ebooklib beautifulsoup4 pypdf pdfplumber mobi deep-translator langdetect mutagen edge-tts tqdm colorama faster-whisper");
 
                 if (chkCreateShortcut.Checked)
                 {
@@ -159,6 +159,18 @@ namespace AudiobookInstaller
                 await DownloadAndInstall("https://www.python.org/ftp/python/3.11.8/python-3.11.8-amd64.exe", "python_installer.exe", "/quiet InstallAllUsers=1 PrependPath=1 Include_test=0");
             }
             
+            // Check if FFmpeg is installed (needed for M4B, Opus, FLAC and WAV output and chapter encoding)
+            bool ffmpegInstalled = await CheckCommand("ffmpeg", "-version");
+            if (!ffmpegInstalled) {
+                lblStatus.Text = "Installing FFmpeg (audio encoder)...";
+                try {
+                    await RunCommand("winget", "install --id Gyan.FFmpeg -e --accept-source-agreements --accept-package-agreements --silent");
+                } catch {
+                    // Optional: without FFmpeg the app still exports MP3, but not M4B, Opus, FLAC or WAV
+                    MessageBox.Show("FFmpeg could not be installed automatically. Install it from https://ffmpeg.org to export M4B, Opus, FLAC and WAV.", "FFmpeg", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                }
+            }
+
             // Refresh environment PATH variables so the current process can see the newly installed tools
             string userPath = Environment.GetEnvironmentVariable("PATH", EnvironmentVariableTarget.User);
             string machinePath = Environment.GetEnvironmentVariable("PATH", EnvironmentVariableTarget.Machine);

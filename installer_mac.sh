@@ -18,11 +18,20 @@ if ! command -v python3 &> /dev/null; then
     exit 1
 fi
 
+if ! command -v ffmpeg &> /dev/null; then
+    if command -v brew &> /dev/null; then
+        echo "Installing FFmpeg (audio encoder)..."
+        brew install ffmpeg
+    else
+        echo "[WARNING] FFmpeg not found. Install it (brew install ffmpeg) to export M4B, Opus, FLAC and WAV."
+    fi
+fi
+
 echo "Installing Node.js dependencies..."
 npm install
 
 echo "Installing Python dependencies..."
-python3 -m pip install ebooklib beautifulsoup4 pypdf mobi deep-translator langdetect mutagen edge-tts tqdm colorama
+python3 -m pip install ebooklib beautifulsoup4 pypdf pdfplumber mobi deep-translator langdetect mutagen edge-tts tqdm colorama faster-whisper
 
 echo "Creating executable app (.app) on Desktop..."
 APP_DIR="$HOME/Desktop/Audiobook Generator with AI.app"

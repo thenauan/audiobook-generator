@@ -2,32 +2,48 @@ import express from "express";
 import { createServer as createViteServer } from "vite";
 import path from "path";
 import multer from "multer";
-import { spawn } from "child_process";
+import { spawn, execFile } from "child_process";
 import fs from "fs";
 import net from "net";
 import https from "https";
 import http from "http";
 
-function getAvailablePort(startPort: number): Promise<number> {
+// Só o próprio computador acessa o servidor (ele abre pastas e lê arquivos locais).
+// Para usar pela rede local de propósito, inicie com HOST=0.0.0.0.
+const HOST = process.env.HOST || '127.0.0.1';
+
+// Arquivos de áudio que podem virar prévia (evita copiar arquivos quaisquer para a pasta pública)
+const AUDIO_EXTENSIONS = new Set(['.mp3', '.m4a', '.m4b', '.aac', '.ogg', '.opus', '.wav', '.flac']);
+
+// Uma porta está livre só se ninguém a usa nem no endereço local nem em "todas as interfaces"
+// (no Windows, os dois podem ser ocupados ao mesmo tempo por programas diferentes)
+function isPortFree(port: number, host: string): Promise<boolean> {
   return new Promise((resolve, reject) => {
     const server = net.createServer();
-    server.listen(startPort, '0.0.0.0', () => {
-      const port = (server.address() as net.AddressInfo).port;
-      server.close(() => resolve(port));
+    server.once('error', (err: any) => {
+      if (err.code === 'EADDRINUSE' || err.code === 'EACCES') resolve(false);
+      else if (err.code === 'EADDRNOTAVAIL' || err.code === 'EAFNOSUPPORT') resolve(true); // sem IPv6 nesta máquina
+      else reject(err);
     });
-    server.on('error', (err: any) => {
-      if (err.code === 'EADDRINUSE') {
-        resolve(getAvailablePort(startPort + 1));
-      } else {
-        reject(err);
-      }
-    });
+    server.listen(port, host, () => server.close(() => resolve(true)));
   });
+}
+
+async function getAvailablePort(startPort: number, extraHosts: string[] = []): Promise<number> {
+  for (let port = startPort; port < startPort + 100; port++) {
+    let free = true;
+    // "::" (IPv4 + IPv6) é o único teste que acusa no Windows uma porta já aberta em todas as interfaces
+    for (const host of ['::', '0.0.0.0', HOST, ...extraHosts]) {
+      if (!(await isPortFree(port, host))) { free = false; break; }
+    }
+    if (free) return port;
+  }
+  throw new Error(`Nenhuma porta livre a partir de ${startPort}`);
 }
 
 const upload = multer({ 
   dest: path.join(process.cwd(), 'uploads/'),
-  limits: { fileSize: 50 * 1024 * 1024 } // 50MB limit
+  limits: { fileSize: 1024 * 1024 * 1024 } // 1GB limit para suportar audiolivros completos
 });
 
 // Ensure uploads directory exists
@@ -38,7 +54,8 @@ if (!fs.existsSync('uploads')) {
 async function startServer() {
   const app = express();
   const PORT = await getAvailablePort(3000);
-  const hmrPort = await getAvailablePort(24678);
+  // A recarga do Vite abre em "localhost", que no Windows pode ser o IPv6 (::1)
+  const hmrPort = await getAvailablePort(24678, ['::1']);
 
   // Ensure uploads directory exists and is writable
   const uploadsDir = path.join(process.cwd(), 'uploads');
@@ -299,13 +316,35 @@ async function startServer() {
   let currentPythonProcess: ReturnType<typeof spawn> | null = null;
 
   app.post("/api/cancel", (req, res) => {
-    if (currentPythonProcess) {
-      currentPythonProcess.kill('SIGTERM');
+    let killed = false;
+    if (currentPythonProcess && currentPythonProcess.pid) {
+      const pid = currentPythonProcess.pid;
+      killed = true;
+      if (process.platform === 'win32') {
+        import('child_process').then(({ exec }) => {
+          exec(`taskkill /pid ${pid} /T /F`, (err) => {
+            if (err) console.error("taskkill PID error:", err);
+          });
+          // Força o encerramento imediato de instâncias órfãs do FFmpeg para liberar CPU e RAM
+          exec('taskkill /IM ffmpeg.exe /F', () => {});
+        });
+      } else {
+        try {
+          process.kill(-pid, 'SIGKILL');
+        } catch (e) {
+          currentPythonProcess.kill('SIGKILL');
+        }
+      }
       currentPythonProcess = null;
-      res.json({ success: true, message: "Process cancelled" });
     } else {
-      res.json({ success: false, message: "No process running" });
+      if (process.platform === 'win32') {
+        import('child_process').then(({ exec }) => {
+          exec('taskkill /IM ffmpeg.exe /F', () => {});
+        });
+      }
     }
+    broadcastProgress({ type: "log", message: "Processo cancelado e recursos liberados imediatamente." });
+    res.json({ success: true, message: killed ? "Process tree and FFmpeg killed" : "Cleaned up" });
   });
 
   // Rotas para Tocar Trecho (Preview)
@@ -313,7 +352,8 @@ async function startServer() {
 
   app.post("/api/snippet", express.json(), (req, res) => {
     const filePath = req.body.path;
-    if (!filePath || !fs.existsSync(filePath)) return res.status(404).json({ error: "File not found" });
+    if (typeof filePath !== 'string' || !fs.existsSync(filePath)) return res.status(404).json({ error: "File not found" });
+    if (!AUDIO_EXTENSIONS.has(path.extname(filePath).toLowerCase())) return res.status(400).json({ error: "Not an audio file" });
 
     const tempName = 'snippet_' + Date.now() + '.mp3';
     const samplesDir = path.join(process.cwd(), 'public', 'samples');
@@ -321,11 +361,10 @@ async function startServer() {
 
     if (!fs.existsSync(samplesDir)) fs.mkdirSync(samplesDir, { recursive: true });
 
-    import('child_process').then(({ exec }) => {
-      exec(`ffmpeg -t 60 -i "${filePath}" -c copy "${outputPath}"`, (error) => {
-        if (error) fs.copyFileSync(filePath, outputPath); // Fallback caso não tenha ffmpeg
-        res.json({ url: '/samples/' + tempName });
-      });
+    // Argumentos separados (sem montar linha de comando): caminhos com aspas não viram comandos
+    execFile('ffmpeg', ['-y', '-t', '60', '-i', filePath, '-c', 'copy', outputPath], (error) => {
+      if (error) fs.copyFileSync(filePath, outputPath); // Fallback caso não tenha ffmpeg
+      res.json({ url: '/samples/' + tempName });
     });
   });
 
@@ -353,37 +392,102 @@ async function startServer() {
     res.json({ success: true });
   });
 
+  // Limpeza de cache temporário (áudios parciais, amostras e uploads descartados)
+  app.post("/api/clean-cache", express.json(), (req, res) => {
+    try {
+      let deletedCount = 0;
+      
+      // 1. Limpar snippets temporários em public/samples
+      const samplesDir = path.join(process.cwd(), 'public', 'samples');
+      if (fs.existsSync(samplesDir)) {
+        try {
+          const files = fs.readdirSync(samplesDir);
+          for (const file of files) {
+            if (file.startsWith('snippet_') || file.startsWith('preview_') || file.startsWith('temp_')) {
+              try {
+                fs.unlinkSync(path.join(samplesDir, file));
+                deletedCount++;
+              } catch (e) {}
+            }
+          }
+        } catch (e) {}
+      }
+
+      // 2. Limpar arquivos temporários na pasta uploads
+      const uploadsDir = path.join(process.cwd(), 'uploads');
+      if (fs.existsSync(uploadsDir)) {
+        try {
+          const files = fs.readdirSync(uploadsDir);
+          for (const file of files) {
+            try {
+              const p = path.join(uploadsDir, file);
+              if (fs.statSync(p).isFile()) {
+                fs.unlinkSync(p);
+                deletedCount++;
+              }
+            } catch (e) {}
+          }
+        } catch (e) {}
+      }
+
+      // 3. Limpar diretórios de cache de áudio (.cache_audiobooks)
+      const possibleCacheDirs = [
+        path.join(process.cwd(), '.cache_audiobooks'),
+        path.join(process.cwd(), 'meus audiobooks', '.cache_audiobooks')
+      ];
+      if (req.body && req.body.outputFolder) {
+        possibleCacheDirs.push(path.join(req.body.outputFolder, '.cache_audiobooks'));
+      }
+      for (const cDir of possibleCacheDirs) {
+        if (fs.existsSync(cDir)) {
+          try {
+            fs.rmSync(cDir, { recursive: true, force: true });
+            deletedCount++;
+          } catch (e) {}
+        }
+      }
+
+      res.json({ success: true, message: "Cache limpo com sucesso!", deleted: deletedCount });
+    } catch (error) {
+      res.status(500).json({ success: false, error: String(error) });
+    }
+  });
+
   app.post("/api/open-folder", express.json(), (req, res) => {
     try {
       let folderPath = req.body.path || path.join(process.cwd(), 'meus audiobooks');
-      folderPath = path.normalize(folderPath); // Higieniza as barras pro Windows Explorer não se perder
+      folderPath = path.normalize(String(folderPath)); // Higieniza as barras pro Windows Explorer não se perder
+      if (folderPath.includes('"')) return res.status(400).json({ success: false });
       const isFile = req.body.isFile;
       
-      let command = '';
+      // Programa + argumentos separados (sem shell): o caminho nunca é interpretado como comando
+      let program: string;
+      let args: string[];
       if (process.platform === 'win32') {
-        command = isFile ? `explorer.exe /select,"${folderPath}"` : `explorer.exe "${folderPath}"`;
+        program = 'explorer.exe';
+        // Mesmo formato que o Explorer espera (/select,"caminho"); aspas não são válidas em caminhos do Windows
+        args = isFile ? [`/select,"${folderPath}"`] : [`"${folderPath}"`];
       } else if (process.platform === 'darwin') {
-        command = isFile ? `open -R "${folderPath}"` : `open "${folderPath}"`;
+        program = 'open';
+        args = isFile ? ['-R', folderPath] : [folderPath];
       } else {
-        command = `xdg-open "${isFile ? require('path').dirname(folderPath) : folderPath}"`;
+        program = 'xdg-open';
+        args = [isFile ? path.dirname(folderPath) : folderPath];
       }
-      
-      import('child_process').then(({ exec }) => {
-        exec(command, (error) => {
-          if (error) {
-            console.error("Failed to open folder:", error);
-            res.status(500).json({ success: false });
-          } else {
-            res.json({ success: true });
-          }
-        });
+
+      const child = spawn(program, args, { detached: true, stdio: 'ignore', windowsVerbatimArguments: process.platform === 'win32' });
+      // O Explorer do Windows sai com código 1 mesmo quando abre a pasta: basta ter iniciado
+      child.once('spawn', () => { child.unref(); res.json({ success: true }); });
+      child.once('error', (error) => {
+        console.error("Failed to open folder:", error);
+        if (!res.headersSent) res.status(500).json({ success: false });
       });
     } catch (error) {
       res.status(500).json({ success: false });
     }
   });
 
-  app.post("/api/select-folder", (req, res) => {
+  app.all("/api/select-folder", (req, res) => {
     if (process.platform === 'win32') {
       const psScript = `
         Add-Type -AssemblyName System.windows.forms;
@@ -394,7 +498,7 @@ async function startServer() {
             $f.SelectedPath
         }
       `;
-      const child = spawn('powershell.exe', ['-NoProfile', '-Command', psScript]);
+      const child = spawn('powershell.exe', ['-NoProfile', '-STA', '-Command', psScript]);
       let output = '';
       child.stdout.on('data', (data) => output += data.toString());
       child.on('close', () => {
@@ -410,34 +514,73 @@ async function startServer() {
     }
   });
 
-  app.post("/api/process", upload.array('files'), (req, res) => {
+  const handleProcessRequest = (req: express.Request, res: express.Response) => {
     try {
-      const filesInfo = JSON.parse(req.body.filesInfo);
-      const config = JSON.parse(req.body.config);
+      let filesInfo: any[] = [];
+      if (req.body.filesInfo) {
+        filesInfo = typeof req.body.filesInfo === 'string' ? JSON.parse(req.body.filesInfo) : req.body.filesInfo;
+      } else if (req.body.metadata) {
+        filesInfo = typeof req.body.metadata === 'string' ? JSON.parse(req.body.metadata) : req.body.metadata;
+      }
+
+      let config: any = {};
+      if (req.body.config) {
+        config = typeof req.body.config === 'string' ? JSON.parse(req.body.config) : req.body.config;
+      } else {
+        config = {
+          voice: req.body.voice,
+          outputFolder: req.body.outputFolder,
+          mode_folder: req.body.fileType === 'multiple' || req.body.mode_folder === true || req.body.mode_folder === 'true',
+          file_format: req.body.fileType || 'single',
+          target_lang: req.body.target_lang || 'pt'
+        };
+      }
       
+      const fileFormat = config.file_format || config.fileType || req.body.fileType || (config.mode_folder ? 'multiple' : 'single');
+      const isMultiple = fileFormat === 'multiple' || config.mode_folder === true || config.mode_folder === 'true';
+
+      const generateSyncText = config.generate_sync_text !== undefined 
+        ? config.generate_sync_text 
+        : (req.body.generate_sync_text !== undefined ? (req.body.generate_sync_text === true || req.body.generate_sync_text === 'true') : true);
+      // Onde guardar o texto sincronizado: metadados do áudio, pasta da biblioteca ou ambos
+      const syncTextDestination = ['metadata', 'library', 'both'].includes(config.sync_text_destination) ? config.sync_text_destination : 'both';
+
       const files = (req.files as Express.Multer.File[]).map((file, index) => {
-        const info = filesInfo[index];
-        const originalExt = path.extname(info.filename);
+        const info = filesInfo[index] || {};
+        const originalExt = path.extname(info.filename || file.originalname);
         const newPath = file.path + originalExt;
         fs.renameSync(file.path, newPath);
         
         return {
-          id: info.id,
+          id: info.id || `file_${index}`,
           path: newPath,
-          title: info.title,
-          author: info.author,
-          translate: info.translate,
-          cover: info.cover,
-          config: info.config
+          title: info.title || 'Desconhecido',
+          author: info.author || 'Desconhecido',
+          genre: info.genre || '',
+          subgenre: info.subgenre || '',
+          narrator: info.narrator || '',
+          language: info.language || '',
+          translate: info.requiresTranslation || info.translate || false,
+          cover: info.cover || null,
+          chapters: info.chapters || [],
+          fileType: info.fileType || fileFormat,
+          file_format: info.fileType || fileFormat,
+          pronunciation_map: info.pronunciationMap || info.pronunciation_map || [],
+          generate_sync_text: info.generate_sync_text !== undefined ? info.generate_sync_text : generateSyncText,
+          sync_text_destination: syncTextDestination,
+          config: { ...(info.config || config), file_format: info.fileType || fileFormat, pronunciation_map: info.pronunciationMap || info.pronunciation_map || [], generate_sync_text: info.generate_sync_text !== undefined ? info.generate_sync_text : generateSyncText, sync_text_destination: syncTextDestination }
         };
       });
 
       const pythonConfig = {
         files,
-        voice: config.voice,
+        voice: config.voice || 'pt-BR-AntonioNeural',
         outputFolder: config.outputFolder,
         target_lang: config.target_lang || 'pt',
-        mode_folder: config.mode_folder !== undefined ? config.mode_folder : true
+        mode_folder: isMultiple,
+        file_format: fileFormat,
+        generate_sync_text: generateSyncText,
+        sync_text_destination: syncTextDestination
       };
 
       // Write configuration payload to a temp JSON file to completely bypass Windows CLI string limits
@@ -501,6 +644,123 @@ async function startServer() {
       console.error("Error processing request:", error);
       res.status(500).json({ error: "Internal server error" });
     }
+  };
+
+  app.post("/api/process", upload.array('files'), handleProcessRequest);
+  app.post("/api/convert", upload.array('files'), handleProcessRequest);
+
+  // ROTA DO AUDIOBOOK-TEXT: Sincronização e Extração de Texto Sincronizado
+  const syncUpload = upload.fields([
+    { name: 'ebook', maxCount: 1 },
+    { name: 'ebookFile', maxCount: 1 },
+    { name: 'audio', maxCount: 1 },
+    { name: 'audioFile', maxCount: 1 }
+  ]);
+
+  // Texto sincronizado de um audiobook do histórico (menu de opções do audiobook):
+  // "áudio + texto" (o usuário envia o livro em texto) ou "só o áudio" (transcrição).
+  app.post("/api/sync-text", syncUpload, async (req, res) => {
+    const files = req.files as { [fieldname: string]: Express.Multer.File[] } | undefined;
+    const ebookFile = files?.ebook?.[0];
+    const tempFilesToClean: string[] = [];
+    try {
+      const audioPath = typeof req.body.audioPath === 'string' ? req.body.audioPath : '';
+      if (!audioPath || !fs.existsSync(audioPath)) {
+        return res.status(400).json({ error: "O arquivo de áudio deste audiobook não foi encontrado." });
+      }
+      if (!AUDIO_EXTENSIONS.has(path.extname(audioPath).toLowerCase())) {
+        return res.status(400).json({ error: "O arquivo deste audiobook não é um áudio." });
+      }
+
+      let ebookPath = '';
+      if (ebookFile) {
+        ebookPath = ebookFile.path + path.extname(ebookFile.originalname);
+        fs.renameSync(ebookFile.path, ebookPath);
+        tempFilesToClean.push(ebookPath);
+      }
+
+      const destination = ['metadata', 'library', 'both'].includes(req.body.destination) ? req.body.destination : 'both';
+      const outputFolder = req.body.outputFolder || path.join(process.cwd(), 'meus audiobooks');
+      const args = ['-u', 'sync_text_tools.py', '--audio', audioPath, '--out-dir', outputFolder,
+        '--title', String(req.body.title || path.basename(audioPath, path.extname(audioPath))),
+        '--author', String(req.body.author || ''), '--destination', destination];
+      if (ebookPath) args.push('--ebook', ebookPath);
+
+      const pythonCmd = process.platform === 'win32' ? 'python' : 'python3';
+      const child = spawn(pythonCmd, args, { stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, PYTHONIOENCODING: 'utf-8' } });
+      let stdout = '';
+      let stderr = '';
+      child.stdout.on('data', d => { stdout += d.toString(); });
+      child.stderr.on('data', d => { stderr += d.toString(); });
+      child.on('error', (err) => {
+        if (!res.headersSent) res.status(500).json({ error: `Não foi possível iniciar o Python: ${err.message}` });
+      });
+      child.on('close', () => {
+        for (const p of tempFilesToClean) { try { if (fs.existsSync(p)) fs.unlinkSync(p); } catch (e) {} }
+        if (res.headersSent) return;
+        // A última linha "result" do script traz o resumo
+        const resultLine = stdout.trim().split(/\r?\n/).reverse().find(l => l.includes('"type": "result"'));
+        let result: any = null;
+        try { result = resultLine ? JSON.parse(resultLine) : null; } catch (e) {}
+        if (result?.success) {
+          res.json(result);
+        } else {
+          console.error("Sync text error:", stderr || stdout);
+          res.status(500).json({ error: result?.error || "Falha ao gerar o texto sincronizado.", details: stderr.slice(-2000) });
+        }
+      });
+    } catch (e: any) {
+      for (const p of tempFilesToClean) { try { if (fs.existsSync(p)) fs.unlinkSync(p); } catch (err) {} }
+      console.error("Error in /api/sync-text:", e);
+      if (!res.headersSent) res.status(500).json({ error: e.message || "Erro interno do servidor." });
+    }
+  });
+
+  // Injetar e salvar metadados no arquivo de audiobook (.mp3, .m4b, .m4a)
+  app.post("/api/save-audiobook-metadata", express.json({ limit: '50mb' }), (req, res) => {
+    try {
+      const data = req.body;
+      const filePath = data.filePath;
+
+      // Se o arquivo não existir fisicamente no disco, apenas retorna sucesso para atualizar no estado/localStorage
+      if (!filePath || !fs.existsSync(filePath)) {
+        return res.json({
+          success: true,
+          fileUpdated: false,
+          message: "Metadados salvos na biblioteca."
+        });
+      }
+
+      // Salva payload temporário para evitar limite de argumentos de linha de comando no Windows
+      const tempJson = path.join(process.cwd(), `meta_inject_${Date.now()}.json`);
+      fs.writeFileSync(tempJson, JSON.stringify(data), 'utf-8');
+
+      const pythonCmd = process.platform === 'win32' ? 'python' : 'python3';
+      const child = spawn(pythonCmd, ['-u', 'inject_metadata.py', tempJson]);
+
+      let stdout = '';
+      let stderr = '';
+      child.stdout.on('data', (d) => stdout += d.toString());
+      child.stderr.on('data', (d) => stderr += d.toString());
+
+      child.on('close', (code) => {
+        try { if (fs.existsSync(tempJson)) fs.unlinkSync(tempJson); } catch {}
+        try {
+          const parsed = JSON.parse(stdout.trim());
+          res.json(parsed);
+        } catch {
+          if (code === 0) {
+            res.json({ success: true, fileUpdated: true, message: "Metadados injetados com sucesso." });
+          } else {
+            console.error("inject_metadata error:", stderr);
+            res.status(500).json({ success: false, error: stderr || "Erro ao injetar metadados." });
+          }
+        }
+      });
+    } catch (err: any) {
+      console.error("Error in /api/save-audiobook-metadata:", err);
+      res.status(500).json({ success: false, error: err.message || "Erro interno." });
+    }
   });
 
   // Catch-all for API routes to prevent falling through to Vite
@@ -519,9 +779,6 @@ async function startServer() {
       appType: "spa",
       configFile: false,
       plugins: [react(), tailwindcss()],
-      define: {
-        'process.env.GEMINI_API_KEY': JSON.stringify(process.env.GEMINI_API_KEY),
-      }
     });
     app.use(vite.middlewares);
   } else {
@@ -538,7 +795,7 @@ async function startServer() {
     res.status(500).json({ error: err.message || "Internal server error" });
   });
 
-  app.listen(PORT, "0.0.0.0", async () => {
+  app.listen(PORT, HOST, async () => {
     console.log(`Server running on http://localhost:${PORT}`);
     const url = `http://localhost:${PORT}`;
     if (!process.env.ELECTRON_MODE) {

@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <clipPath id="shape"><circle cx="256" cy="256" r="256"/></clipPath>
+    <filter id="soft" filterUnits="userSpaceOnUse" x="-300" y="-300" width="1112" height="1112">
+      <feGaussianBlur stdDeviation="46"/>
+    </filter>
+    <radialGradient id="glow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.34"/>
+      <stop offset="45%" stop-color="#9cc3ff" stop-opacity="0.12"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="sheen" cx="30%" cy="18%" r="70%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.16"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="glyphGlow" filterUnits="userSpaceOnUse" x="-100" y="-100" width="712" height="712">
+      <!-- Sombra de fundo do símbolo -->
+      <feGaussianBlur in="SourceAlpha" stdDeviation="2.4" result="sb"/>
+      <feOffset in="sb" dy="1.5" result="so"/>
+      <feFlood flood-color="#000000" flood-opacity="0.9"/>
+      <feComposite in2="so" operator="in" result="shadow"/>
+      <feMerge><feMergeNode in="shadow"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <g clip-path="url(#shape)">
+    <rect width="512" height="512" fill="#04070f"/>
+    <g filter="url(#soft)">
+      <circle cx="120" cy="110" r="210" fill="#0d3b8f" opacity="0.95"/>
+      <circle cx="430" cy="220" r="190" fill="#8a1430" opacity="0.85"/>
+      <circle cx="210" cy="470" r="210" fill="#0a5c3c" opacity="0.9"/>
+    </g>
+    <rect width="512" height="512" fill="#000000" opacity="0.28"/>
+    <rect width="512" height="512" fill="url(#sheen)"/>
+    <g transform="translate(81 81) scale(14.583)" fill="none" stroke="#ffffff" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round" filter="url(#glyphGlow)">
+    <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H19a1 1 0 0 1 1 1v18a1 1 0 0 1-1 1H6.5a1 1 0 0 1 0-5H20"/>
+    <path d="M8 12v-2a4 4 0 0 1 8 0v2"/>
+    <circle cx="15" cy="12" r="1" fill="#ffffff"/>
+    <circle cx="9" cy="12" r="1" fill="#ffffff"/>
+    </g>
+  </g>
+</svg>

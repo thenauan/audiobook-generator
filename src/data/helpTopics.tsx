@@ -1,0 +1,190 @@
+// ===== Tópicos da Ajuda =====
+// Cada faixa da Ajuda abre a tela de tópico (HelpTopicScreen) com: introdução, passo a passo,
+// recursos e detalhes e perguntas frequentes — no mesmo modelo do Audiobook Player.
+import React from 'react';
+import {
+  FileText, AudioWaveform, Languages, FolderOpen, Keyboard, Upload, Tags, Mic, ListOrdered, BookA, RefreshCcw,
+  Gauge, Layers, HardDrive, FileAudio, Music4, Captions, BookOpenText, Wand2, Globe, ShieldCheck, Search,
+  MousePointerClick, Code2, Clock, FolderCog, BookHeadphones, Trash2, Play, Pencil, ArrowDownAZ, Info, LayoutGrid,
+} from 'lucide-react';
+import { AiStarsIcon } from '../components/AppGlyph';
+
+type IconType = React.ComponentType<{ size?: number; strokeWidth?: number; className?: string }>;
+
+export interface HelpStep { title: string; text: string }
+export interface HelpFeature { icon: IconType; title: string; text: string }
+export interface HelpFaq { q: string; a: string }
+
+export interface HelpTopic {
+  id: string;
+  title: string;
+  subtitle: string;
+  gradient: string;
+  icon: IconType;
+  intro: string;
+  steps: HelpStep[];
+  features: HelpFeature[];
+  faq?: HelpFaq[];
+}
+
+export const HELP_TOPICS: HelpTopic[] = [
+  {
+    id: 'converter',
+    title: 'Como converter e-books',
+    subtitle: 'Importar Epub, Pdf, Mobi ou Txt, vozes neurais, metadados e capítulos',
+    gradient: 'from-blue-600 via-indigo-600 to-cyan-500',
+    icon: AiStarsIcon,
+    intro: 'O Audiobook Generator lê o texto de livros digitais, separa os capítulos e narra tudo com vozes neurais. Você pode converter vários e-books de uma vez, revisar os dados de cada um antes e acompanhar o progresso de cada livro.',
+    steps: [
+      { title: 'Abra o Conversor', text: 'No menu lateral esquerdo, clique em "Conversor".' },
+      { title: 'Adicione os e-books', text: 'Arraste os arquivos (.epub, .pdf, .mobi ou .txt) para a área colorida do Conversor ou clique nela para escolher. Com livros já na lista, use o botão de envio no canto superior direito para incluir mais.' },
+      { title: 'Revise cada livro', text: 'Confira título e autor no próprio card. As etiquetas logo abaixo trocam voz, formato, gênero, idioma, narrador, ano e se o texto sincronizado será gerado.' },
+      { title: 'Ajuste os detalhes (opcional)', text: 'O botão de lápis abre a edição completa: capa, sinopse, capítulos, tradução e dicionário de pronúncia.' },
+      { title: 'Clique em Converter', text: 'O botão "Converter" aparece no cabeçalho quando há pelo menos um e-book na fila. A barra de cada livro mostra a etapa e o tempo estimado.' },
+      { title: 'Ouça o resultado', text: 'Os audiobooks prontos vão para "Convertidos", onde você pode ouvir um trecho, abrir na pasta, editar os dados ou gerar o texto.' },
+    ],
+    features: [
+      { icon: Upload, title: 'Formatos aceitos', text: 'Epub, Pdf, Mobi e Txt. Vários livros podem ser carregados e convertidos em lote.' },
+      { icon: Tags, title: 'Metadados automáticos', text: 'Título, autor, idioma, ano e capa são lidos do arquivo e podem ser corrigidos antes da conversão.' },
+      { icon: Mic, title: 'Vozes neurais', text: 'Vozes naturais como Antônio e Francisca em português, além de vozes em outros idiomas. Cada voz tem uma amostra para ouvir antes.' },
+      { icon: ListOrdered, title: 'Capítulos', text: 'Os capítulos são detectados automaticamente. Na edição você renomeia, reordena ou divide capítulos longos.' },
+      { icon: BookA, title: 'Dicionário de pronúncia', text: 'Ensine a voz a falar nomes e termos difíceis (ex.: "Nietzsche" → "Nitche"). Vale só para aquele livro.' },
+      { icon: Info, title: 'Informações de conversão', text: 'O botão (i) no card mostra o tempo estimado da conversão, a duração e o tamanho do audiobook e o formato do áudio.' },
+      { icon: RefreshCcw, title: 'Conversão que continua', text: 'Se a conversão for interrompida, os capítulos prontos ficam guardados e o app retoma de onde parou.' },
+    ],
+    faq: [
+      { q: 'Posso cancelar uma conversão?', a: 'Sim. Use o X no card do livro ou "Cancelar todos" ao lado do título "Convertendo".' },
+      { q: 'Por que o botão Converter sumiu?', a: 'Ele só aparece quando há e-books ainda não convertidos na lista.' },
+      { q: 'O Pdf saiu com cabeçalhos e números de página?', a: 'O app remove números de página, cabeçalhos repetidos e quebras de linha automaticamente, mas Pdfs escaneados ou com várias colunas podem precisar de revisão nos capítulos.' },
+    ],
+  },
+  {
+    id: 'sync-text',
+    title: 'Texto sincronizado',
+    subtitle: 'Gerar o texto na conversão ou depois, com o áudio + texto ou só com o áudio',
+    gradient: 'from-violet-600 via-purple-600 to-fuchsia-600',
+    icon: FileText,
+    intro: 'O texto sincronizado acompanha a narração frase a frase, como uma letra de música. Ele pode ser criado junto com a conversão ou depois, para qualquer audiobook em "Convertidos", e pode ficar dentro do próprio arquivo de áudio, em arquivos na pasta da biblioteca ou nos dois.',
+    steps: [
+      { title: 'Durante a conversão', text: 'Deixe a etiqueta "Texto Sinc" em "Sim" no card do e-book (ou ative em Ajustes › Conversão para todos). O texto é gerado logo depois do áudio.' },
+      { title: 'Depois, em Convertidos', text: 'Clique nos três pontinhos de um audiobook e escolha "Gerar texto".' },
+      { title: 'Escolha a origem', text: '"Áudio + texto do livro" pede o arquivo do livro (Epub, Pdf, Mobi ou Txt) e alinha a voz ao texto oficial. "Só o áudio" transcreve a narração com IA.' },
+      { title: 'Encontre o resultado', text: 'Conforme o destino escolhido, o texto fica dentro do arquivo de áudio, em "Meus textos" de Convertidos, ou nos dois.' },
+    ],
+    features: [
+      { icon: BookOpenText, title: 'Áudio + texto do livro', text: 'O resultado mais fiel: nomes, termos raros e pontuação vêm do livro original.' },
+      { icon: Wand2, title: 'Só o áudio', text: 'Funciona sem o arquivo do livro. A IA transcreve a narração, então nomes incomuns podem sair com outra grafia.' },
+      { icon: Music4, title: 'Dentro do arquivo', text: 'MP3 recebe letras sincronizadas (SYLT/USLT), M4B recebe a letra no campo ©lyr e FLAC/Opus no campo LYRICS.' },
+      { icon: Captions, title: 'Na pasta da biblioteca', text: 'Salva .lrc, .srt e .sync.json ao lado do áudio, e o texto aparece em "Meus textos".' },
+    ],
+    faq: [
+      { q: 'Onde escolho o destino do texto?', a: 'Em Ajustes › Conversão de Áudio › "Salvar texto sincronizado em".' },
+      { q: 'E audiobooks com um arquivo por capítulo?', a: 'Nesse caso o texto é sempre salvo na pasta da biblioteca, porque não há um arquivo único para guardá-lo.' },
+      { q: 'Posso editar o texto depois?', a: 'Sim. Em "Meus textos", use "Editar dados" no menu do texto. Na edição de um audiobook também é possível trocar ou remover o texto anexado.' },
+    ],
+  },
+  {
+    id: 'converted',
+    title: 'Convertidos',
+    subtitle: 'Ouvir, editar, organizar e excluir audiobooks e textos prontos',
+    gradient: 'from-sky-600 via-blue-700 to-indigo-800',
+    icon: BookHeadphones,
+    intro: 'Tudo o que o app gera aparece em "Convertidos": os audiobooks em "Meus Audiobooks" e os textos sincronizados salvos na biblioteca em "Meus Textos". Daqui você ouve um trecho, abre o arquivo na pasta, edita os dados, gera o texto e exclui o que não quer mais na lista.',
+    steps: [
+      { title: 'Abra Convertidos', text: 'No menu lateral, clique em "Convertidos". A tela mostra duas linhas de audiobooks e os seus textos; "Ver todos" abre a lista completa de cada um.' },
+      { title: 'Ouça um trecho', text: 'Passe o mouse na capa e clique no play.' },
+      { title: 'Use o menu de opções', text: 'Os três pontinhos ao lado do título abrem "Ouvir Trecho", "Abrir na Pasta", "Editar dados", "Gerar texto", "Mais detalhes" e "Excluir de Convertidos".' },
+      { title: 'Exclua vários de uma vez', text: 'Clique no botão vermelho de lixeira no cabeçalho, marque os audiobooks e textos e clique em "Excluir". A confirmação mostra a lista do que foi marcado; "Cancelar" sai da seleção.' },
+    ],
+    features: [
+      { icon: Play, title: 'Prévia rápida', text: 'O trecho toca o começo do audiobook sem sair do app.' },
+      { icon: Pencil, title: 'Editar dados', text: 'Título, autor, capa, sinopse, capítulos e o texto anexado. As mudanças são gravadas também nos metadados do arquivo.' },
+      { icon: ArrowDownAZ, title: 'Ordenar', text: 'Por título (A–Z ou Z–A), ano ou duração. Títulos que começam com número ou símbolo vêm antes da letra A.' },
+      { icon: Trash2, title: 'Excluir com confirmação', text: 'Toda exclusão pede confirmação e mostra as capas dos itens. Os arquivos de áudio e de texto continuam na pasta: só saem da lista.' },
+      { icon: LayoutGrid, title: 'Barra de letras', text: 'Em "Ver todos", a barra à direita leva direto a cada letra, década ou faixa de duração.' },
+    ],
+    faq: [
+      { q: 'Excluir apaga o arquivo do computador?', a: 'Não. O item sai de Convertidos, mas o áudio e os textos continuam na pasta de salvamento.' },
+      { q: 'Por que um audiobook não aparece?', a: 'Só aparecem os audiobooks convertidos com sucesso. Conversões com erro ficam no Conversor, com a opção de tentar de novo.' },
+    ],
+  },
+  {
+    id: 'formats',
+    title: 'Formatos e qualidade',
+    subtitle: 'M4B, MP3, Opus, FLAC, WAV e a qualidade de cada um',
+    gradient: 'from-emerald-600 via-teal-600 to-cyan-600',
+    icon: AudioWaveform,
+    intro: 'A voz é gerada em alta qualidade, normalizada e guardada sem perdas antes de virar o arquivo final, que é codificado uma única vez. Assim, o formato e a qualidade escolhidos definem só o tamanho do arquivo e a compatibilidade, sem perdas acumuladas.',
+    steps: [
+      { title: 'Escolha o formato padrão', text: 'Em Ajustes › Conversão de Áudio › "Formato do audiobook".' },
+      { title: 'Escolha a qualidade', text: 'No mesmo lugar, em "Qualidade": Padrão, Alta ou Máxima.' },
+      { title: 'Troque por livro, se quiser', text: 'A etiqueta de formato no card de cada e-book muda só aquele livro.' },
+    ],
+    features: [
+      { icon: FileAudio, title: 'M4B (AAC)', text: 'Um arquivo com capítulos e capa, o formato preferido dos apps de audiobook.' },
+      { icon: Music4, title: 'MP3', text: 'Toca em qualquer aparelho. Leva capítulos e capa; também pode ser gerado como um MP3 por capítulo.' },
+      { icon: Gauge, title: 'Opus', text: 'A melhor qualidade pelo menor tamanho, com capítulos e capa.' },
+      { icon: Layers, title: 'FLAC e WAV', text: 'Sem perda. FLAC mantém capítulos e capa; WAV é para edição e não guarda capítulos.' },
+    ],
+    faq: [
+      { q: 'Qual qualidade escolher?', a: 'Padrão já soa bem para voz. Alta é um equilíbrio; Máxima (MP3 320k, AAC 256k, Opus 128k) evita qualquer perda audível, com arquivos maiores.' },
+      { q: 'A qualidade vale para todos os formatos?', a: 'Vale para MP3, M4B e Opus. FLAC e WAV são sempre sem perda.' },
+    ],
+  },
+  {
+    id: 'translation',
+    title: 'Tradução e idiomas',
+    subtitle: 'Livros em outros idiomas e o idioma da interface',
+    gradient: 'from-amber-500 via-orange-500 to-rose-500',
+    icon: Languages,
+    intro: 'O app detecta o idioma de cada e-book. Quando ele é diferente do idioma da voz escolhida, você pode traduzir o livro com IA antes da narração, ou narrar no idioma original com uma voz daquele idioma.',
+    steps: [
+      { title: 'Carregue o e-book', text: 'O idioma detectado aparece na etiqueta "Idioma" do card.' },
+      { title: 'Responda à pergunta de tradução', text: 'Se o idioma não combinar com a voz, um pop-up pergunta se você quer traduzir.' },
+      { title: 'Mude quando quiser', text: 'Na edição do e-book, o interruptor "Traduzir obra com IA" liga ou desliga a tradução.' },
+    ],
+    features: [
+      { icon: Globe, title: 'Detecção automática', text: 'O idioma vem dos metadados do arquivo e do próprio texto.' },
+      { icon: Mic, title: 'Voz no idioma certo', text: 'Para narrar no idioma original, escolha uma voz daquele idioma na etiqueta "Voz".' },
+      { icon: Languages, title: 'Idioma da interface', text: 'Português, inglês, espanhol ou árabe, em Ajustes › Interface.' },
+    ],
+  },
+  {
+    id: 'folders',
+    title: 'Pastas e arquivos',
+    subtitle: 'Onde os audiobooks e textos são salvos',
+    gradient: 'from-slate-700 via-slate-800 to-zinc-900',
+    icon: FolderOpen,
+    intro: 'Tudo o que o app cria fica na pasta escolhida na configuração inicial. Os arquivos são seus: podem ser copiados para o celular, abertos em qualquer player ou movidos para outro lugar.',
+    steps: [
+      { title: 'Veja a pasta atual', text: 'Em Ajustes › Armazenamento & Pastas.' },
+      { title: 'Troque se quiser', text: 'Use "Alterar pasta". Os próximos audiobooks serão salvos no novo local.' },
+      { title: 'Abra um audiobook no Explorer', text: 'Em Convertidos, use "Abrir na Pasta" no menu do audiobook, ou "Ver na pasta" em "Mais detalhes".' },
+    ],
+    features: [
+      { icon: HardDrive, title: 'Arquivos locais', text: 'Os audiobooks e textos ficam só no seu computador; apenas o texto a narrar (e a traduzir) passa pelos serviços de voz e tradução.' },
+      { icon: FolderCog, title: 'Cache de conversão', text: 'Os capítulos prontos ficam em cache para retomar conversões. "Limpar cache" em Armazenamento libera esse espaço.' },
+      { icon: ShieldCheck, title: 'Pasta obrigatória', text: 'Na primeira abertura, o app pede uma pasta para não salvar arquivos em um lugar inesperado.' },
+    ],
+  },
+  {
+    id: 'tips',
+    title: 'Atalhos e dicas',
+    subtitle: 'Arrastar arquivos, prévias, pesquisa e modo de desenvolvedor',
+    gradient: 'from-pink-600 via-rose-600 to-red-600',
+    icon: Keyboard,
+    intro: 'Alguns atalhos para usar o app mais rápido.',
+    steps: [
+      { title: 'Arraste e solte', text: 'Arraste e-books de qualquer pasta direto para a tela do Conversor.' },
+      { title: 'Ouça um trecho', text: 'Em Convertidos, passe o mouse na capa e clique no play, ou use "Ouvir Trecho" no menu.' },
+      { title: 'Conheça outros apps', text: 'Em "Outros Apps", passe o mouse no ícone do Audiobook Player para abri-lo na web, ou use o menu para baixá-lo pelo GitHub.' },
+      { title: 'Pesquise', text: 'A Pesquisa encontra audiobooks e textos convertidos pelo título ou autor.' },
+    ],
+    features: [
+      { icon: MousePointerClick, title: 'Menus que nascem do botão', text: 'Os pop-ups crescem a partir do botão clicado; clique fora para fechar.' },
+      { icon: Clock, title: 'Ordenar', text: 'Em Convertidos, o botão de ordenar organiza por título, ano ou duração.' },
+      { icon: Search, title: 'Pesquisa', text: 'Os resultados aparecem logo abaixo da barra; os botões de cada resultado surgem ao passar o mouse. As últimas pesquisas ficam guardadas e podem ser apagadas.' },
+      { icon: Code2, title: 'Modo de desenvolvedor', text: 'Digite //dev na Pesquisa para abrir simulações de teste.' },
+    ],
+  },
+];

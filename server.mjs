@@ -1,39 +1,42 @@
-var __require = /* @__PURE__ */ ((x) => typeof require !== "undefined" ? require : typeof Proxy !== "undefined" ? new Proxy(x, {
-  get: (a, b) => (typeof require !== "undefined" ? require : a)[b]
-}) : x)(function(x) {
-  if (typeof require !== "undefined") return require.apply(this, arguments);
-  throw Error('Dynamic require of "' + x + '" is not supported');
-});
-
 // server.ts
 import express from "express";
 import path from "path";
 import multer from "multer";
-import { spawn } from "child_process";
+import { spawn, execFile } from "child_process";
 import fs from "fs";
 import net from "net";
 import https from "https";
 import http from "http";
-function getAvailablePort(startPort) {
+var HOST = process.env.HOST || "127.0.0.1";
+var AUDIO_EXTENSIONS = /* @__PURE__ */ new Set([".mp3", ".m4a", ".m4b", ".aac", ".ogg", ".opus", ".wav", ".flac"]);
+function isPortFree(port, host) {
   return new Promise((resolve, reject) => {
     const server = net.createServer();
-    server.listen(startPort, "0.0.0.0", () => {
-      const port = server.address().port;
-      server.close(() => resolve(port));
+    server.once("error", (err) => {
+      if (err.code === "EADDRINUSE" || err.code === "EACCES") resolve(false);
+      else if (err.code === "EADDRNOTAVAIL" || err.code === "EAFNOSUPPORT") resolve(true);
+      else reject(err);
     });
-    server.on("error", (err) => {
-      if (err.code === "EADDRINUSE") {
-        resolve(getAvailablePort(startPort + 1));
-      } else {
-        reject(err);
-      }
-    });
+    server.listen(port, host, () => server.close(() => resolve(true)));
   });
+}
+async function getAvailablePort(startPort, extraHosts = []) {
+  for (let port = startPort; port < startPort + 100; port++) {
+    let free = true;
+    for (const host of ["::", "0.0.0.0", HOST, ...extraHosts]) {
+      if (!await isPortFree(port, host)) {
+        free = false;
+        break;
+      }
+    }
+    if (free) return port;
+  }
+  throw new Error(`Nenhuma porta livre a partir de ${startPort}`);
 }
 var upload = multer({
   dest: path.join(process.cwd(), "uploads/"),
-  limits: { fileSize: 50 * 1024 * 1024 }
-  // 50MB limit
+  limits: { fileSize: 1024 * 1024 * 1024 }
+  // 1GB limit para suportar audiolivros completos
 });
 if (!fs.existsSync("uploads")) {
   fs.mkdirSync("uploads");
@@ -41,7 +44,7 @@ if (!fs.existsSync("uploads")) {
 async function startServer() {
   const app = express();
   const PORT = await getAvailablePort(3e3);
-  const hmrPort = await getAvailablePort(24678);
+  const hmrPort = await getAvailablePort(24678, ["::1"]);
   const uploadsDir = path.join(process.cwd(), "uploads");
   if (!fs.existsSync(uploadsDir)) {
     fs.mkdirSync(uploadsDir, { recursive: true });
@@ -261,27 +264,49 @@ async function startServer() {
   });
   let currentPythonProcess = null;
   app.post("/api/cancel", (req, res) => {
-    if (currentPythonProcess) {
-      currentPythonProcess.kill("SIGTERM");
+    let killed = false;
+    if (currentPythonProcess && currentPythonProcess.pid) {
+      const pid = currentPythonProcess.pid;
+      killed = true;
+      if (process.platform === "win32") {
+        import("child_process").then(({ exec }) => {
+          exec(`taskkill /pid ${pid} /T /F`, (err) => {
+            if (err) console.error("taskkill PID error:", err);
+          });
+          exec("taskkill /IM ffmpeg.exe /F", () => {
+          });
+        });
+      } else {
+        try {
+          process.kill(-pid, "SIGKILL");
+        } catch (e) {
+          currentPythonProcess.kill("SIGKILL");
+        }
+      }
       currentPythonProcess = null;
-      res.json({ success: true, message: "Process cancelled" });
     } else {
-      res.json({ success: false, message: "No process running" });
+      if (process.platform === "win32") {
+        import("child_process").then(({ exec }) => {
+          exec("taskkill /IM ffmpeg.exe /F", () => {
+          });
+        });
+      }
     }
+    broadcastProgress({ type: "log", message: "Processo cancelado e recursos liberados imediatamente." });
+    res.json({ success: true, message: killed ? "Process tree and FFmpeg killed" : "Cleaned up" });
   });
   app.use("/samples", express.static(path.join(process.cwd(), "public", "samples")));
   app.post("/api/snippet", express.json(), (req, res) => {
     const filePath = req.body.path;
-    if (!filePath || !fs.existsSync(filePath)) return res.status(404).json({ error: "File not found" });
+    if (typeof filePath !== "string" || !fs.existsSync(filePath)) return res.status(404).json({ error: "File not found" });
+    if (!AUDIO_EXTENSIONS.has(path.extname(filePath).toLowerCase())) return res.status(400).json({ error: "Not an audio file" });
     const tempName = "snippet_" + Date.now() + ".mp3";
     const samplesDir2 = path.join(process.cwd(), "public", "samples");
     const outputPath = path.join(samplesDir2, tempName);
     if (!fs.existsSync(samplesDir2)) fs.mkdirSync(samplesDir2, { recursive: true });
-    import("child_process").then(({ exec }) => {
-      exec(`ffmpeg -t 60 -i "${filePath}" -c copy "${outputPath}"`, (error) => {
-        if (error) fs.copyFileSync(filePath, outputPath);
-        res.json({ url: "/samples/" + tempName });
-      });
+    execFile("ffmpeg", ["-y", "-t", "60", "-i", filePath, "-c", "copy", outputPath], (error) => {
+      if (error) fs.copyFileSync(filePath, outputPath);
+      res.json({ url: "/samples/" + tempName });
     });
   });
   app.post("/api/delete-snippet", express.json(), (req, res) => {
@@ -311,34 +336,95 @@ async function startServer() {
     }
     res.json({ success: true });
   });
+  app.post("/api/clean-cache", express.json(), (req, res) => {
+    try {
+      let deletedCount = 0;
+      const samplesDir2 = path.join(process.cwd(), "public", "samples");
+      if (fs.existsSync(samplesDir2)) {
+        try {
+          const files = fs.readdirSync(samplesDir2);
+          for (const file of files) {
+            if (file.startsWith("snippet_") || file.startsWith("preview_") || file.startsWith("temp_")) {
+              try {
+                fs.unlinkSync(path.join(samplesDir2, file));
+                deletedCount++;
+              } catch (e) {
+              }
+            }
+          }
+        } catch (e) {
+        }
+      }
+      const uploadsDir2 = path.join(process.cwd(), "uploads");
+      if (fs.existsSync(uploadsDir2)) {
+        try {
+          const files = fs.readdirSync(uploadsDir2);
+          for (const file of files) {
+            try {
+              const p = path.join(uploadsDir2, file);
+              if (fs.statSync(p).isFile()) {
+                fs.unlinkSync(p);
+                deletedCount++;
+              }
+            } catch (e) {
+            }
+          }
+        } catch (e) {
+        }
+      }
+      const possibleCacheDirs = [
+        path.join(process.cwd(), ".cache_audiobooks"),
+        path.join(process.cwd(), "meus audiobooks", ".cache_audiobooks")
+      ];
+      if (req.body && req.body.outputFolder) {
+        possibleCacheDirs.push(path.join(req.body.outputFolder, ".cache_audiobooks"));
+      }
+      for (const cDir of possibleCacheDirs) {
+        if (fs.existsSync(cDir)) {
+          try {
+            fs.rmSync(cDir, { recursive: true, force: true });
+            deletedCount++;
+          } catch (e) {
+          }
+        }
+      }
+      res.json({ success: true, message: "Cache limpo com sucesso!", deleted: deletedCount });
+    } catch (error) {
+      res.status(500).json({ success: false, error: String(error) });
+    }
+  });
   app.post("/api/open-folder", express.json(), (req, res) => {
     try {
       let folderPath = req.body.path || path.join(process.cwd(), "meus audiobooks");
-      folderPath = path.normalize(folderPath);
+      folderPath = path.normalize(String(folderPath));
+      if (folderPath.includes('"')) return res.status(400).json({ success: false });
       const isFile = req.body.isFile;
-      let command = "";
+      let program;
+      let args;
       if (process.platform === "win32") {
-        command = isFile ? `explorer.exe /select,"${folderPath}"` : `explorer.exe "${folderPath}"`;
+        program = "explorer.exe";
+        args = isFile ? [`/select,"${folderPath}"`] : [`"${folderPath}"`];
       } else if (process.platform === "darwin") {
-        command = isFile ? `open -R "${folderPath}"` : `open "${folderPath}"`;
+        program = "open";
+        args = isFile ? ["-R", folderPath] : [folderPath];
       } else {
-        command = `xdg-open "${isFile ? __require("path").dirname(folderPath) : folderPath}"`;
+        program = "xdg-open";
+        args = [isFile ? path.dirname(folderPath) : folderPath];
       }
-      import("child_process").then(({ exec }) => {
-        exec(command, (error) => {
-          if (error) {
-            console.error("Failed to open folder:", error);
-            res.status(500).json({ success: false });
-          } else {
-            res.json({ success: true });
-          }
-        });
+      const child = spawn(program, args, { detached: true, stdio: "ignore", windowsVerbatimArguments: process.platform === "win32" });
+      child.once("spawn", () => {
+        child.unref();
+        res.json({ success: true });
+      });
+      child.once("error", (error) => {
+        console.error("Failed to open folder:", error);
+        if (!res.headersSent) res.status(500).json({ success: false });
       });
     } catch (error) {
       res.status(500).json({ success: false });
     }
   });
-  app.post("/api/select-folder", (req, res) => {
+  app.all("/api/select-folder", (req, res) => {
     if (process.platform === "win32") {
       const psScript = `
         Add-Type -AssemblyName System.windows.forms;
@@ -349,7 +435,7 @@ async function startServer() {
             $f.SelectedPath
         }
       `;
-      const child = spawn("powershell.exe", ["-NoProfile", "-Command", psScript]);
+      const child = spawn("powershell.exe", ["-NoProfile", "-STA", "-Command", psScript]);
       let output = "";
       child.stdout.on("data", (data) => output += data.toString());
       child.on("close", () => {
@@ -364,31 +450,64 @@ async function startServer() {
       res.status(501).json({ error: "Folder selection is only supported on Windows" });
     }
   });
-  app.post("/api/process", upload.array("files"), (req, res) => {
+  const handleProcessRequest = (req, res) => {
     try {
-      const filesInfo = JSON.parse(req.body.filesInfo);
-      const config = JSON.parse(req.body.config);
+      let filesInfo = [];
+      if (req.body.filesInfo) {
+        filesInfo = typeof req.body.filesInfo === "string" ? JSON.parse(req.body.filesInfo) : req.body.filesInfo;
+      } else if (req.body.metadata) {
+        filesInfo = typeof req.body.metadata === "string" ? JSON.parse(req.body.metadata) : req.body.metadata;
+      }
+      let config = {};
+      if (req.body.config) {
+        config = typeof req.body.config === "string" ? JSON.parse(req.body.config) : req.body.config;
+      } else {
+        config = {
+          voice: req.body.voice,
+          outputFolder: req.body.outputFolder,
+          mode_folder: req.body.fileType === "multiple" || req.body.mode_folder === true || req.body.mode_folder === "true",
+          file_format: req.body.fileType || "single",
+          target_lang: req.body.target_lang || "pt"
+        };
+      }
+      const fileFormat = config.file_format || config.fileType || req.body.fileType || (config.mode_folder ? "multiple" : "single");
+      const isMultiple = fileFormat === "multiple" || config.mode_folder === true || config.mode_folder === "true";
+      const generateSyncText = config.generate_sync_text !== void 0 ? config.generate_sync_text : req.body.generate_sync_text !== void 0 ? req.body.generate_sync_text === true || req.body.generate_sync_text === "true" : true;
+      const syncTextDestination = ["metadata", "library", "both"].includes(config.sync_text_destination) ? config.sync_text_destination : "both";
       const files = req.files.map((file, index) => {
-        const info = filesInfo[index];
-        const originalExt = path.extname(info.filename);
+        const info = filesInfo[index] || {};
+        const originalExt = path.extname(info.filename || file.originalname);
         const newPath = file.path + originalExt;
         fs.renameSync(file.path, newPath);
         return {
-          id: info.id,
+          id: info.id || `file_${index}`,
           path: newPath,
-          title: info.title,
-          author: info.author,
-          translate: info.translate,
-          cover: info.cover,
-          config: info.config
+          title: info.title || "Desconhecido",
+          author: info.author || "Desconhecido",
+          genre: info.genre || "",
+          subgenre: info.subgenre || "",
+          narrator: info.narrator || "",
+          language: info.language || "",
+          translate: info.requiresTranslation || info.translate || false,
+          cover: info.cover || null,
+          chapters: info.chapters || [],
+          fileType: info.fileType || fileFormat,
+          file_format: info.fileType || fileFormat,
+          pronunciation_map: info.pronunciationMap || info.pronunciation_map || [],
+          generate_sync_text: info.generate_sync_text !== void 0 ? info.generate_sync_text : generateSyncText,
+          sync_text_destination: syncTextDestination,
+          config: { ...info.config || config, file_format: info.fileType || fileFormat, pronunciation_map: info.pronunciationMap || info.pronunciation_map || [], generate_sync_text: info.generate_sync_text !== void 0 ? info.generate_sync_text : generateSyncText, sync_text_destination: syncTextDestination }
         };
       });
       const pythonConfig = {
         files,
-        voice: config.voice,
+        voice: config.voice || "pt-BR-AntonioNeural",
         outputFolder: config.outputFolder,
         target_lang: config.target_lang || "pt",
-        mode_folder: config.mode_folder !== void 0 ? config.mode_folder : true
+        mode_folder: isMultiple,
+        file_format: fileFormat,
+        generate_sync_text: generateSyncText,
+        sync_text_destination: syncTextDestination
       };
       const configPath = path.join(process.cwd(), `config_${Date.now()}.json`);
       fs.writeFileSync(configPath, JSON.stringify(pythonConfig));
@@ -443,6 +562,135 @@ async function startServer() {
       console.error("Error processing request:", error);
       res.status(500).json({ error: "Internal server error" });
     }
+  };
+  app.post("/api/process", upload.array("files"), handleProcessRequest);
+  app.post("/api/convert", upload.array("files"), handleProcessRequest);
+  const syncUpload = upload.fields([
+    { name: "ebook", maxCount: 1 },
+    { name: "ebookFile", maxCount: 1 },
+    { name: "audio", maxCount: 1 },
+    { name: "audioFile", maxCount: 1 }
+  ]);
+  app.post("/api/sync-text", syncUpload, async (req, res) => {
+    const files = req.files;
+    const ebookFile = files?.ebook?.[0];
+    const tempFilesToClean = [];
+    try {
+      const audioPath = typeof req.body.audioPath === "string" ? req.body.audioPath : "";
+      if (!audioPath || !fs.existsSync(audioPath)) {
+        return res.status(400).json({ error: "O arquivo de \xE1udio deste audiobook n\xE3o foi encontrado." });
+      }
+      if (!AUDIO_EXTENSIONS.has(path.extname(audioPath).toLowerCase())) {
+        return res.status(400).json({ error: "O arquivo deste audiobook n\xE3o \xE9 um \xE1udio." });
+      }
+      let ebookPath = "";
+      if (ebookFile) {
+        ebookPath = ebookFile.path + path.extname(ebookFile.originalname);
+        fs.renameSync(ebookFile.path, ebookPath);
+        tempFilesToClean.push(ebookPath);
+      }
+      const destination = ["metadata", "library", "both"].includes(req.body.destination) ? req.body.destination : "both";
+      const outputFolder = req.body.outputFolder || path.join(process.cwd(), "meus audiobooks");
+      const args = [
+        "-u",
+        "sync_text_tools.py",
+        "--audio",
+        audioPath,
+        "--out-dir",
+        outputFolder,
+        "--title",
+        String(req.body.title || path.basename(audioPath, path.extname(audioPath))),
+        "--author",
+        String(req.body.author || ""),
+        "--destination",
+        destination
+      ];
+      if (ebookPath) args.push("--ebook", ebookPath);
+      const pythonCmd = process.platform === "win32" ? "python" : "python3";
+      const child = spawn(pythonCmd, args, { stdio: ["ignore", "pipe", "pipe"], env: { ...process.env, PYTHONIOENCODING: "utf-8" } });
+      let stdout = "";
+      let stderr = "";
+      child.stdout.on("data", (d) => {
+        stdout += d.toString();
+      });
+      child.stderr.on("data", (d) => {
+        stderr += d.toString();
+      });
+      child.on("error", (err) => {
+        if (!res.headersSent) res.status(500).json({ error: `N\xE3o foi poss\xEDvel iniciar o Python: ${err.message}` });
+      });
+      child.on("close", () => {
+        for (const p of tempFilesToClean) {
+          try {
+            if (fs.existsSync(p)) fs.unlinkSync(p);
+          } catch (e) {
+          }
+        }
+        if (res.headersSent) return;
+        const resultLine = stdout.trim().split(/\r?\n/).reverse().find((l) => l.includes('"type": "result"'));
+        let result = null;
+        try {
+          result = resultLine ? JSON.parse(resultLine) : null;
+        } catch (e) {
+        }
+        if (result?.success) {
+          res.json(result);
+        } else {
+          console.error("Sync text error:", stderr || stdout);
+          res.status(500).json({ error: result?.error || "Falha ao gerar o texto sincronizado.", details: stderr.slice(-2e3) });
+        }
+      });
+    } catch (e) {
+      for (const p of tempFilesToClean) {
+        try {
+          if (fs.existsSync(p)) fs.unlinkSync(p);
+        } catch (err) {
+        }
+      }
+      console.error("Error in /api/sync-text:", e);
+      if (!res.headersSent) res.status(500).json({ error: e.message || "Erro interno do servidor." });
+    }
+  });
+  app.post("/api/save-audiobook-metadata", express.json({ limit: "50mb" }), (req, res) => {
+    try {
+      const data = req.body;
+      const filePath = data.filePath;
+      if (!filePath || !fs.existsSync(filePath)) {
+        return res.json({
+          success: true,
+          fileUpdated: false,
+          message: "Metadados salvos na biblioteca."
+        });
+      }
+      const tempJson = path.join(process.cwd(), `meta_inject_${Date.now()}.json`);
+      fs.writeFileSync(tempJson, JSON.stringify(data), "utf-8");
+      const pythonCmd = process.platform === "win32" ? "python" : "python3";
+      const child = spawn(pythonCmd, ["-u", "inject_metadata.py", tempJson]);
+      let stdout = "";
+      let stderr = "";
+      child.stdout.on("data", (d) => stdout += d.toString());
+      child.stderr.on("data", (d) => stderr += d.toString());
+      child.on("close", (code) => {
+        try {
+          if (fs.existsSync(tempJson)) fs.unlinkSync(tempJson);
+        } catch {
+        }
+        try {
+          const parsed = JSON.parse(stdout.trim());
+          res.json(parsed);
+        } catch {
+          if (code === 0) {
+            res.json({ success: true, fileUpdated: true, message: "Metadados injetados com sucesso." });
+          } else {
+            console.error("inject_metadata error:", stderr);
+            res.status(500).json({ success: false, error: stderr || "Erro ao injetar metadados." });
+          }
+        }
+      });
+    } catch (err) {
+      console.error("Error in /api/save-audiobook-metadata:", err);
+      res.status(500).json({ success: false, error: err.message || "Erro interno." });
+    }
   });
   app.all("/api/*", (req, res) => {
     console.log(`API Route not found: ${req.method} ${req.url}`);
@@ -456,10 +704,7 @@ async function startServer() {
       server: { middlewareMode: true, hmr: process.env.DISABLE_HMR !== "true" ? { port: hmrPort } : false },
       appType: "spa",
       configFile: false,
-      plugins: [react(), tailwindcss()],
-      define: {
-        "process.env.GEMINI_API_KEY": JSON.stringify(process.env.GEMINI_API_KEY)
-      }
+      plugins: [react(), tailwindcss()]
     });
     app.use(vite.middlewares);
   } else {
@@ -473,7 +718,7 @@ async function startServer() {
     console.error("Unhandled error:", err);
     res.status(500).json({ error: err.message || "Internal server error" });
   });
-  app.listen(PORT, "0.0.0.0", async () => {
+  app.listen(PORT, HOST, async () => {
     console.log(`Server running on http://localhost:${PORT}`);
     const url = `http://localhost:${PORT}`;
     if (!process.env.ELECTRON_MODE) {

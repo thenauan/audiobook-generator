@@ -1,50 +1,201 @@
+/* ==========================================================================
+   SISTEMA DE DESIGN DO ESQUELETO
+   Cores e temas (claro/escuro), cor de destaque, vidro (cards e pop-ups), áreas seguras do
+   celular, cabeçalho com desfoque progressivo, medidas do iOS, pop-ups, folhas, bordas de
+   rolagem e transições. Ajuste as cores em @theme e :root.
+   ========================================================================== */
 @import "tailwindcss";
 
-@theme {
-  --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+@custom-variant dark (&:where(.dark, .dark *));
+/* Celular deitado (pouca altura): telas reorganizadas lado a lado */
+@custom-variant land (@media (max-width: 1023px) and (orientation: landscape) and (max-height: 600px));
 
-  --color-winblue: #0086F0;
+@theme {
+  /* Interface de celular até 1023px (celulares em qualquer orientação e tablets em pé);
+     menu lateral a partir de 1024px (tablets deitados e computador) */
+  --breakpoint-md: 64rem;
+  --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+
+  --color-winblue: var(--winblue, #0086F0);
   --color-success: #438E44;
   --color-error: #B83232;
   --color-warning: #FFB900;
+
+  --text-xs: calc(0.75rem * var(--font-scale, 1));
+  --text-sm: calc(0.875rem * var(--font-scale, 1));
+  --text-base: calc(1rem * var(--font-scale, 1));
+  --text-lg: calc(1.125rem * var(--font-scale, 1));
+  --text-xl: calc(1.25rem * var(--font-scale, 1));
+  --text-2xl: calc(1.5rem * var(--font-scale, 1));
+  --text-3xl: calc(1.875rem * var(--font-scale, 1));
+  --text-4xl: calc(2.25rem * var(--font-scale, 1));
+  --text-5xl: calc(3rem * var(--font-scale, 1));
+  --text-6xl: calc(3.75rem * var(--font-scale, 1));
+  --text-7xl: calc(4.5rem * var(--font-scale, 1));
+  --text-8xl: calc(6rem * var(--font-scale, 1));
 }
+
+:root {
+  /* Altura total da tela. No app instalado (tela de início), usa a maior altura possível: o iPhone pode
+     informar uma área visível menor que a tela e deixar uma faixa vazia embaixo */
+  --screen-h: 100dvh;
+  /* Margem lateral padrão do iOS: 16 pt em telas estreitas (ex.: iPhone SE) e 20 pt a partir de 390 pt
+     (iPhone 12 em diante); no celular deitado, a área segura do recorte manda quando for maior */
+  --page-margin: 16px;
+  /* Áreas seguras laterais (recortes da tela). Em celulares deitados com proporção de aparelhos com
+     notch/Dynamic Island, uma margem mínima do lado do recorte é garantida mesmo quando o navegador
+     não informa a área segura (data-notch, definido em main.tsx) */
+  --safe-left: env(safe-area-inset-left, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+  /* Mobile: barra de abas e miniplayer centralizados com largura máxima (tablets não esticam);
+     a margem lateral é a mesma do conteúdo e respeita os recortes da tela (celular deitado) */
+  --mobile-bar-inset: max(var(--page-margin), calc((100vw - 560px) / 2), calc(12px + var(--safe-left)), calc(12px + var(--safe-right)));
+  /* Distância da barra até a base: fica logo acima do indicador de início, como no iOS 26 */
+  --mobile-bar-bottom: max(12px, calc(env(safe-area-inset-bottom) - 12px));
+  /* Área segura do topo. No Safari do iPhone (fora do app instalado), o sistema desfoca a faixa da barra
+     de status por cima da página sem informá-la: main.tsx define --ios-status-bar nesse caso */
+  --safe-top: max(env(safe-area-inset-top, 0px), var(--ios-status-bar, 0px));
+  /* Topo do cabeçalho: abaixo da barra de status (e do desfoque do sistema) com uma folga */
+  --app-header-top: max(20px, calc(var(--safe-top) + 12px));
+  --font-scale: 0.85;
+}
+
+/* Barra e miniplayer lado a lado (celular deitado, iPad mini em pé, dobráveis abertos) */
+@media (min-width: 640px) {
+  :root {
+    --mobile-bar-inset: max(var(--page-margin), calc((100vw - 960px) / 2), calc(12px + var(--safe-left)), calc(12px + var(--safe-right)));
+  }
+}
+
+html[data-font-size="small"],
+html[data-font-size="standard"] {
+  --font-scale: 0.85;
+}
+
+html[data-font-size="large"] {
+  --font-scale: 1.02;
+}
+
+/* Micro badges font scaling */
+html[data-font-size="small"] .text-\[8px\], html[data-font-size="standard"] .text-\[8px\] { font-size: calc(8px * var(--font-scale, 0.85)); }
+html[data-font-size="small"] .text-\[9px\], html[data-font-size="standard"] .text-\[9px\] { font-size: calc(9px * var(--font-scale, 0.85)); }
+html[data-font-size="small"] .text-\[10px\], html[data-font-size="standard"] .text-\[10px\] { font-size: calc(10px * var(--font-scale, 0.85)); }
+html[data-font-size="small"] .text-\[11px\], html[data-font-size="standard"] .text-\[11px\] { font-size: calc(11px * var(--font-scale, 0.85)); }
+
+html[data-font-size="large"] .text-\[8px\] { font-size: calc(8px * var(--font-scale, 1.02)); }
+html[data-font-size="large"] .text-\[9px\] { font-size: calc(9px * var(--font-scale, 1.02)); }
+html[data-font-size="large"] .text-\[10px\] { font-size: calc(10px * var(--font-scale, 1.02)); }
+html[data-font-size="large"] .text-\[11px\] { font-size: calc(11px * var(--font-scale, 1.02)); }
 
 @layer base {
   :root {
+    --app-winblue: #0086F0;
+    --app-winblue-rgb: 0, 134, 240;
+    --winblue: #0086F0;
+    --winblue-rgb: 0, 134, 240;
     --bg-mica: #F0F2F5;
     --bg-card: #FFFFFF;
+    --bg-sheet: #F2F2F7;
+    --bg-card-50: rgba(255, 255, 255, 0.28);
+    --bg-card-60: rgba(255, 255, 255, 0.35);
+    --bg-card-75: rgba(255, 255, 255, 0.45);
+    --bg-card-80: rgba(255, 255, 255, 0.52);
+    --bg-card-85: rgba(255, 255, 255, 0.58);
+    --bg-card-90: rgba(255, 255, 255, 0.62);
+    --bg-card-95: rgba(255, 255, 255, 0.68);
     --card-hover: #F8F9FA;
     --text-main: #1A1A1A;
     --text-muted: #4B5563;
-    --button-secondary-bg: rgba(0, 0, 0, 0.1);
-    --button-secondary-hover: rgba(0, 0, 0, 0.15);
-    --dropzone-border: rgba(0, 0, 0, 0.2);
+    --button-secondary-bg: rgba(0, 0, 0, 0.06);
+    --button-secondary-hover: rgba(0, 0, 0, 0.10);
+    --dropzone-border: rgba(0, 0, 0, 0.15);
     --toggle-bg-off: #9CA3AF;
-    --status-btn-bg: rgba(0, 0, 0, 0.1);
+    --status-btn-bg: rgba(0, 0, 0, 0.06);
     --status-btn-text: #1A1A1A;
     --button-light-bg: #E5E7EB;
     --button-light-text: #1F2937;
+    --hover-highlight-bg: rgba(148, 163, 184, 0.22);
+    --hover-highlight-border: rgba(100, 116, 139, 0.38);
+    --hover-highlight-shadow: 0 0 14px rgba(100, 116, 139, 0.30);
+    --hover-highlight-text: #0f172a;
+    --hover-highlight-text-muted: #334155;
+    --hover-highlight-glow: rgba(100, 116, 139, 0.40);
+    --slider-fill: #8E95A2;
+    --slider-fill-hover: #1A1A1A;
+    --slider-track: rgba(0, 0, 0, 0.14);
+    --slider-thumb-glow: rgba(100, 116, 139, 0.25);
+    --slider-thumb-glow-soft: rgba(100, 116, 139, 0.12);
   }
 
   .dark {
     --bg-mica: #161616;
     --bg-card: #242424;
+    --bg-sheet: #1C1C1E;
+    --bg-card-50: rgba(30, 30, 34, 0.25);
+    --bg-card-60: rgba(30, 30, 34, 0.32);
+    --bg-card-75: rgba(30, 30, 34, 0.42);
+    --bg-card-80: rgba(30, 30, 34, 0.50);
+    --bg-card-85: rgba(30, 30, 34, 0.56);
+    --bg-card-90: rgba(30, 30, 34, 0.62);
+    --bg-card-95: rgba(30, 30, 34, 0.68);
     --card-hover: #2A2A2A;
     --text-main: #F2F2F2;
     --text-muted: #9CA3AF;
-    --button-secondary-bg: rgba(255, 255, 255, 0.08);
-    --button-secondary-hover: rgba(255, 255, 255, 0.12);
-    --dropzone-border: rgba(255, 255, 255, 0.15);
+    --button-secondary-bg: rgba(255, 255, 255, 0.06);
+    --button-secondary-hover: rgba(255, 255, 255, 0.10);
+    --dropzone-border: rgba(255, 255, 255, 0.12);
     --toggle-bg-off: #4B5563;
-    --status-btn-bg: rgba(255, 255, 255, 0.1);
+    --status-btn-bg: rgba(255, 255, 255, 0.08);
     --status-btn-text: #F2F2F2;
+    --hover-highlight-bg: rgba(255, 255, 255, 0.15);
+    --hover-highlight-border: rgba(255, 255, 255, 0.25);
+    --hover-highlight-shadow: 0 0 12px rgba(255, 255, 255, 0.20);
+    --hover-highlight-text: #ffffff;
+    --hover-highlight-text-muted: rgba(255, 255, 255, 0.80);
+    --hover-highlight-glow: rgba(255, 255, 255, 0.35);
+    --slider-fill: #9CA3AF;
+    --slider-fill-hover: #FFFFFF;
+    --slider-track: rgba(255, 255, 255, 0.16);
+    --slider-thumb-glow: rgba(255, 255, 255, 0.25);
+    --slider-thumb-glow-soft: rgba(255, 255, 255, 0.12);
   }
 }
 
 @layer utilities {
+  .backdrop-blur-3xl {
+    -webkit-backdrop-filter: blur(22px) saturate(165%);
+    backdrop-filter: blur(22px) saturate(165%);
+  }
+  .backdrop-blur-2xl {
+    -webkit-backdrop-filter: blur(16px) saturate(160%);
+    backdrop-filter: blur(16px) saturate(160%);
+  }
+  .backdrop-blur-xl {
+    -webkit-backdrop-filter: blur(12px) saturate(150%);
+    backdrop-filter: blur(12px) saturate(150%);
+  }
+  .backdrop-blur-md {
+    -webkit-backdrop-filter: blur(8px) saturate(140%);
+    backdrop-filter: blur(8px) saturate(140%);
+  }
+
+  /* Impede que .transition-all do CSS entre em conflito a cada frame com transform, width, height e filter do Framer Motion */
+  .transition-all {
+    transition-property: background-color, border-color, color, fill, stroke, opacity, box-shadow, scale, translate, rotate;
+    transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+    transition-duration: 150ms;
+  }
+
   .bg-mica { background-color: var(--bg-mica); }
   .bg-card { background-color: var(--bg-card); }
+  .bg-card\/50 { background-color: var(--bg-card-50); }
+  .bg-card\/60 { background-color: var(--bg-card-60); }
+  .bg-card\/75 { background-color: var(--bg-card-75); }
+  .bg-card\/80 { background-color: var(--bg-card-80); }
+  .bg-card\/85 { background-color: var(--bg-card-85); }
+  .bg-card\/90 { background-color: var(--bg-card-90); }
+  .bg-card\/95 { background-color: var(--bg-card-95); }
   .text-main { color: var(--text-main); }
   .text-winblue { color: var(--color-winblue); }
   .bg-winblue { background-color: var(--color-winblue); }
@@ -57,11 +208,46 @@
   .font-fluent { font-family: var(--font-sans); }
 }
 
+/* Pop-ups nunca devem ser afetados pela cor de destaque da capa nas páginas dos audiobooks */
+[data-popup-content="true"] {
+  --winblue: var(--app-winblue, #0086F0);
+  --winblue-rgb: var(--app-winblue-rgb, 0, 134, 240);
+  --color-winblue: var(--app-winblue, #0086F0);
+}
+
+/* Evita múltiplas camadas redundantes de backdrop-filter dentro de pop-ups e miniplayer que já possuem fundo desfocado */
+[data-popup-content="true"] button.backdrop-blur-3xl,
+[data-popup-content="true"] label.backdrop-blur-3xl,
+#mini-player button.backdrop-blur-3xl,
+#mini-player label.backdrop-blur-3xl {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+*,
+*::before,
+*::after,
+body,
+button,
+input,
+textarea,
+select,
+pre,
+code,
+kbd,
+samp,
+.font-mono {
+  font-family: var(--font-sans) !important;
+}
+
 body {
-  font-family: var(--font-sans);
+  font-size: calc(1rem * var(--font-scale, 1));
   background-color: var(--bg-mica);
   color: var(--text-main);
   transition: background-color 0.3s ease, color 0.3s ease;
+  margin: 0;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 /* Custom Scrollbar */
@@ -86,7 +272,914 @@ body {
   background: rgba(255, 255, 255, 0.3);
 }
 
+.custom-scrollbar {
+  overscroll-behavior-y: contain;
+}
+
 .custom-scrollbar::-webkit-scrollbar {
   width: 4px;
 }
 
+/* Apple Style Range Slider with hover-only micro thumb */
+input[type="range"].apple-slider {
+  --slider-current-fill: var(--slider-fill);
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+  cursor: pointer;
+  height: 4px;
+  border-radius: 9999px;
+  outline: none;
+  transition: filter 0.18s ease;
+}
+
+.group:hover input[type="range"].apple-slider,
+input[type="range"].apple-slider:hover,
+input[type="range"].apple-slider:active {
+  --slider-current-fill: var(--slider-fill-hover);
+}
+
+input[type="range"].apple-slider::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 9999px;
+  background: transparent;
+}
+
+input[type="range"].apple-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background-color: var(--slider-fill-hover);
+  margin-top: -3px;
+  opacity: 0;
+  transition: opacity 0.18s ease, transform 0.18s ease, box-shadow 0.18s ease, background-color 0.18s ease;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+}
+
+.group:hover input[type="range"].apple-slider::-webkit-slider-thumb,
+input[type="range"].apple-slider:hover::-webkit-slider-thumb {
+  opacity: 1;
+  transform: scale(1.1);
+}
+
+input[type="range"].apple-slider::-webkit-slider-thumb:hover,
+input[type="range"].apple-slider::-webkit-slider-thumb:active,
+input[type="range"].apple-slider:active::-webkit-slider-thumb {
+  opacity: 1;
+  transform: scale(1.25);
+  box-shadow: 0 0 8px 1px var(--slider-thumb-glow), 0 0 12px 2px var(--slider-thumb-glow-soft);
+}
+
+input[type="range"].apple-slider::-moz-range-track {
+  height: 4px;
+  border-radius: 9999px;
+  background: transparent;
+}
+
+input[type="range"].apple-slider::-moz-range-thumb {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background-color: var(--slider-fill-hover);
+  border: none;
+  opacity: 0;
+  transition: opacity 0.18s ease, transform 0.18s ease, box-shadow 0.18s ease, background-color 0.18s ease;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+}
+
+.group:hover input[type="range"].apple-slider::-moz-range-thumb,
+input[type="range"].apple-slider:hover::-moz-range-thumb {
+  opacity: 1;
+  transform: scale(1.1);
+}
+
+input[type="range"].apple-slider::-moz-range-thumb:hover,
+input[type="range"].apple-slider::-moz-range-thumb:active,
+input[type="range"].apple-slider:active::-moz-range-thumb {
+  opacity: 1;
+  transform: scale(1.25);
+  box-shadow: 0 0 8px 1px var(--slider-thumb-glow), 0 0 12px 2px var(--slider-thumb-glow-soft);
+}
+
+/* Animated Equalizer Wave in vibrant blue */
+@keyframes audioWave1 {
+  0%, 100% { height: 4px; }
+  50% { height: 14px; }
+}
+@keyframes audioWave2 {
+  0%, 100% { height: 14px; }
+  50% { height: 5px; }
+}
+@keyframes audioWave3 {
+  0%, 100% { height: 6px; }
+  50% { height: 13px; }
+}
+@keyframes audioWave4 {
+  0%, 100% { height: 12px; }
+  50% { height: 4px; }
+}
+
+.audio-bar-1 { animation: audioWave1 0.75s ease-in-out infinite; }
+.audio-bar-2 { animation: audioWave2 0.55s ease-in-out infinite; }
+.audio-bar-3 { animation: audioWave3 0.85s ease-in-out infinite; }
+.audio-bar-4 { animation: audioWave4 0.65s ease-in-out infinite; }
+
+/* ==========================================================================
+   DESTAQUE HOVER: Branco no modo escuro, Cinza Brilhante no modo claro
+   Evita que elementos e textos fiquem brancos ilegíveis sobre fundos claros
+   ========================================================================== */
+
+html:not(.dark) [class*="hover:bg-white"]:hover {
+  background-color: var(--hover-highlight-bg) !important;
+}
+
+html:not(.dark) [class*="hover:border-white"]:hover {
+  border-color: var(--hover-highlight-border) !important;
+}
+
+html:not(.dark) [class*="hover:shadow-"][class*="255,255,255"]:hover {
+  box-shadow: var(--hover-highlight-shadow) !important;
+}
+
+html:not(.dark) .group:hover [class*="group-hover:shadow-"][class*="255,255,255"] {
+  box-shadow: var(--hover-highlight-shadow) !important;
+}
+
+html:not(.dark) [class*="hover:text-white"]:hover {
+  color: var(--hover-highlight-text) !important;
+}
+
+html:not(.dark) [class*="hover:text-white/80"]:hover {
+  color: var(--hover-highlight-text-muted) !important;
+}
+
+html:not(.dark) .group:hover [class*="group-hover:text-white"] {
+  color: var(--hover-highlight-text) !important;
+}
+
+html:not(.dark) .group:hover [class*="group-hover:text-white/80"] {
+  color: var(--hover-highlight-text-muted) !important;
+}
+
+html:not(.dark) .group:hover [class*="group-hover:bg-white"] {
+  background-color: var(--hover-highlight-bg) !important;
+}
+
+html:not(.dark) .group:hover [class*="group-hover:border-white"] {
+  border-color: var(--hover-highlight-border) !important;
+}
+
+html:not(.dark) .group:hover [class*="group-hover:drop-shadow"] {
+  filter: drop-shadow(0 0 8px var(--hover-highlight-glow)) !important;
+}
+
+/* Transcrição na tela cheia (sempre sobre fundo escuro): preservar branco */
+html:not(.dark) .fullscreen-transcript [class*="hover:text-white"]:hover {
+  color: rgba(255, 255, 255, 0.8) !important;
+}
+
+/* Ocultar barra de rolagem em carrosséis e barras de navegação */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* ==========================================================================
+   CABEÇALHO COM "SCROLL EDGE EFFECT" ESTILO iOS 26 / macOS
+   Desfoque progressivo (variável): camadas empilhadas com desfoque crescente,
+   cada uma mascarada numa faixa, de modo que o conteúdo fica muito desfocado no
+   topo e vai ficando nítido gradualmente, sem borda visível. Por cima, um véu
+   suave da cor de fundo com saturação aumentada (vibrancy) para legibilidade.
+   ========================================================================== */
+
+.apple-header-blur {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: calc(108px + var(--safe-top));
+  pointer-events: none;
+  z-index: 20;
+}
+
+.apple-header-blur > .apple-blur-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+/* Intensidade controlada pela rolagem (variável definida no contêiner) */
+.apple-header-blur > .apple-blur-layer,
+.apple-header-blur > .apple-blur-tint {
+  opacity: var(--header-blur, 0);
+}
+
+/* Do mais fraco (embaixo) ao mais forte (no topo) */
+.apple-header-blur > .apple-blur-layer:nth-child(1) {
+  -webkit-backdrop-filter: blur(1px) saturate(140%);
+  backdrop-filter: blur(1px) saturate(140%);
+  -webkit-mask-image: linear-gradient(to top, transparent 0%, #000 14%, #000 30%, transparent 44%);
+  mask-image: linear-gradient(to top, transparent 0%, #000 14%, #000 30%, transparent 44%);
+}
+.apple-header-blur > .apple-blur-layer:nth-child(2) {
+  -webkit-backdrop-filter: blur(2.5px) saturate(150%);
+  backdrop-filter: blur(2.5px) saturate(150%);
+  -webkit-mask-image: linear-gradient(to top, transparent 14%, #000 30%, #000 44%, transparent 58%);
+  mask-image: linear-gradient(to top, transparent 14%, #000 30%, #000 44%, transparent 58%);
+}
+.apple-header-blur > .apple-blur-layer:nth-child(3) {
+  -webkit-backdrop-filter: blur(5px) saturate(160%);
+  backdrop-filter: blur(5px) saturate(160%);
+  -webkit-mask-image: linear-gradient(to top, transparent 30%, #000 44%, #000 58%, transparent 72%);
+  mask-image: linear-gradient(to top, transparent 30%, #000 44%, #000 58%, transparent 72%);
+}
+.apple-header-blur > .apple-blur-layer:nth-child(4) {
+  -webkit-backdrop-filter: blur(10px) saturate(170%);
+  backdrop-filter: blur(10px) saturate(170%);
+  -webkit-mask-image: linear-gradient(to top, transparent 44%, #000 58%, #000 72%, transparent 86%);
+  mask-image: linear-gradient(to top, transparent 44%, #000 58%, #000 72%, transparent 86%);
+}
+.apple-header-blur > .apple-blur-layer:nth-child(5) {
+  -webkit-backdrop-filter: blur(18px) saturate(180%);
+  backdrop-filter: blur(18px) saturate(180%);
+  -webkit-mask-image: linear-gradient(to top, transparent 58%, #000 72%, #000 86%, transparent 100%);
+  mask-image: linear-gradient(to top, transparent 58%, #000 72%, #000 86%, transparent 100%);
+}
+.apple-header-blur > .apple-blur-layer:nth-child(6) {
+  -webkit-backdrop-filter: blur(28px) saturate(180%);
+  backdrop-filter: blur(28px) saturate(180%);
+  -webkit-mask-image: linear-gradient(to top, transparent 72%, #000 86%);
+  mask-image: linear-gradient(to top, transparent 72%, #000 86%);
+}
+
+/* Véu da cor de fundo: denso no topo e sumindo suavemente (curva suave, sem degraus) */
+.apple-header-blur > .apple-blur-tint {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    to bottom,
+    color-mix(in srgb, var(--bg-mica) 74%, transparent) 0%,
+    color-mix(in srgb, var(--bg-mica) 58%, transparent) 22%,
+    color-mix(in srgb, var(--bg-mica) 34%, transparent) 46%,
+    color-mix(in srgb, var(--bg-mica) 14%, transparent) 70%,
+    color-mix(in srgb, var(--bg-mica) 4%, transparent) 86%,
+    transparent 100%
+  );
+}
+
+@supports not ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
+  .apple-header-blur > .apple-blur-tint {
+    background: linear-gradient(
+      to bottom,
+      var(--bg-mica) 0%,
+      var(--bg-mica) 30%,
+      transparent 100%
+    );
+  }
+}
+
+
+
+
+/* ==========================================================================
+   VERSÃO MOBILE (abaixo do breakpoint md)
+   ========================================================================== */
+@media (max-width: 1023px) {
+  /* Seções: a grade vira uma linha com rolagem horizontal e encaixe, mostrando
+     2 itens inteiros e metade do terceiro (como no Apple Music / Audible) */
+  .mobile-row {
+    display: flex !important;
+    gap: 12px !important;
+    overflow-x: auto;
+    overflow-y: visible;
+    /* Sem "snap": quando a lista da seção muda (itens saindo/entrando), o encaixe fazia a linha
+       pular sozinha para o fim. Rolagem livre com inércia, sem ancoragem */
+    overflow-anchor: none;
+    margin-inline: calc(-1 * var(--page-margin));
+    padding-inline: var(--page-margin);
+    padding-bottom: 4px;
+    overscroll-behavior-x: contain;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .mobile-row::-webkit-scrollbar {
+    display: none;
+  }
+  /* Celular: exatamente 3 itens visíveis dentro das margens (o restante, arrastando).
+     Tablets: largura limitada, mostrando mais itens */
+  .mobile-row > * {
+    flex: 0 0 min(calc((100% - 24px) / 3), 170px);
+    min-width: 0;
+  }
+  /* Cards retangulares (gêneros, idiomas, coleções): 2 por vez, para o nome caber */
+  .mobile-row > [class*="aspect-[16/9]"] {
+    flex-basis: min(calc((100% - 12px) / 2), 260px);
+  }
+
+  /* Distâncias menores: título da tela -> conteúdo, e capa/foto -> nome nos cards */
+  main h1 {
+    margin-bottom: 1.25rem !important;
+  }
+  .mobile-row [data-zoom-key],
+  .mobile-grid-3 [data-zoom-key] {
+    margin-bottom: 0.25rem !important;
+  }
+  .mobile-row [data-zoom-key] + div,
+  .mobile-grid-3 [data-zoom-key] + div {
+    margin-top: 0.25rem !important;
+  }
+
+  /* Desempenho na rolagem: o fundo desfocado fixo das páginas de audiobook/autor fica mais leve */
+  main img[alt="blur"] {
+    filter: blur(48px) !important;
+    mix-blend-mode: normal !important;
+    transform: scale(1.15);
+  }
+
+  /* Desempenho: no celular o desfoque do cabeçalho usa só as 3 camadas mais fortes (metade do custo) */
+  .apple-header-blur > .apple-blur-layer:nth-child(-n + 3) {
+    display: none;
+  }
+
+  /* Subtítulos das telas 25% menores no celular */
+  main h2.text-xl,
+  main h3.text-lg {
+    font-size: calc(0.9375rem * var(--font-scale, 1)) !important;
+  }
+
+  /* Listas completas (sem subtítulo): 3 colunas, como no Apple Books */
+  /* Listas completas: colunas automáticas pela largura (3 nos celulares, 6–7 nos tablets) */
+  .mobile-grid-3 {
+    grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)) !important;
+    gap: 12px !important;
+  }
+
+  /* Listas de cards retangulares (gêneros, idiomas, coleções): 2 por linha no celular, mais nos tablets */
+  .mobile-grid-2 {
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)) !important;
+    gap: 12px !important;
+  }
+
+  /* Evita o menu nativo de "copiar/compartilhar" no toque longo dos cards */
+  .mobile-row img,
+  .mobile-grid-3 img {
+    -webkit-touch-callout: none;
+    -webkit-user-drag: none;
+  }
+
+  /* Itens tocáveis ficam destacados enquanto o dedo está sobre eles (como no iOS) */
+  * {
+    -webkit-tap-highlight-color: transparent;
+  }
+}
+
+@media (hover: none) {
+  .mobile-press:active,
+  button:active:not(:disabled),
+  [role="button"]:active,
+  a:active,
+  .cursor-pointer:active {
+    filter: brightness(0.82);
+    transition: filter 0s;
+  }
+}
+
+
+/* ==========================================================================
+   BARRAS DE ROLAGEM DISCRETAS: invisíveis em repouso; aparecem enquanto algo é
+   rolado (classe .is-scrolling, aplicada em main.tsx) e somem logo depois
+   ========================================================================== */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+.is-scrolling {
+  scrollbar-color: rgba(128, 128, 128, 0.45) transparent;
+}
+::-webkit-scrollbar-thumb,
+.custom-scrollbar::-webkit-scrollbar-thumb,
+.dark ::-webkit-scrollbar-thumb {
+  background-color: transparent !important;
+  transition: background-color 0.3s ease;
+}
+.is-scrolling::-webkit-scrollbar-thumb,
+.is-scrolling.custom-scrollbar::-webkit-scrollbar-thumb {
+  background-color: rgba(128, 128, 128, 0.45) !important;
+}
+::-webkit-scrollbar-track {
+  background: transparent !important;
+}
+
+
+/* ==========================================================================
+   CELULAR: MEDIDAS DO iOS
+   Botões do cabeçalho com 44pt (alvo de toque mínimo do iOS), títulos de navegação
+   de 17pt, itens de menu com 44pt de altura e texto de 15pt; campos de texto com 16px
+   (abaixo disso o Safari aproxima a tela ao digitar)
+   ========================================================================== */
+@media (max-width: 1023px) {
+  input,
+  textarea,
+  select {
+    font-size: 16px !important;
+  }
+
+  [data-app-header] .h-9:not([data-popup-content] *) {
+    height: 2.75rem !important;
+  }
+  [data-app-header] .w-9:not([data-popup-content] *) {
+    width: 2.75rem !important;
+  }
+  [data-fs-ctrl-row] .h-9:not([data-popup-content] *) {
+    height: 2.75rem !important;
+  }
+  [data-fs-ctrl-row] .w-9:not([data-popup-content] *) {
+    width: 2.75rem !important;
+  }
+  [data-app-header] button span.text-xs:not([data-popup-content] *) {
+    font-size: 15px !important;
+  }
+  [data-app-header] h2.text-lg {
+    font-size: 17px !important;
+  }
+
+  [data-popup-content] button.group.w-full {
+    font-size: 15px !important;
+    min-height: 44px;
+    border-radius: 20px !important;
+  }
+  /* Opção tocada (ou sob o dedo ao arrastar): o mesmo destaque do "passar o mouse" no computador */
+  [data-popup-content] [data-touch-active] {
+    background-color: rgb(255 255 255 / 0.15) !important;
+    border-color: rgb(255 255 255 / 0.2) !important;
+    box-shadow: 0 0 12px rgb(255 255 255 / 0.15) !important;
+    color: #fff;
+    transform: scale(1.02);
+  }
+  html:not(.dark) [data-popup-content] [data-touch-active] {
+    background-color: rgb(100 116 139 / 0.18) !important;
+    border-color: rgb(100 116 139 / 0.25) !important;
+    color: inherit;
+  }
+  [data-popup-content] [data-touch-active].text-red-500 {
+    background-color: rgb(239 68 68 / 0.15) !important;
+    border-color: rgb(239 68 68 / 0.3) !important;
+    box-shadow: 0 0 12px rgb(239 68 68 / 0.2) !important;
+    color: rgb(248 113 113);
+  }
+  [data-popup-content] [data-touch-active] .group-hover\:text-white { color: inherit; }
+  /* Pop-ups mais largos (as opções não quebram linha) e com cantos bem arredondados, como no iOS */
+  [data-popup-content="true"]:is(.w-44, .w-52, .w-56, .w-60, .w-64) {
+    width: min(290px, calc(100vw - 32px)) !important;
+  }
+  [data-popup-content="true"]:is(.rounded-\[20px\], .rounded-\[24px\], .rounded-\[28px\]):not([data-mobile-confirm]) {
+    border-radius: 30px !important;
+  }
+  [data-popup-content] button.group.w-full svg {
+    width: 17px;
+    height: 17px;
+  }
+  [data-popup-content] button.h-8:not(.w-8) {
+    height: 2.5rem !important;
+    font-size: 14px !important;
+  }
+  /* Botões redondos (ex.: três pontinhos dos resultados da pesquisa) continuam redondos e com 40pt */
+  [data-popup-content] button.w-8.h-8 {
+    width: 2.5rem !important;
+    height: 2.5rem !important;
+  }
+  [data-popup-content] h3.text-sm,
+  [data-popup-content] h4.text-sm {
+    font-size: 15px !important;
+  }
+
+  /* Marcações em tela cheia: texto e botões maiores */
+  .bookmarks-screen p.text-xs {
+    font-size: 15px !important;
+  }
+  .bookmarks-screen textarea {
+    height: 7rem !important;
+  }
+  .bookmarks-screen button.h-7:not(.w-7),
+  .bookmarks-screen button.h-8:not(.w-8) {
+    height: 2.5rem !important;
+    padding-inline: 1rem !important;
+    font-size: 14px !important;
+  }
+  /* Editar/excluir marcação: botões redondos de 40pt, como os demais da interface */
+  .bookmarks-screen button.w-7.h-7 {
+    width: 2.5rem !important;
+    height: 2.5rem !important;
+    padding: 0 !important;
+  }
+  .bookmarks-screen button.w-7.h-7 svg {
+    width: 16px;
+    height: 16px;
+  }
+  .bookmarks-screen button.h-6 {
+    height: 2rem !important;
+    padding-inline: 0.875rem !important;
+    font-size: 12px !important;
+  }
+  .bookmarks-screen button.h-11 {
+    height: 3rem !important;
+    font-size: 15px !important;
+  }
+
+  /* Teclado aberto: barra de abas e miniplayer saem do caminho */
+  html.keyboard-open [data-mobile-tab-bar],
+  html.keyboard-open #mini-player {
+    opacity: 0 !important;
+    pointer-events: none !important;
+  }
+}
+
+
+/* ==========================================================================
+   CELULAR DEITADO: tudo um pouco menor para caber sobre a barra de abas e o
+   miniplayer (cabeçalho, subtítulo, capas, título e autor sem cortes); os nomes
+   das telas ficam sempre no cabeçalho
+   ========================================================================== */
+@media (max-width: 1023px) and (orientation: landscape) and (max-height: 600px) {
+  main h1 {
+    display: none !important;
+  }
+  .mobile-row > * {
+    flex-basis: clamp(88px, calc((100dvh - 236px) / 1.6), 132px) !important;
+  }
+  .mobile-row > [class*="aspect-[16/9]"] {
+    flex-basis: clamp(160px, calc((100dvh - 200px) * 1.78), 240px) !important;
+  }
+  .mobile-grid-3 {
+    grid-template-columns: repeat(auto-fill, minmax(88px, 1fr)) !important;
+  }
+  main h2.text-xl,
+  main h3.text-lg {
+    font-size: 14px !important;
+  }
+}
+
+
+/* Girar o aparelho: fade rápido enquanto a interface se readequa ao novo formato */
+@keyframes rotate-fade {
+  0% { opacity: 0; }
+  35% { opacity: 0; }
+  100% { opacity: 1; }
+}
+html.is-rotating body {
+  animation: rotate-fade 0.4s ease-out;
+}
+
+
+/* Áreas seguras: recortes laterais da tela (celular deitado) e barras do sistema */
+@media (max-width: 1023px) {
+  .app-scroll,
+  [data-app-header] {
+    padding-left: max(var(--page-margin), var(--safe-left)) !important;
+    padding-right: max(var(--page-margin), var(--safe-right)) !important;
+  }
+}
+
+/* iPad mini e dobráveis abertos (em pé): mais itens por linha, sem ficarem pequenos demais */
+@media (min-width: 640px) and (max-width: 1023px) and (min-height: 601px) {
+  .mobile-grid-3 {
+    grid-template-columns: repeat(auto-fill, minmax(124px, 1fr)) !important;
+    gap: 16px !important;
+  }
+  .mobile-row > * {
+    flex-basis: 150px;
+  }
+  .mobile-grid-2 {
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)) !important;
+  }
+}
+
+
+/* ==========================================================================
+   ÁREAS SEGURAS EM TODAS AS TELAS (celulares e tablets): barra de status em cima,
+   indicador de início/barra de navegação embaixo e recortes laterais
+   ========================================================================== */
+.safe-area-pad {
+  padding-top: var(--safe-top);
+  padding-bottom: env(safe-area-inset-bottom);
+  padding-left: var(--safe-left);
+  padding-right: var(--safe-right);
+}
+@media (max-width: 1023px) {
+  .fs-safe {
+    padding-left: max(var(--page-margin), var(--safe-left)) !important;
+    padding-right: max(var(--page-margin), var(--safe-right)) !important;
+  }
+}
+@media (min-width: 1024px) {
+  /* Tablets deitados (menu lateral): menu, miniplayer e player longe das barras do sistema */
+  .sidebar-safe {
+    top: max(16px, calc(var(--safe-top) + 8px)) !important;
+    bottom: max(16px, env(safe-area-inset-bottom)) !important;
+  }
+  html:not([dir="rtl"]) .sidebar-safe {
+    left: max(16px, var(--safe-left)) !important;
+  }
+  html[dir="rtl"] .sidebar-safe {
+    right: max(16px, var(--safe-right)) !important;
+  }
+  .desk-mini-safe {
+    bottom: max(16px, env(safe-area-inset-bottom)) !important;
+  }
+}
+
+
+/* Fim da rolagem: o conteúdo termina logo acima da barra de abas/miniplayer (sem espaço vazio grande) */
+@media (max-width: 1023px) {
+  .app-scroll {
+    padding-bottom: calc(var(--mobile-bar-bottom) + 62px + 20px) !important;
+  }
+  /* Com miniplayer em pé: espaço para a barra e o miniplayer empilhados (em páginas curtas a barra
+     não chega a se recolher, então o último item precisa ficar visível acima dos dois) */
+  .app-scroll.has-mini {
+    padding-bottom: calc(var(--mobile-bar-bottom) + 62px + 8px + 52px + 16px) !important;
+  }
+}
+@media (min-width: 640px) and (max-width: 1023px) {
+  /* Lado a lado: barra e miniplayer na mesma linha */
+  .app-scroll.has-mini {
+    padding-bottom: calc(var(--mobile-bar-bottom) + 62px + 20px) !important;
+  }
+}
+
+
+/* Folha (sheet) aberta: a tela de trás recua, como no iOS */
+.app-shell {
+  transform-origin: 50% 0;
+  transition: transform 0.42s cubic-bezier(0.32, 0.72, 0, 1), border-radius 0.42s cubic-bezier(0.32, 0.72, 0, 1), filter 0.42s ease;
+}
+html.sheet-open .app-shell {
+  transform: translateY(calc(var(--safe-top) + 2px)) scale(0.93);
+  border-radius: 24px;
+  filter: brightness(0.72);
+}
+
+
+/* Celular instalado como app: a página inteira não "quica" ao rolar além do fim (só as listas rolam) */
+html,
+body {
+  overscroll-behavior-y: none;
+}
+
+/* ==========================================================================
+   CELULAR: CONFIRMAÇÕES NA BASE DA TELA (cartão como os do iOS)
+   Título e texto centralizados; botões no mesmo design, centralizados e maiores
+   ========================================================================== */
+[data-mobile-confirm] h4,
+[data-mobile-confirm] h3 {
+  text-align: center;
+  font-size: 17px !important;
+  line-height: 1.3;
+  margin-bottom: 6px !important;
+}
+[data-mobile-confirm] h4 + p,
+[data-mobile-confirm] h3 + p {
+  text-align: center;
+  font-size: 14px !important;
+  line-height: 1.45;
+}
+[data-mobile-confirm] .justify-end {
+  justify-content: center !important;
+}
+[data-mobile-confirm] .justify-end > button,
+[data-mobile-confirm] .justify-end > * > button {
+  height: 3rem !important;
+  min-width: 132px;
+  padding-inline: 1.5rem !important;
+  font-size: 15px !important;
+  justify-content: center;
+  gap: 8px !important;
+}
+[data-mobile-confirm] .justify-end > button svg {
+  width: 16px;
+  height: 16px;
+}
+[data-mobile-confirm] .justify-end {
+  gap: 12px !important;
+  padding-top: 8px;
+}
+
+
+/* Celular deitado: a confirmação fica só no canto inferior direito, com a largura que tem em pé */
+@media (max-width: 1023px) and (orientation: landscape) and (max-height: 600px) {
+  [data-mobile-confirm] {
+    left: auto !important;
+    width: min(380px, calc(100vw - 24px)) !important;
+    right: max(12px, var(--safe-right)) !important;
+  }
+}
+
+/* Barra de pesquisa do cabeçalho: nunca sob o recorte da tela (notch/Dynamic Island no celular deitado) */
+@media (max-width: 1023px) {
+  [data-search-bar] {
+    width: calc(100vw - 2 * max(var(--page-margin), var(--safe-left), var(--safe-right))) !important;
+  }
+}
+
+
+/* Celular deitado com proporção de aparelho com notch: margem do lado do recorte */
+@media (max-width: 1023px) and (orientation: landscape) and (max-height: 600px) {
+  html[data-notch="left"] {
+    --safe-left: max(env(safe-area-inset-left, 0px), 44px);
+  }
+  html[data-notch="right"] {
+    --safe-right: max(env(safe-area-inset-right, 0px), 44px);
+  }
+}
+
+
+/* Telas de ajuste no celular: o endereço da pasta fica numa pílula alinhada como os botões */
+.settings-action-panel [data-path-pill] {
+  height: 3rem !important;
+  max-width: 100% !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 0 1.25rem !important;
+  font-size: 13px !important;
+  text-align: center;
+}
+.settings-action-panel [data-path-pill] > span {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Celular deitado: folhas (adicionar à coleção, marcações…) centralizadas, longe do notch/Dynamic Island */
+@media (max-width: 1023px) and (orientation: landscape) and (max-height: 600px) {
+  [data-mobile-sheet] {
+    left: max(16px, calc(var(--safe-left) + 8px), calc((100vw - 640px) / 2)) !important;
+    right: max(16px, calc(var(--safe-right) + 8px), calc((100vw - 640px) / 2)) !important;
+  }
+}
+
+
+/* App instalado (tela de início do iPhone/Android): a página ocupa a tela inteira, sem faixa
+   vazia embaixo, e o fundo do sistema tem a mesma cor do app */
+html,
+body,
+#root {
+  height: 100%;
+  min-height: 100%;
+}
+html {
+  background-color: var(--bg-mica);
+}
+body {
+  overflow: hidden;
+}
+.app-shell {
+  position: fixed;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: var(--screen-h) !important;
+}
+
+/* Toque: a barra de progresso tem área de toque maior (a linha continua fina) e a bolinha fica
+   sempre visível, para tocar e arrastar */
+@media (pointer: coarse) {
+  input[type="range"].apple-slider {
+    height: 28px;
+    background-size: 100% 4px !important;
+    background-repeat: no-repeat !important;
+    background-position: center !important;
+    touch-action: none;
+  }
+  input[type="range"].apple-slider::-webkit-slider-runnable-track {
+    height: 28px;
+  }
+  input[type="range"].apple-slider::-webkit-slider-thumb {
+    opacity: 1;
+    width: 14px;
+    height: 14px;
+    margin-top: 7px;
+  }
+  input[type="range"].apple-slider:active::-webkit-slider-thumb {
+    transform: scale(1.35);
+  }
+  input[type="range"].apple-slider::-moz-range-thumb {
+    opacity: 1;
+    width: 14px;
+    height: 14px;
+  }
+}
+
+/* Player em tela cheia: o cabeçalho já está dentro das margens do player (sem margem dobrada) */
+@media (max-width: 1023px) {
+  [data-fullscreen-player] [data-app-header] {
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+  }
+}
+
+
+/* Player em tela cheia: com um pop-up aberto no cabeçalho, ele fica acima da capa e dos controles */
+[data-fullscreen-player] [data-app-header]:has([data-popup-content]) {
+  z-index: 60;
+}
+
+
+/* Safari do iPhone em pé: reserva a faixa da barra de status (desfocada pelo sistema) */
+@media (orientation: portrait) {
+  html.ios-safari {
+    --ios-status-bar: 48px;
+  }
+}
+
+
+@media (min-width: 390px) and (max-width: 1023px) {
+  :root {
+    --page-margin: 20px;
+  }
+}
+
+/* Capa/foto de ponta a ponta no topo das páginas: anula exatamente a margem lateral da tela */
+.mobile-bleed {
+  margin-left: calc(-1 * max(var(--page-margin), var(--safe-left)));
+  margin-right: calc(-1 * max(var(--page-margin), var(--safe-right)));
+}
+
+/* Telas de ajuste no celular: em todos os botões, o ícone fica à esquerda e o texto à direita */
+.settings-action-panel button > svg:last-child:not(:first-child),
+.settings-action-panel label > svg:last-child:not(:first-child),
+.settings-action-panel button > :last-child:not(:first-child):is(.lucide, svg),
+.settings-action-panel button > span:last-child:has(> svg):not(:first-child) {
+  order: -1;
+}
+
+/* App instalado no iPhone: contorno do bug do iOS 26 (WebKit 301994) em que a área do app termina antes
+   da base da tela — a página e seus contêineres usam a altura dinâmica da tela */
+html.standalone,
+html.standalone body,
+html.standalone #root {
+  height: 100dvh;
+  max-height: 100dvh;
+}
+
+/* Barra de abas e miniplayer em camadas próprias, acima das telas: não somem nem piscam durante as
+   transições entre telas (no Safari, camadas com desfoque podiam ser redesenhadas junto com a tela) */
+[data-mobile-tab-bar],
+#mini-player {
+  will-change: transform;
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+}
+
+/* Computador: pop-ups 20% mais largos (os textos das opções não quebram linha) */
+@media (min-width: 1024px) {
+  [data-popup-content="true"].w-44 { width: min(13.2rem, calc(100vw - 32px)) !important; }
+  [data-popup-content="true"].w-52 { width: min(15.6rem, calc(100vw - 32px)) !important; }
+  [data-popup-content="true"].w-56 { width: min(16.8rem, calc(100vw - 32px)) !important; }
+  [data-popup-content="true"].w-60 { width: min(18rem, calc(100vw - 32px)) !important; }
+  [data-popup-content="true"].w-64 { width: min(19.2rem, calc(100vw - 32px)) !important; }
+  [data-popup-content="true"].w-72 { width: min(21.6rem, calc(100vw - 32px)) !important; }
+  [data-popup-content="true"].w-80 { width: min(24rem, calc(100vw - 32px)) !important; }
+  [data-popup-content="true"].w-96 { width: min(28.8rem, calc(100vw - 32px)) !important; }
+}
+
+/* ==========================================================================
+   BORDAS DAS ÁREAS COM ROLAGEM (sem "linha seca")
+   O conteúdo se dissolve na borda em que ainda há o que rolar (atributos definidos em
+   scrollFade.ts). As faixas crescem/somem suavemente ao começar ou terminar a rolagem.
+   ========================================================================== */
+@property --fade-top { syntax: '<length>'; inherits: false; initial-value: 0px; }
+@property --fade-bottom { syntax: '<length>'; inherits: false; initial-value: 0px; }
+
+:is([data-scroll-fade], .fullscreen-transcript, [data-popup-content="true"].overflow-y-auto, [data-popup-content="true"] .overflow-y-auto, [data-mobile-sheet] .overflow-y-auto, [data-mobile-confirm] .overflow-y-auto) {
+  --fade-size: 22px;
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 var(--fade-top), #000 calc(100% - var(--fade-bottom)), transparent 100%);
+  mask-image: linear-gradient(to bottom, transparent 0, #000 var(--fade-top), #000 calc(100% - var(--fade-bottom)), transparent 100%);
+  transition: --fade-top 0.22s ease, --fade-bottom 0.22s ease;
+}
+:is([data-scroll-fade], .fullscreen-transcript, [data-popup-content="true"].overflow-y-auto, [data-popup-content="true"] .overflow-y-auto, [data-mobile-sheet] .overflow-y-auto, [data-mobile-confirm] .overflow-y-auto)[data-fade-top] {
+  --fade-top: var(--fade-size);
+}
+:is([data-scroll-fade], .fullscreen-transcript, [data-popup-content="true"].overflow-y-auto, [data-popup-content="true"] .overflow-y-auto, [data-mobile-sheet] .overflow-y-auto, [data-mobile-confirm] .overflow-y-auto)[data-fade-bottom] {
+  --fade-bottom: var(--fade-size);
+}
+/* Letra do player em tela cheia e folhas: transição mais longa, como no Apple Music */
+.fullscreen-transcript { --fade-size: 64px; }
+[data-mobile-sheet] .overflow-y-auto { --fade-size: 32px; }
+[data-scroll-fade="search"] { --fade-size: 28px; }
+
+/* Esqueleto: no computador, a confirmação vira um cartão central na base (não ocupa a largura toda) */
+@media (min-width: 1024px) {
+  [data-mobile-confirm] {
+    left: calc(50% - 210px + 136px) !important;
+    right: auto !important;
+    width: 420px;
+  }
+}

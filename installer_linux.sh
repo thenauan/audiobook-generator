@@ -18,11 +18,15 @@ if ! command -v python3 &> /dev/null; then
     exit 1
 fi
 
+if ! command -v ffmpeg &> /dev/null; then
+    echo "[WARNING] FFmpeg not found. Install it (e.g. sudo apt install ffmpeg) to export M4B, Opus, FLAC and WAV."
+fi
+
 echo "Installing Node.js dependencies..."
 npm install
 
 echo "Installing Python dependencies..."
-python3 -m pip install ebooklib beautifulsoup4 pypdf mobi deep-translator langdetect mutagen edge-tts tqdm colorama
+python3 -m pip install ebooklib beautifulsoup4 pypdf pdfplumber mobi deep-translator langdetect mutagen edge-tts tqdm colorama faster-whisper
 
 echo "Creating system shortcut..."
 mkdir -p ~/.local/share/applications

@@ -1,7 +1,17 @@
 import re
 
-def melhorar_pronuncia(texto, lang):
+def melhorar_pronuncia(texto, lang, pronunciation_map=None):
     if not texto: return texto
+    
+    # Dicionário de Pronúncia Personalizada (Pronunciation Map)
+    if pronunciation_map:
+        items = pronunciation_map.items() if isinstance(pronunciation_map, dict) else [
+            (item.get('original'), item.get('replacement')) for item in pronunciation_map if isinstance(item, dict)
+        ]
+        for orig, rep in items:
+            if orig and rep:
+                pattern = rf'\b{re.escape(str(orig).strip())}\b'
+                texto = re.sub(pattern, str(rep).strip(), texto, flags=re.IGNORECASE)
     
     # General structural normalization
     texto = re.sub(r'[ \t]+', ' ', texto)

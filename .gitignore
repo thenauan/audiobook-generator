@@ -24,3 +24,9 @@ config_*.json
 # OS generated files
 .DS_Store
 Thumbs.db
+
+# Local references, test outputs and dev scripts (not part of the app)
+esqueleto/
+meus audiobooks/
+audiobook-text/
+find_uppercase.mjs

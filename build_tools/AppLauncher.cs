@@ -3,14 +3,14 @@ using System.Diagnostics;
 using System.IO;
 using System.Reflection;
 
-// Define Assembly Information for the executable (Version 1.0)
+// Define Assembly Information for the executable (Version 1.1)
 [assembly: AssemblyTitle("Audiobook Generator with AI")]
 [assembly: AssemblyDescription("AI-Powered Audiobook Generator Launcher")]
 [assembly: AssemblyCompany("Audiobook Generator")]
 [assembly: AssemblyProduct("Audiobook Generator with AI")]
 [assembly: AssemblyCopyright("Copyright © 2026")]
-[assembly: AssemblyVersion("1.0.0.0")]
-[assembly: AssemblyFileVersion("1.0.0.0")]
+[assembly: AssemblyVersion("1.1.0.0")]
+[assembly: AssemblyFileVersion("1.1.0.0")]
 
 namespace AudiobookLauncher
 {
