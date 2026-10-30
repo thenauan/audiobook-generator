@@ -14,6 +14,7 @@ import { estimateConversion } from '../../app/estimates';
 import { voicesFor, narrationLang, effectiveVoice, languageCode } from '../../data/voices';
 import { LANGUAGES, languageByName, translationTargets, targetLanguageName, appLangCode } from '../../data/languages';
 import { RiTranslateAi2 } from 'react-icons/ri';
+import { GENRES, SUBGENRES, genreSelectorOptions, splitGenres, joinGenres } from '../../data/genres';
 import { voiceOptions as buildVoiceOptions } from '../../data/voiceOptions';
 import { CARD_ANIMATE, CARD_EXIT, CARD_INITIAL, cardTransition, ebookLayoutId } from './cardMotion';
 
@@ -449,31 +450,19 @@ export const EbookCardItem: React.FC<EbookCardItemProps> = ({
                     setActiveSettingSelector({
                       id: `genre-${file.id}`,
                       triggerEl: e.currentTarget,
-                      title: 'Gênero Literário',
+                      title: 'Gêneros',
                       currentValue: file.genre,
-                      inputPlaceholder: 'Digite o gênero (ex: Ficção, Poesia)...',
-                      options: [
-                        { value: 'Ficção', label: 'Ficção', icon: <BookOpen size={13} /> },
-                        { value: 'Fantasia & Ficção Científica', label: 'Fantasia & Ficção Científica', icon: <Sparkles size={13} /> },
-                        { value: 'Romance & Drama', label: 'Romance & Drama', icon: <Heart size={13} /> },
-                        { value: 'Suspense & Mistério', label: 'Suspense & Mistério', icon: <Compass size={13} /> },
-                        { value: 'Terror & Horror', label: 'Terror & Horror', icon: <Flame size={13} /> },
-                        { value: 'Não-Ficção', label: 'Não-Ficção', icon: <FileText size={13} /> },
-                        { value: 'Biografia & Memórias', label: 'Biografia & Memórias', icon: <User size={13} /> },
-                        { value: 'Desenvolvimento Pessoal', label: 'Desenvolvimento Pessoal', icon: <Lightbulb size={13} /> },
-                        { value: 'Negócios & Finanças', label: 'Negócios & Finanças', icon: <TrendingUp size={13} /> },
-                        { value: 'História & Filosofia', label: 'História & Filosofia', icon: <Landmark size={13} /> },
-                        { value: 'Clássicos', label: 'Clássicos', icon: <Bookmark size={13} /> },
-                        { value: '__custom__', label: 'Digitar outro gênero...', icon: <Edit3 size={13} />, isCustomInput: true },
-                      ],
-                      onSelect: (val) => onUpdateFile({ genre: val })
+                      multi: true,
+                      inputPlaceholder: 'Digite um ou mais, separados por vírgula...',
+                      options: genreSelectorOptions(GENRES, 'Digitar outros gêneros...', <Edit3 size={13} />),
+                      onSelect: (val) => onUpdateFile({ genre: joinGenres(splitGenres(val)) })
                     });
                   }}
                   className="group/tag h-8 px-3.5 rounded-full bg-black/5 dark:bg-white/5 border border-[var(--text-main)]/10 hover:border-neutral-400 dark:hover:border-white/40 hover:bg-neutral-200/80 dark:hover:bg-white/15 hover:shadow-[0_0_12px_rgba(0,0,0,0.12)] dark:hover:shadow-[0_0_12px_rgba(255,255,255,0.25)] text-[11px] font-semibold flex items-center gap-1.5 transition-all shrink-0 cursor-pointer"
                   title="Definir gênero"
                 >
                   <Tag size={12} className={`${getTagIconClass(isGenreSelected)} shrink-0 transition-colors`} />
-                  <span className={getTagTextClass(isGenreSelected)}>{isGenreSelected ? file.genre : '+ Gênero'}</span>
+                  <span className={`${getTagTextClass(isGenreSelected)} max-w-[220px] truncate`} title={file.genre}>{isGenreSelected ? file.genre : '+ Gênero'}</span>
                 </motion.button>
 
                 {/* Tag Subgênero */}
@@ -488,28 +477,19 @@ export const EbookCardItem: React.FC<EbookCardItemProps> = ({
                     setActiveSettingSelector({
                       id: `subgenre-${file.id}`,
                       triggerEl: e.currentTarget,
-                      title: 'Subgênero',
+                      title: 'Subgêneros',
                       currentValue: file.subgenre,
-                      inputPlaceholder: 'Digite o subgênero (ex: Cyberpunk, Épica)...',
-                      options: [
-                        { value: 'Fantasia Épica', label: 'Fantasia Épica', icon: <Sparkles size={13} /> },
-                        { value: 'Cyberpunk & Distopia', label: 'Cyberpunk & Distopia', icon: <Cpu size={13} /> },
-                        { value: 'Thriller Psicológico', label: 'Thriller Psicológico', icon: <Zap size={13} /> },
-                        { value: 'Romance Contemporâneo', label: 'Romance Contemporâneo', icon: <Heart size={13} /> },
-                        { value: 'Ficção Histórica', label: 'Ficção Histórica', icon: <Landmark size={13} /> },
-                        { value: 'Produtividade & Foco', label: 'Produtividade & Foco', icon: <CheckCircle2 size={13} /> },
-                        { value: 'Finanças & Investimentos', label: 'Finanças & Investimentos', icon: <TrendingUp size={13} /> },
-                        { value: 'Psicologia & Comportamento', label: 'Psicologia & Comportamento', icon: <Brain size={13} /> },
-                        { value: '__custom__', label: 'Digitar outro subgênero...', icon: <Edit3 size={13} />, isCustomInput: true },
-                      ],
-                      onSelect: (val) => onUpdateFile({ subgenre: val })
+                      multi: true,
+                      inputPlaceholder: 'Digite um ou mais, separados por vírgula...',
+                      options: genreSelectorOptions(SUBGENRES, 'Digitar outros subgêneros...', <Edit3 size={13} />),
+                      onSelect: (val) => onUpdateFile({ subgenre: joinGenres(splitGenres(val)) })
                     });
                   }}
                   className="group/tag h-8 px-3.5 rounded-full bg-black/5 dark:bg-white/5 border border-[var(--text-main)]/10 hover:border-neutral-400 dark:hover:border-white/40 hover:bg-neutral-200/80 dark:hover:bg-white/15 hover:shadow-[0_0_12px_rgba(0,0,0,0.12)] dark:hover:shadow-[0_0_12px_rgba(255,255,255,0.25)] text-[11px] font-semibold flex items-center gap-1.5 transition-all shrink-0 cursor-pointer"
                   title="Definir subgênero"
                 >
                   <Layers size={12} className={`${getTagIconClass(isSubgenreSelected)} shrink-0 transition-colors`} />
-                  <span className={getTagTextClass(isSubgenreSelected)}>{isSubgenreSelected ? file.subgenre : '+ Subgênero'}</span>
+                  <span className={`${getTagTextClass(isSubgenreSelected)} max-w-[220px] truncate`} title={file.subgenre}>{isSubgenreSelected ? file.subgenre : '+ Subgênero'}</span>
                 </motion.button>
 
                 {/* Tag Idioma */}

@@ -74,6 +74,10 @@ export interface AppFile {
   cover?: string;
   customCover?: string;
   coverColor?: string;
+  /** Capa de onde a cor foi lida (para ler de novo só quando a capa muda) */
+  coverColorFrom?: string;
+  /** Cor escolhida pelo usuário na edição: não é trocada pela cor da capa */
+  coverColorUser?: boolean;
   audioSizeEst?: string;
   metadataStatus?: 'loading' | 'loaded' | 'error';
   phaseStartTime?: number;
@@ -177,6 +181,8 @@ export interface ActiveSettingSelector {
   inputPlaceholder?: string;
   initialInputValue?: string;
   allowCustomInput?: boolean;
+  /** Várias escolhas: cada clique marca ou desmarca e o pop-up fica aberto; o valor é a lista separada por vírgula */
+  multi?: boolean;
 }
 
 export interface NavGroupItem<T> {

@@ -25,6 +25,7 @@ import { getGenericBookCover, getGenericCoverColor, getGenericTextCover, normali
 import { DEFAULT_AUDIOBOOKS, DEFAULT_RECENT_SEARCHES } from '../data/defaults';
 import { compareGroupKeys, compareTitles, getAlphabetGroupKey } from '../lib/grouping';
 import { translations } from '../translations';
+import { extractCoverColor } from '../lib/coverColor';
 import { loadJSON, saveJSON, removeKey, isArray } from '../lib/storage';
 import { estimateConversion } from './estimates';
 import { VOICES, languageCode, voiceLang, effectiveVoice } from '../data/voices';
@@ -290,6 +291,20 @@ export function useAppState() {
   const [files, setFiles] = useState<AppFile[]>([]);
   // Livros cuja conclusão já foi registrada em Convertidos (evita registrar o mesmo livro duas vezes)
   const completedFileIdsRef = useRef<Set<string>>(new Set());
+
+  // Cor de cada livro a partir da própria capa (fundo, destaques e barra dos cards seguem a capa). Lida de novo
+  // só quando a capa muda; uma cor escolhida pelo usuário na edição é mantida.
+  useEffect(() => {
+    const chave = (src: string) => `${src.length}:${src.slice(-64)}`;
+    for (const f of files) {
+      const src = f.customCover || f.cover;
+      if (!src || src.startsWith('data:image/svg') || f.coverColorUser || f.coverColorFrom === chave(src)) continue;
+      extractCoverColor(src).then(cor => {
+        setFiles(prev => prev.map(x => x.id !== f.id || (x.customCover || x.cover) !== src || x.coverColorUser ? x
+          : { ...x, coverColor: cor || x.coverColor, coverColorFrom: chave(src) }));
+      });
+    }
+  }, [files]);
 
   // Lista vazia (último livro removido, com ou sem erro, convertendo ou não): volta a área de arrastar
   useEffect(() => {
@@ -1187,7 +1202,7 @@ export function useAppState() {
     setEditBookGenerateSyncText(file.generateSyncText !== undefined ? file.generateSyncText : true);
     setEditBookRequiresTranslation(Boolean(file.requiresTranslation));
     setEditBookCover(file.customCover || file.cover);
-    setEditCoverColor(coverColorsMap[file.id] || getGenericCoverColor(file.cover, file.title, file.author));
+    setEditCoverColor(coverColorsMap[file.id] || file.coverColor || getGenericCoverColor(file.cover, file.title, file.author));
     setEditBookDescription(file.description || '');
     setEditBookChapters(
       file.chapters && file.chapters.length > 0
@@ -1289,6 +1304,7 @@ export function useAppState() {
             customCover: editBookCover,
             cover: editBookCover || f.cover,
             coverColor: editCoverColor,
+            coverColorUser: f.coverColorUser || editCoverColor !== f.coverColor,
             description: editBookDescription,
             chapters: safeChapters,
             pronunciationMap: editBookPronunciationMap

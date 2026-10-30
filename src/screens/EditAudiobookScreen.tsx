@@ -12,11 +12,14 @@ import { transicaoConteudo } from '../navigation/transitions';
 import { getButtonCoverPopupStyle, clearButtonCoverAnchorCache } from '../components/Popovers';
 import { COVER_COLOR_PICKER, getGenericBookCover } from '../lib/covers';
 import { SettingToggle } from '../components/cards/SettingToggle';
+import { GENRES, SUBGENRES, toggleGenre, splitGenres } from '../data/genres';
 import { useApp } from '../app/AppContext';
 import { voicesFor, languageCode, voiceLang, hasSample } from '../data/voices';
 
 export function EditAudiobookScreen() {
   const { showToast, playingVoiceCode, toggleVoiceSample, editingBook, editBookTitle, setEditBookTitle, editBookAuthor, setEditBookAuthor, editBookCategory, setEditBookCategory, editBookSubgenre, setEditBookSubgenre, editBookNarrator, setEditBookNarrator, editBookLanguage, setEditBookLanguage, editBookYear, setEditBookYear, editBookVoice, setEditBookVoice, editBookFileType, setEditBookFileType, editBookGenerateSyncText, setEditBookGenerateSyncText, editBookRequiresTranslation, setEditBookRequiresTranslation, editBookCover, setEditBookCover, editCoverColor, setEditCoverColor, editBookDescription, setEditBookDescription, editBookChapters, setEditBookChapters, editBookPronunciationMap, setEditBookPronunciationMap, pronOrigInput, setPronOrigInput, pronRepInput, setPronRepInput, previewChapter, setPreviewChapter, previewChapterAnchor, setPreviewChapterAnchor, editBookHasTranscript, setEditBookHasTranscript, editBookTranscriptFileName, setEditBookTranscriptFileName, editBookCoverInputRef, editBookTranscriptInputRef, pronTagsScrollRef, handlePronMouseDown, handlePronMouseLeaveOrUp, handlePronMouseMove, handleSplitLongChapter, availableVoices, editingFileId, defaultVoice } = useApp();
+  const [todosGeneros, setTodosGeneros] = React.useState(false);
+  const [todosSubgeneros, setTodosSubgeneros] = React.useState(false);
   // Editando um e-book da lista do Conversor (ainda não convertido) ou um audiobook pronto do Histórico
   const isPendingConversion = Boolean(editingFileId);
   return (() => {
@@ -227,19 +230,22 @@ export function EditAudiobookScreen() {
               value={editBookCategory}
               onChange={(e) => setEditBookCategory(e.target.value)}
               className="w-full h-11 px-5 rounded-full bg-card/75 border border-[var(--text-main)]/10 text-[var(--text-main)] text-sm font-semibold shadow-sm backdrop-blur-3xl focus:outline-none focus:border-winblue/60 focus:ring-2 focus:ring-winblue/30 focus:shadow-[0_0_15px_rgba(var(--winblue-rgb),0.35)] transition-all"
-              placeholder="Gênero / Categoria (ex: Ficção Científica, Romance...)"
+              placeholder="Gêneros, separados por vírgula (ex: Romance, LGBTQIA+)"
             />
             <div className="flex flex-wrap gap-1.5 mt-2">
-              {['Ficção', 'Fantasia', 'Romance', 'Mistério', 'Sci-Fi', 'Desenvolvimento Pessoal', 'Biografia', 'História'].map(g => (
+              {(todosGeneros ? GENRES : GENRES.slice(0, 10)).map(o => o.value).map(g => (
                 <button
                   key={g}
                   type="button"
-                  onClick={() => setEditBookCategory(g)}
-                  className="text-[10px] font-medium px-2.5 py-1 rounded-full bg-card/75 border border-[var(--text-main)]/10 hover:bg-white/15 hover:border-white/25 hover:text-white hover:shadow-[0_0_12px_rgba(255,255,255,0.2)] text-[var(--text-muted)] transition-all cursor-pointer"
+                  onClick={() => setEditBookCategory(toggleGenre(editBookCategory, g))}
+                  className={`text-[10px] font-medium px-2.5 py-1 rounded-full border transition-all cursor-pointer hover:shadow-[0_0_12px_rgba(255,255,255,0.2)] ${splitGenres(editBookCategory).some(x => x.toLowerCase() === g.toLowerCase()) ? 'bg-winblue/15 border-winblue/45 text-winblue' : 'bg-card/75 border-[var(--text-main)]/10 text-[var(--text-muted)] hover:bg-white/15 hover:border-white/25 hover:text-white'}`}
                 >
                   {g}
                 </button>
               ))}
+              <button type="button" onClick={() => setTodosGeneros(v => !v)} className="text-[10px] font-medium px-2.5 py-1 rounded-full bg-card/75 border border-[var(--text-main)]/10 hover:bg-white/15 hover:border-white/25 hover:text-white hover:shadow-[0_0_12px_rgba(255,255,255,0.2)] text-winblue transition-all cursor-pointer">
+                {todosGeneros ? 'Ver menos' : `Ver todos (${GENRES.length})`}
+              </button>
             </div>
           </div>
 
@@ -253,19 +259,22 @@ export function EditAudiobookScreen() {
                 value={editBookSubgenre}
                 onChange={(e) => setEditBookSubgenre(e.target.value)}
                 className="w-full h-11 px-5 rounded-full bg-card/75 border border-[var(--text-main)]/10 text-[var(--text-main)] text-sm font-semibold shadow-sm backdrop-blur-3xl focus:outline-none focus:border-winblue/60 focus:ring-2 focus:ring-winblue/30 focus:shadow-[0_0_15px_rgba(var(--winblue-rgb),0.35)] transition-all"
-                placeholder="Subgênero (ex: Distopia)"
+                placeholder="Subgêneros, separados por vírgula (ex: Romantasia, Ficção Queer)"
               />
               <div className="flex flex-wrap gap-1.5 mt-2">
-                {['Distopia', 'Cyberpunk', 'Fantasia Sombria', 'Thriller', 'Aventura', 'Autoajuda', 'Espiritualidade', 'Finanças'].map(sg => (
+                {(todosSubgeneros ? SUBGENRES : SUBGENRES.slice(0, 10)).map(o => o.value).map(sg => (
                   <button
                     key={sg}
                     type="button"
-                    onClick={() => setEditBookSubgenre(sg)}
-                    className="text-[10px] font-medium px-2.5 py-1 rounded-full bg-card/75 border border-[var(--text-main)]/10 hover:bg-white/15 hover:border-white/25 hover:text-white hover:shadow-[0_0_12px_rgba(255,255,255,0.2)] text-[var(--text-muted)] transition-all cursor-pointer"
+                    onClick={() => setEditBookSubgenre(toggleGenre(editBookSubgenre, sg))}
+                    className={`text-[10px] font-medium px-2.5 py-1 rounded-full border transition-all cursor-pointer hover:shadow-[0_0_12px_rgba(255,255,255,0.2)] ${splitGenres(editBookSubgenre).some(x => x.toLowerCase() === sg.toLowerCase()) ? 'bg-winblue/15 border-winblue/45 text-winblue' : 'bg-card/75 border-[var(--text-main)]/10 text-[var(--text-muted)] hover:bg-white/15 hover:border-white/25 hover:text-white'}`}
                   >
                     {sg}
                   </button>
                 ))}
+                <button type="button" onClick={() => setTodosSubgeneros(v => !v)} className="text-[10px] font-medium px-2.5 py-1 rounded-full bg-card/75 border border-[var(--text-main)]/10 hover:bg-white/15 hover:border-white/25 hover:text-white hover:shadow-[0_0_12px_rgba(255,255,255,0.2)] text-winblue transition-all cursor-pointer">
+                  {todosSubgeneros ? 'Ver menos' : `Ver todos (${SUBGENRES.length})`}
+                </button>
               </div>
             </div>
             <div>

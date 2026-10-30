@@ -13,6 +13,11 @@ All notable changes to **Audiobook Generator** — the free ebook to audiobook c
 - Audiobook preview play/pause: only one preview plays at a time, the button turns into pause right away and a second click stops it — no more double playback or previews that can't be paused.
 - The edit screen now shows when an audiobook has synchronized text (checked in the file itself: metadata and .lrc/.srt/.sync.json next to it).
 
+### Added
+- **More genres and subgenres** (38 genres, 42 subgenres), including **LGBTQIA+**, Sapphic and MLM romance, Queer fiction, LGBTQIA+ memoirs, Diversity & inclusion, Romantasy, Dark romance, Cozy mystery and more.
+- **Several genres and subgenres per book**, separated by commas: pick as many as you want in the book card (the pop-up stays open) or tap them on the edit screen.
+- **Cards follow the real cover:** the book color (animated background, border, progress bar and highlights) now comes from the cover image itself instead of a palette color.
+
 ### Changed
 - **One progress percentage** for the whole book (reading, translation, narration, volume, final file and text), always moving forward; the step text no longer shows its own percentage.
 - Next to the time remaining, the count of the current step: parts narrated, chapters with volume adjusted, chapters in the M4B, chapter files generated or text chunks translated.

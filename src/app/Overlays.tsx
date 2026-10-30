@@ -17,6 +17,7 @@ import { PopupMorphContainer, MenuOptionItem, getButtonCoverPopupStyle, clearBut
 import { SortOption } from './types';
 import { getGenericBookCover, getGenericTextCover } from '../lib/covers';
 import { useApp } from './AppContext';
+import { splitGenres, joinGenres, toggleGenre } from '../data/genres';
 import { voiceLang } from '../data/voices';
 import { targetLanguageName } from '../data/languages';
 
@@ -103,8 +104,18 @@ export function Overlays() {
                         onSubmit={(e) => {
                           e.preventDefault();
                           if (selectorInputValue.trim()) {
-                            page.onSelect(selectorInputValue.trim());
-                            close();
+                            if (sel.multi && !subpage) {
+                              // Digitados (um ou vários, separados por vírgula) entram na lista
+                              const novo = joinGenres([...splitGenres(page.currentValue), ...splitGenres(selectorInputValue)]);
+                              page.onSelect(novo);
+                              setActiveSettingSelector({ ...sel, currentValue: novo });
+                              setSelectorInputValue('');
+                              setSelectorDirection(-1);
+                              setSelectorMode('select');
+                            } else {
+                              page.onSelect(selectorInputValue.trim());
+                              close();
+                            }
                           }
                         }}
                         className="space-y-3"
@@ -173,7 +184,9 @@ export function Overlays() {
                       )}
                       <div className="overflow-y-auto custom-scrollbar space-y-0.5 max-h-[320px]">
                         {page.options.map((option, idx) => {
-                          const isSelected = option.selected ?? page.currentValue === option.value;
+                          const isSelected = option.selected ?? (sel.multi && !subpage
+                            ? splitGenres(page.currentValue).some(g => g.toLowerCase() === String(option.value).toLowerCase())
+                            : page.currentValue === option.value);
                           const isCustomAction = option.value === '__custom__' || option.isCustomInput;
                           const opensPage = Boolean(option.subpage);
                           const showSection = option.section && option.section !== page.options[idx - 1]?.section;
@@ -194,6 +207,11 @@ export function Overlays() {
                                     if (subpage) setSelectorInputValue('');
                                     setSelectorDirection(1);
                                     setSelectorMode(subpage ? `subinput:${subIndex}` : 'input');
+                                  } else if (sel.multi && !subpage) {
+                                    // Várias escolhas: marca/desmarca e continua aberto
+                                    const novo = toggleGenre(page.currentValue, option.value);
+                                    page.onSelect(novo);
+                                    setActiveSettingSelector({ ...sel, currentValue: novo });
                                   } else {
                                     page.onSelect(option.value);
                                     close();
@@ -207,7 +225,7 @@ export function Overlays() {
                               >
                                 {isSelected && (
                                   <motion.div
-                                    layoutId="setting-active-pill"
+                                    layoutId={sel.multi ? undefined : "setting-active-pill"}
                                     className="absolute inset-0 bg-winblue/15 rounded-2xl shadow-[0_0_10px_rgba(var(--winblue-rgb),0.2)] pointer-events-none z-0"
                                     transition={{ type: "spring", stiffness: 520, damping: 36, mass: 0.55 }}
                                   />
@@ -254,7 +272,7 @@ export function Overlays() {
                                   )}
                                   {isSelected && !opensPage && (
                                     <motion.div
-                                      layoutId="setting-active-check"
+                                      layoutId={sel.multi ? undefined : "setting-active-check"}
                                       className="text-winblue shrink-0"
                                       transition={{ type: "spring", stiffness: 520, damping: 36, mass: 0.55 }}
                                     >
