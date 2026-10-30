@@ -178,6 +178,38 @@ def _ffmetadata(caminho: str, titulo: str, autor: str, genero: Optional[str], na
             f.write(f"[CHAPTER]\nTIMEBASE=1/1000\nSTART={ch['start_time']}\nEND={ch['end_time']}\ntitle={esc(ch['title'])}\n\n")
 
 
+def aplicar_ano(caminho: str, ano: Optional[str]) -> None:
+    """Ano de publicação nas tags do arquivo final (MP3: TDRC; M4B/M4A: ©day; FLAC/Opus: DATE)."""
+    ano = str(ano or "").strip()
+    if not ano:
+        return
+    ext = os.path.splitext(caminho)[1].lower()
+    try:
+        if ext == ".mp3":
+            from mutagen.id3 import ID3, TDRC, ID3NoHeaderError
+            try:
+                tags = ID3(caminho)
+            except ID3NoHeaderError:
+                tags = ID3()
+            tags.add(TDRC(encoding=3, text=ano))
+            tags.save(caminho, v2_version=3)
+        elif ext in (".m4b", ".m4a", ".mp4"):
+            from mutagen.mp4 import MP4
+            audio = MP4(caminho)
+            if audio.tags is None:
+                audio.add_tags()
+            audio.tags["©day"] = [ano]
+            audio.save()
+        elif ext in (".flac", ".opus", ".ogg"):
+            from mutagen.flac import FLAC
+            from mutagen.oggopus import OggOpus
+            audio = FLAC(caminho) if ext == ".flac" else OggOpus(caminho)
+            audio["DATE"] = ano
+            audio.save()
+    except Exception:
+        pass  # o ano é um detalhe: nunca falha a conversão por causa dele
+
+
 def _tempo_capitulo(ms: int) -> str:
     h, resto = divmod(int(ms), 3_600_000)
     m, resto = divmod(resto, 60_000)

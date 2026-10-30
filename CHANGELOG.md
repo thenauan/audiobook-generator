@@ -6,6 +6,22 @@ All notable changes to **Audiobook Generator** — the free ebook to audiobook c
 
 ---
 
+## [Unreleased]
+
+### Fixed
+- Converted audiobooks no longer appear twice in **Converted** (existing duplicates are removed when the app opens).
+- Audiobook preview play/pause: only one preview plays at a time, the button turns into pause right away and a second click stops it — no more double playback or previews that can't be paused.
+- The edit screen now shows when an audiobook has synchronized text (checked in the file itself: metadata and .lrc/.srt/.sync.json next to it).
+
+### Changed
+- **One progress percentage** for the whole book (reading, translation, narration, volume, final file and text), always moving forward; the step text no longer shows its own percentage.
+- Next to the time remaining, the count of the current step: parts narrated, chapters with volume adjusted, chapters in the M4B, chapter files generated or text chunks translated.
+- **Time remaining** follows the real pace of the conversion and keeps adjusting (recent pace + average pace, smoothed).
+- Publication **year** is read from the ebook and written to the audiobook (MP3, M4B, FLAC, Opus).
+- **Round desktop icon** (Windows, macOS and app window).
+
+---
+
 ## [1.2.0] — 2026-10-30
 
 ### Supported formats

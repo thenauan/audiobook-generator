@@ -355,7 +355,7 @@ def ler_epub(caminho: str) -> Dict:
         meta = {}
         md = opf.find("opf:metadata", NS)
         if md is not None:
-            for campo in ("title", "creator", "language", "subject", "description"):
+            for campo in ("title", "creator", "language", "subject", "description", "date"):
                 vals = [(e.text or "").strip() for e in md.findall(f"dc:{campo}", NS) if (e.text or "").strip()]
                 meta[campo] = vals
         manifesto = {}

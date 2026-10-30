@@ -45,7 +45,7 @@ except Exception:  # biblioteca opcional: o caminho principal não depende dela
 from mutagen.mp3 import MP3
 from mutagen.id3 import ID3, TIT2, TALB, TRCK, TPE1, TPE2, TCON, APIC, CHAP, CTOC
 
-from audio_output import (FORMATOS, EXTENSOES_AUDIO, formato, qualidade, normalizar_capitulo, duracao_ms,
+from audio_output import (aplicar_ano, FORMATOS, EXTENSOES_AUDIO, formato, qualidade, normalizar_capitulo, duracao_ms,
                           gerar_arquivo_unico, codificar_capitulo, obter_communicate)
 from book_structure import estruturar_livro, preparar_para_narracao, titulo_falado, limpar_texto, texto_completo, LivroIlegivel
 
@@ -281,7 +281,8 @@ async def traduzir_capitulos(caps, file_id, alvo):
 
     def ao_concluir():
         feitos["n"] += 1
-        emit({"type": "progress", "fileId": file_id, "status": "translating", "progress": min(100, feitos["n"] / total * 100)})
+        emit({"type": "progress", "fileId": file_id, "status": "translating", "progress": round(3 + min(1, feitos["n"] / total) * 12, 1),
+              "message": "Traduzindo o texto", "partsDone": min(feitos["n"], total), "partsTotal": total, "partsUnit": "trechos traduzidos"})
 
     # Títulos: um pedido só (uma linha por título); se o tradutor juntar ou separar linhas, traduz um por um
     titulos = [c["titulo"].replace("\n", " ").strip() for c in caps]
@@ -677,6 +678,18 @@ async def process_file(file_info, config):
         narrador = file_info.get("narrator", "")
         cfg = _config_do_livro(file_info, config)
 
+        # Capa: a do e-book. Sem capa (ou só uma imagem SVG, que não vai dentro do áudio), a capa genérica do app,
+        # quando pedida (a versão de terminal pede; o app gráfico mantém o comportamento de sempre)
+        capa = str(file_info.get("cover") or "")
+        if file_info.get("generic_cover") and (not capa or capa.startswith("data:image/svg")):
+            try:
+                from capa_generica import gerar_capa_generica
+                gerada = gerar_capa_generica(titulo, autor, file_info.get("cover_color") or file_info.get("coverColor"))
+                if gerada:
+                    file_info["cover"] = gerada
+            except Exception as e:
+                emit({"type": "log", "message": f"Capa genérica não gerada: {e}"})
+
         pasta_destino = _escolher(file_info, cfg, "outputFolder", "output_dir")
         if not pasta_destino:
             emit({"type": "error", "fileId": file_id, "error": "Pasta de destino não definida. Escolha uma em Ajustes › Armazenamento e pastas."})
@@ -695,7 +708,7 @@ async def process_file(file_info, config):
         is_multiple = fmt_saida == "multiple"
         ext_saida = FORMATOS[fmt_saida]["ext"]
 
-        emit({"type": "progress", "fileId": file_id, "status": "processing", "progress": 0, "message": "Lendo o livro..."})
+        emit({"type": "progress", "fileId": file_id, "status": "processing", "progress": 1, "message": "Lendo o livro"})
 
         # 1) Capítulos
         caps = []
@@ -716,14 +729,15 @@ async def process_file(file_info, config):
 
         # 2) Tradução para o idioma da voz
         if file_info.get("translate"):
-            emit({"type": "progress", "fileId": file_id, "status": "translating", "progress": 0})
+            emit({"type": "progress", "fileId": file_id, "status": "translating", "progress": 3, "message": "Traduzindo o texto"})
             caps = await traduzir_capitulos(caps, file_id, {"zh": "zh-CN"}.get(idioma, idioma))
 
         # 3) Texto do narrador (o texto sincronizado usa o texto sem esses ajustes)
-        emit({"type": "progress", "fileId": file_id, "status": "editing", "progress": 0})
+        inicio_narracao = 15 if file_info.get("translate") else 3
+        emit({"type": "progress", "fileId": file_id, "status": "editing", "progress": inicio_narracao, "message": "Preparando o texto"})
         mapa = file_info.get("pronunciationMap") or file_info.get("pronunciation_map") or cfg.get("pronunciation_map") or []
         narracao = [(titulo_falado(c["titulo"]), preparar_para_narracao(c["conteudo"], voz, mapa)) for c in caps]
-        emit({"type": "progress", "fileId": file_id, "status": "editing", "progress": 100})
+        emit({"type": "progress", "fileId": file_id, "status": "editing", "progress": inicio_narracao, "message": "Preparando o texto"})
 
         # 4) Síntese
         pasta_destino = os.path.abspath(pasta_destino)
@@ -765,24 +779,34 @@ async def process_file(file_info, config):
         _TRAVAS.append(trava)
 
         total = max(1, sum(len([p for p in dividir_em_blocos_seguros(f"{t}.\n\n{x}") if re.search(r"\w", p)]) for t, x in narracao))
-        # Progresso: partes narradas 5-75%, volume dos capítulos 75-85%, arquivo final 85-98%
+        # Uma porcentagem só para o livro todo: leitura até 3%, tradução 3-15%, narração até 75%, volume dos capítulos
+        # 75-85%, arquivo final 85-95% e texto sincronizado 95-99%. Ao lado, a contagem da etapa atual.
         teto = 75
         feitos = {"n": 0}
         caps_prontos = {"n": 0}
+        n_caps = max(1, len(narracao))
+
+        def emitir_volume():
+            emit({"type": "progress", "fileId": file_id, "status": "processing",
+                  "progress": round(teto + caps_prontos["n"] / n_caps * 10, 1), "message": "Ajustando o volume dos capítulos",
+                  "partsDone": caps_prontos["n"], "partsTotal": n_caps, "partsUnit": "capítulos com volume ajustado"})
 
         def progresso(n):
             feitos["n"] += n
-            emit({"type": "progress", "fileId": file_id, "status": "processing", "progress": 5 + feitos["n"] / total * (teto - 5),
-                  "partsDone": feitos["n"], "partsTotal": total})
+            if feitos["n"] >= total:  # narração toda pronta: agora o que falta é o volume dos capítulos
+                emitir_volume()
+                return
+            emit({"type": "progress", "fileId": file_id, "status": "processing",
+                  "progress": round(inicio_narracao + feitos["n"] / total * (teto - inicio_narracao), 1), "message": "Narrando",
+                  "partsDone": feitos["n"], "partsTotal": total, "partsUnit": "partes narradas"})
 
         def capitulo_pronto():
             caps_prontos["n"] += 1
-            if feitos["n"] >= total:  # narração toda pronta: agora o que falta é o volume dos capítulos
-                emit({"type": "progress", "fileId": file_id, "status": "processing",
-                      "progress": teto + caps_prontos["n"] / max(1, len(narracao)) * 10,
-                      "message": f"Ajustando o volume dos capítulos ({caps_prontos['n']}/{len(narracao)})..."})
+            if feitos["n"] >= total:
+                emitir_volume()
 
-        emit({"type": "progress", "fileId": file_id, "status": "processing", "progress": 5, "partsDone": 0, "partsTotal": total})
+        emit({"type": "progress", "fileId": file_id, "status": "processing", "progress": inicio_narracao, "message": "Narrando",
+              "partsDone": 0, "partsTotal": total, "partsUnit": "partes narradas"})
 
         async def medir_velocidade():
             """Velocidade real de download do áudio (média dos últimos segundos), enviada ao card."""
@@ -814,11 +838,23 @@ async def process_file(file_info, config):
         chapters_info = []
         nome_formato = ext_saida.lstrip(".").upper()
 
-        def progresso_final(fracao, rotulo=None):
-            emit({"type": "progress", "fileId": file_id, "status": "processing", "progress": round(85 + fracao * 13, 1),
-                  "message": rotulo or f"Montando o arquivo {nome_formato} ({round(fracao * 100)}%)..."})
+        def progresso_final(fracao, feitos_saida=0, total_saida=None, unidade=None, rotulo=None):
+            emit({"type": "progress", "fileId": file_id, "status": "processing", "progress": round(85 + fracao * 10, 1),
+                  "message": rotulo or f"Montando o arquivo {nome_formato}",
+                  "partsDone": feitos_saida, "partsTotal": total_saida or len(caps),
+                  "partsUnit": unidade or f"capítulos no {nome_formato}"})
 
-        progresso_final(0)
+        def progresso_montagem(fracao):
+            # Quantos capítulos o FFmpeg já escreveu no arquivo final (pelo tempo já gerado)
+            if chapters_info:
+                gerado = fracao * chapters_info[-1]["end_time"]
+                prontos = sum(1 for c in chapters_info if c["end_time"] <= gerado + 1)
+                progresso_final(fracao, prontos, len(chapters_info))
+            else:
+                progresso_final(fracao)
+
+        progresso_final(0, 0, len(caps), "arquivos de capítulo gerados" if is_multiple else None,
+                        "Gerando os arquivos dos capítulos" if is_multiple else None)
         if is_multiple:
             pasta_livro = get_unique_path(os.path.join(pasta_destino, f"{nome_base} (Audiobook)"))
             os.makedirs(pasta_livro, exist_ok=True)
@@ -835,7 +871,8 @@ async def process_file(file_info, config):
             async def um_capitulo_com_progresso(i, f, c):
                 destino = await um_capitulo(i, f, c)
                 prontos_saida["n"] += 1
-                progresso_final(prontos_saida["n"] / len(caps), f"Gerando os arquivos dos capítulos ({prontos_saida['n']}/{len(caps)})...")
+                progresso_final(prontos_saida["n"] / len(caps), prontos_saida["n"], len(caps), "arquivos de capítulo gerados",
+                                "Gerando os arquivos dos capítulos")
                 return destino
 
             gerados = list(await asyncio.gather(*[um_capitulo_com_progresso(i, f, c) for i, (f, c) in enumerate(zip(arquivos_cap, caps), start=1)]))
@@ -849,15 +886,20 @@ async def process_file(file_info, config):
             os.makedirs(pasta_destino, exist_ok=True)
             saida = get_unique_path(os.path.join(pasta_destino, f"{nome_base}{ext_saida}"))
             await asyncio.to_thread(gerar_arquivo_unico, saida, fmt_saida, qualidade_saida, chapters_info, titulo, autor, genero, narrador,
-                                    file_info.get("cover"), cache_dir, progresso_final)
+                                    file_info.get("cover"), cache_dir, progresso_montagem)
             if ext_saida == ".mp3":
                 await asyncio.to_thread(aplicar_tags_arquivo_unico, saida, titulo, autor, file_info.get("cover"), chapters_info, genero, narrador)
             gerados.append(saida)
+        ano = str(file_info.get("year") or "").strip()
+        if ano:
+            for arquivo in gerados:
+                if os.path.splitext(arquivo)[1].lower() in EXTENSOES_AUDIO:
+                    await asyncio.to_thread(aplicar_ano, arquivo, ano)
 
         # 6) Texto sincronizado: os tempos de cada frase vêm da própria síntese (sem transcrever o áudio)
         sync_text_info = None
         if gerar_sync:
-            emit({"type": "progress", "fileId": file_id, "status": "syncing", "progress": 90, "message": "Gerando o texto sincronizado..."})
+            emit({"type": "progress", "fileId": file_id, "status": "syncing", "progress": 95, "message": "Gerando o texto sincronizado"})
             try:
                 from sync_text_tools import save_sync_text
                 destino_texto = _escolher(file_info, cfg, "sync_text_destination", padrao="both")
@@ -894,7 +936,7 @@ async def process_file(file_info, config):
                 sync_text_info = {"content": resultado["content"], "format": resultado["format"], "wordCount": resultado["wordCount"],
                                   "files": resultado.get("files") or [],
                                   "savedToLibrary": resultado["savedToLibrary"], "embedded": len(resultado["embedded"]) > 0}
-                emit({"type": "progress", "fileId": file_id, "status": "syncing", "progress": 99, "message": "Texto sincronizado pronto."})
+                emit({"type": "progress", "fileId": file_id, "status": "syncing", "progress": 99, "message": "Texto sincronizado pronto"})
             except Exception as se:
                 emit({"type": "log", "message": f"Aviso sincronização texto: {se}"})
 

@@ -115,6 +115,12 @@ def _titulo_autor(title, author, file_path, original_name):
     return str(title).strip() or "Desconhecido", author
 
 
+def _ano(texto):
+    """Ano (4 dígitos) de uma data de metadados: "2015-03-01", "D:20150301...", "2015"."""
+    m = re.search(r"(1[5-9]\d\d|20\d\d)", str(texto or ""))
+    return m.group(1) if m else ""
+
+
 def extract_metadata(file_path, original_name=None, ao_parcial=None):
     """Nunca levanta exceção: no pior caso devolve o nome do arquivo como título e nenhum capítulo
     (o conversor tenta ler o livro de novo na hora de converter). `ao_parcial` recebe logo no começo o que
@@ -122,7 +128,7 @@ def extract_metadata(file_path, original_name=None, ao_parcial=None):
     from book_structure import estruturar_livro, ler_epub, ler_texto_arquivo, LivroIlegivel
 
     ext = os.path.splitext(file_path)[1].lower()
-    title = author = genre = subgenre = narrator = language = ""
+    title = author = genre = subgenre = narrator = language = year = ""
     cover_data = None
     avisos = []
     ilegivel = ""
@@ -137,6 +143,7 @@ def extract_metadata(file_path, original_name=None, ao_parcial=None):
             subjects = meta.get("subject") or []
             genre = subjects[0] if subjects else ""
             subgenre = subjects[1] if len(subjects) > 1 else ""
+            year = _ano((meta.get("date") or [""])[0])
             if livro["cover"]:
                 cover_data = _capa_data_url(*livro["cover"])
         elif ext == '.pdf':
@@ -151,6 +158,7 @@ def extract_metadata(file_path, original_name=None, ao_parcial=None):
                 title = meta.title or ""
                 author = meta.author or ""
                 genre = getattr(meta, "subject", "") or ""
+                year = _ano(str(meta.get("/CreationDate", "") or ""))
             try:
                 language = str(reader.trailer['/Root'].get('/Lang', '') or '')
             except Exception:
@@ -163,6 +171,7 @@ def extract_metadata(file_path, original_name=None, ao_parcial=None):
                     title = (livro["meta"].get("title") or [""])[0]
                     author = ", ".join(livro["meta"].get("creator") or [])
                     language = (livro["meta"].get("language") or [""])[0]
+                    year = _ano((livro["meta"].get("date") or [""])[0])
                     if livro["cover"]:
                         cover_data = _capa_data_url(*livro["cover"])
                 else:
@@ -181,7 +190,7 @@ def extract_metadata(file_path, original_name=None, ao_parcial=None):
     if ao_parcial:
         t, a = _titulo_autor(title, author, file_path, original_name)
         try:
-            ao_parcial({"partial": True, "title": t, "author": a, "genre": str(genre).strip(), "subgenre": str(subgenre).strip(),
+            ao_parcial({"partial": True, "title": t, "author": a, "genre": str(genre).strip(), "subgenre": str(subgenre).strip(), "year": year,
                         "language": normalize_language_name(language) if language else "", "cover": cover_data})
         except Exception:
             pass
@@ -234,6 +243,7 @@ def extract_metadata(file_path, original_name=None, ao_parcial=None):
         "author": author,
         "genre": str(genre).strip(),
         "subgenre": str(subgenre).strip(),
+        "year": year,
         "narrator": str(narrator).strip(),
         "language": normalize_language_name(language),
         "charCount": int(char_count),

@@ -27,61 +27,93 @@ export const ConvertingEbookCardItem: React.FC<ConvertingEbookCardItemProps> = (
   const progressStyle = getCoverProgressStyle(accentColor, resolvedTheme === 'dark');
 
   const getStatusText = () => {
-    if (file.status === 'translating') return 'Traduzindo texto...';
-    if (file.status === 'editing') return 'Otimizando pronúncia com IA...';
-    if (file.status === 'syncing') return file.syncMessage || 'Sincronizando áudio e texto...';
     if (file.status === 'idle') return 'Aguardando na fila...';
     if (file.status === 'success' || file.progress >= 100) return 'Audiobook gerado com sucesso!';
-    return file.stageMessage || 'Gerando audiobook...';
+    const etapa = file.stageMessage || (file.status === 'translating' ? 'Traduzindo o texto' : file.status === 'syncing' ? 'Gerando o texto sincronizado' : 'Gerando o audiobook');
+    return `${etapa.replace(/\s*\(\d+%\)/, '').replace(/[.…]+$/, '')}...`;
   };
+
+  // Tempo restante pelo ritmo real da conversão: guarda o progresso ao longo do tempo e combina o ritmo do
+  // último minuto (reage a etapas mais rápidas ou lentas) com o ritmo médio (estável). No começo, sem dados,
+  // usa a estimativa inicial. O número é suavizado e desce de segundo em segundo entre as atualizações.
+  const amostras = React.useRef<{ t: number; p: number }[]>([]);
+  const restanteSuave = React.useRef<number | null>(null);
+  const [, setTique] = React.useState(0);
+  const ativo = file.status !== 'idle' && file.status !== 'success' && file.status !== 'error' && (file.progress || 0) < 100;
+
+  React.useEffect(() => {
+    if (!ativo) return;
+    const lista = amostras.current;
+    const agora = Date.now();
+    const p = file.progress || 0;
+    if (lista.length === 0 || p !== lista[lista.length - 1].p) lista.push({ t: agora, p });
+    while (lista.length > 2 && agora - lista[1].t > 120000) lista.shift(); // janela de ~2 minutos (mais o ponto inicial)
+  }, [file.progress, ativo]);
+
+  // Uma vez por segundo: recalcula pelo ritmo e suaviza (fora da renderização, para não contar em dobro)
+  const calcularRef = React.useRef<() => number | null>(() => null);
+  React.useEffect(() => {
+    if (!ativo) return;
+    const passo = () => {
+      const calculado = calcularRef.current();
+      const anterior = restanteSuave.current;
+      if (calculado != null) {
+        // Entre atualizações o tempo desce 1 s por segundo; uma estimativa nova puxa aos poucos
+        restanteSuave.current = anterior == null ? calculado : Math.max(0, anterior - 1) * 0.8 + calculado * 0.2;
+      } else if (anterior != null) {
+        restanteSuave.current = Math.max(0, anterior - 1);
+      }
+      setTique(n => n + 1);
+    };
+    passo();
+    const id = setInterval(passo, 1000);
+    return () => clearInterval(id);
+  }, [ativo]);
+
+  const estimativaInicialSeg = (() => {
+    const str = file.processingTimeEst || '';
+    let total = 0;
+    const h = str.match(/(\d+)\s*h/i), m = str.match(/(\d+)\s*m(?:in)?/i), sg = str.match(/(\d+)\s*s/i);
+    if (h) total += parseInt(h[1], 10) * 3600;
+    if (m) total += parseInt(m[1], 10) * 60;
+    if (sg) total += parseInt(sg[1], 10);
+    return total > 0 ? total : null;
+  })();
+
+  const calcularRestante = (): number | null => {
+    const lista = amostras.current;
+    const p = file.progress || 0;
+    const agora = Date.now();
+    if (lista.length < 2) return estimativaInicialSeg != null ? estimativaInicialSeg * (100 - p) / 100 : null;
+    const primeiro = lista[0];
+    const decorrido = (agora - primeiro.t) / 1000;
+    const ganhoTotal = p - primeiro.p;
+    // Ritmo recente: do ponto de ~60 s atrás até agora
+    const ref = [...lista].reverse().find(a => agora - a.t >= 60000) || primeiro;
+    const ritmoRecente = (p - ref.p) / Math.max(1, (agora - ref.t) / 1000);
+    const ritmoMedio = ganhoTotal / Math.max(1, decorrido);
+    if (ganhoTotal < 0.5 || decorrido < 8) {
+      return estimativaInicialSeg != null ? estimativaInicialSeg * (100 - p) / 100 : null;
+    }
+    const ritmo = ritmoRecente > 0 ? ritmoRecente * 0.6 + ritmoMedio * 0.4 : ritmoMedio;
+    return ritmo > 0 ? (100 - p) / ritmo : null;
+  };
+
+  calcularRef.current = calcularRestante;
 
   const getTimeRemainingStr = () => {
     if (file.status === 'success' || file.progress >= 100) return 'Concluído';
     if (file.status === 'idle') return 'Aguardando fila...';
-    
-    // Parse do tempo total estimado a partir de processingTimeEst
-    const parseEstimatedSec = (str?: string) => {
-      if (!str) return 120;
-      let total = 0;
-      const hMatch = str.match(/(\d+)\s*h/i);
-      const mMatch = str.match(/(\d+)\s*m(?:in)?/i);
-      const sMatch = str.match(/(\d+)\s*s(?:eg)?/i);
-      if (hMatch) total += parseInt(hMatch[1], 10) * 3600;
-      if (mMatch) total += parseInt(mMatch[1], 10) * 60;
-      if (sMatch) total += parseInt(sMatch[1], 10);
-      return total > 0 ? total : 120;
-    };
-
-    const totalEstSec = parseEstimatedSec(file.processingTimeEst);
-
-    if (file.progress > 0) {
-      const remainingPct = Math.max(0, 100 - (file.progress || 0));
-      const remSec = Math.max(3, Math.round((remainingPct / 100) * totalEstSec));
-      if (remSec >= 3600) {
-        const remH = Math.floor(remSec / 3600);
-        const remM = Math.ceil((remSec % 3600) / 60);
-        return `${remH}h ${remM}m restante(s)`;
-      }
-      if (remSec >= 60) {
-        const remM = Math.floor(remSec / 60);
-        const remS = remSec % 60;
-        return remS > 5 ? `${remM}m ${remS}s restante(s)` : `${remM} min restante(s)`;
-      }
-      return `${remSec}s restante(s)`;
-    }
-
-    if (file.processingTimeEst) {
-      const clean = file.processingTimeEst.replace(/restantes?/i, '').trim();
-      if (clean.toLowerCase().includes('aguardando')) return clean;
-      return `${clean} restante(s)`;
-    }
-    return 'Calculando tempo...';
+    const suave = restanteSuave.current;
+    if (suave == null) return 'Calculando tempo...';
+    const seg = Math.max(1, Math.round(suave));
+    if (seg >= 3600) return `${Math.floor(seg / 3600)}h ${Math.round((seg % 3600) / 60)}m restante(s)`;
+    if (seg >= 60) return `${Math.floor(seg / 60)}m ${String(seg % 60).padStart(2, '0')}s restante(s)`;
+    return `${seg}s restante(s)`;
   };
 
-  const partsTotal = file.partsTotal || (file.chapters && file.chapters.length > 0 ? file.chapters.length : 10);
-  const partsDone = file.partsDone !== undefined 
-    ? file.partsDone 
-    : Math.min(partsTotal, Math.max(file.progress > 0 ? 1 : 0, Math.round(((file.progress || 0) / 100) * partsTotal)));
+  // Contagem da etapa atual (partes narradas, capítulos com volume ajustado, capítulos no M4B...)
+  const partsLabel = file.partsTotal ? `${file.partsDone ?? 0}/${file.partsTotal} ${file.partsUnit || 'partes'}` : null;
 
   // Velocidade real de download do áudio, medida pelo conversor (fora da narração fica em 0)
   const getSpeedStr = () => {
@@ -183,11 +215,13 @@ export const ConvertingEbookCardItem: React.FC<ConvertingEbookCardItemProps> = (
                     <span>{getTimeRemainingStr()}</span>
                   </div>
 
-                  {/* Partes com ícone à esquerda */}
-                  <div className="flex items-center gap-1.5" title="Partes do audiobook">
-                    <Layers size={12} className="opacity-80 shrink-0 text-inherit" />
-                    <span>{partsDone}/{partsTotal} partes</span>
-                  </div>
+                  {/* Contagem da etapa atual, com ícone à esquerda */}
+                  {partsLabel && (
+                    <div className="flex items-center gap-1.5" title="Andamento da etapa atual">
+                      <Layers size={12} className="opacity-80 shrink-0 text-inherit" />
+                      <span>{partsLabel}</span>
+                    </div>
+                  )}
 
                   {/* Download / Velocidade com ícone à esquerda */}
                   <div className="flex items-center gap-1.5" title="Velocidade de processamento">

@@ -607,6 +607,29 @@ async function startServer() {
     }
   });
 
+  // Texto sincronizado de um audiobook: nos metadados do arquivo (MP3: SYLT/USLT; M4B: ©lyr; FLAC/Opus: LYRICS)
+  // e/ou ao lado dele na pasta (.lrc, .srt, .sync.json)
+  app.post("/api/sync-text-status", express.json(), (req, res) => {
+    const audio = typeof req.body?.path === 'string' ? path.resolve(req.body.path) : '';
+    if (!audio || !fs.existsSync(audio) || !AUDIO_EXTENSIONS.has(path.extname(audio).toLowerCase())) {
+      return res.json({ exists: false, embedded: false, files: [] });
+    }
+    const base = audio.slice(0, -path.extname(audio).length);
+    const files = ['.lrc', '.sync.json', '.srt'].map(e => base + e).filter(f => fs.existsSync(f));
+    const script = [
+      'import sys, mutagen',
+      'f = mutagen.File(sys.argv[1])',
+      'ok = False',
+      'if f is not None and f.tags is not None:',
+      '    keys = [str(k) for k in f.tags.keys()]',
+      '    ok = any(k.startswith(("SYLT", "USLT")) or k in ("\xa9lyr", "LYRICS", "lyrics") for k in keys)',
+      'print("1" if ok else "0")',
+    ].join('\n');
+    execFile(PYTHON_CMD, ['-c', script, audio], { env: PY_ENV, windowsHide: true, timeout: 20000 }, (err, stdout) => {
+      res.json({ exists: true, embedded: !err && String(stdout).trim() === '1', files });
+    });
+  });
+
   app.post("/api/open-folder", express.json(), (req, res) => {
     try {
       let folderPath = req.body.path || path.join(process.cwd(), 'meus audiobooks');
@@ -761,6 +784,7 @@ async function startServer() {
           author: info.author || 'Desconhecido',
           genre: info.genre || '',
           subgenre: info.subgenre || '',
+          year: info.year || '',
           narrator: info.narrator || '',
           language: info.language || '',
           voice: info.voice || config.voice || 'pt-BR-AntonioNeural',

@@ -214,36 +214,49 @@ export function useAppState() {
   const [playingSnippet, setPlayingSnippet] = useState<{ path: string; tempUrl: string } | null>(null);
   const snippetHowlRef = useRef<Howl | null>(null);
 
+  // Trecho de um audiobook: um só tocando por vez. O trecho é recortado pelo servidor (leva alguns segundos):
+  // durante essa espera o botão já vira "pausar", um segundo clique cancela, e uma resposta que chega atrasada
+  // (de um clique antigo) é descartada — antes isso fazia tocar duplicado ou não deixava pausar.
+  const snippetTokenRef = useRef(0);
+  const snippetCurrentRef = useRef<{ path: string; tempUrl?: string } | null>(null);
+  const deleteSnippetFile = (tempUrl?: string) => {
+    if (tempUrl) fetch('/api/delete-snippet', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tempUrl }) }).catch(() => {});
+  };
+  const stopSnippet = () => {
+    snippetTokenRef.current += 1; // invalida qualquer pedido em andamento
+    try { snippetHowlRef.current?.unload(); } catch { /* já parado */ }
+    snippetHowlRef.current = null;
+    deleteSnippetFile(snippetCurrentRef.current?.tempUrl);
+    snippetCurrentRef.current = null;
+    setPlayingSnippet(null);
+  };
   const toggleSnippet = async (path: string) => {
-    if (playingSnippet && playingSnippet.path === path) {
-      snippetHowlRef.current?.stop();
-      fetch('/api/delete-snippet', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tempUrl: playingSnippet.tempUrl }) }).catch(() => {});
-      setPlayingSnippet(null);
-    } else {
-      if (snippetHowlRef.current && playingSnippet) {
-        snippetHowlRef.current.stop();
-        fetch('/api/delete-snippet', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tempUrl: playingSnippet.tempUrl }) }).catch(() => {});
-      }
-      try {
-        const res = await fetch('/api/snippet', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ path }) });
-        const data = await res.json();
-        if (data.url) {
-          setPlayingSnippet({ path, tempUrl: data.url });
-          const sound = new Howl({
-            src: [data.url],
-            html5: true,
-            onend: () => {
-              fetch('/api/delete-snippet', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tempUrl: data.url }) }).catch(() => {});
-              setPlayingSnippet(null);
-            },
-            onloaderror: () => setPlayingSnippet(null),
-            onplayerror: () => setPlayingSnippet(null)
-          });
-          sound.play();
-          snippetHowlRef.current = sound;
-        }
-      } catch (e) {
-        setPlayingSnippet(null);
+    const atual = snippetCurrentRef.current;
+    stopSnippet();
+    if (atual && atual.path === path) return; // era este trecho (tocando ou carregando): só para
+    const token = snippetTokenRef.current;
+    snippetCurrentRef.current = { path };
+    setPlayingSnippet({ path, tempUrl: '' });
+    try {
+      const res = await fetch('/api/snippet', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ path }) });
+      const data = await res.json().catch(() => ({}));
+      if (token !== snippetTokenRef.current) { deleteSnippetFile(data.url); return; } // cancelado enquanto carregava
+      if (!res.ok || !data.url) throw new Error(data.error || 'trecho indisponível');
+      snippetCurrentRef.current = { path, tempUrl: data.url };
+      setPlayingSnippet({ path, tempUrl: data.url });
+      const sound = new Howl({
+        src: [data.url],
+        html5: true,
+        onend: () => { if (token === snippetTokenRef.current) stopSnippet(); },
+        onloaderror: () => { if (token === snippetTokenRef.current) { stopSnippet(); showToast('Não foi possível tocar o trecho deste audiobook.'); } },
+        onplayerror: () => { if (token === snippetTokenRef.current) { stopSnippet(); showToast('Não foi possível tocar o trecho deste audiobook.'); } },
+      });
+      snippetHowlRef.current = sound;
+      sound.play();
+    } catch (e) {
+      if (token === snippetTokenRef.current) {
+        stopSnippet();
+        showToast(`Não foi possível tocar o trecho: ${e instanceof Error ? e.message : e}`);
       }
     }
   };
@@ -275,6 +288,8 @@ export function useAppState() {
   // Estados de Conversão e Arquivos
   const [phase, setPhase] = useState<Phase>(0);
   const [files, setFiles] = useState<AppFile[]>([]);
+  // Livros cuja conclusão já foi registrada em Convertidos (evita registrar o mesmo livro duas vezes)
+  const completedFileIdsRef = useRef<Set<string>>(new Set());
 
   // Lista vazia (último livro removido, com ou sem erro, convertendo ou não): volta a área de arrastar
   useEffect(() => {
@@ -410,8 +425,16 @@ export function useAppState() {
   const [history, setHistory] = useState<HistoryItem[]>(() => {
     if (typeof window === 'undefined') return DEFAULT_AUDIOBOOKS;
     const items = loadJSON<HistoryItem[]>('audiobook_history', DEFAULT_AUDIOBOOKS, isArray);
-    // O histórico mostra só audiobooks convertidos com sucesso (e ignora entradas corrompidas)
-    return items.filter(h => h && typeof h === 'object' && h.id && h.status !== 'error');
+    // O histórico mostra só audiobooks convertidos com sucesso (e ignora entradas corrompidas).
+    // Versões anteriores podiam registrar o mesmo audiobook duas vezes: o mesmo arquivo de áudio vira um item só.
+    const seen = new Set<string>();
+    return items.filter(h => {
+      if (!h || typeof h !== 'object' || !h.id || h.status === 'error') return false;
+      const key = h.path ? `path:${h.path}` : `id:${h.id}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
   });
 
   useEffect(() => {
@@ -1219,6 +1242,23 @@ export function useAppState() {
     }
     setActiveBookMenu(null);
     navigateTo('edit-audiobook');
+    // Confere no próprio arquivo se ele tem texto sincronizado (o registro pode estar desatualizado)
+    if (book.path) {
+      fetch('/api/sync-text-status', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ path: book.path }) })
+        .then(r => r.json())
+        .then((st: { exists?: boolean; embedded?: boolean; files?: string[] }) => {
+          if (!st?.exists) return;
+          const lrc = (st.files || []).find(f => /\.lrc$/i.test(f));
+          const has = Boolean(st.embedded || (st.files && st.files.length > 0));
+          setEditBookHasTranscript(has);
+          setEditBookTranscriptFileName(st.embedded ? undefined : lrc ? lrc.split(/[\\/]/).pop() : undefined);
+          if (has) setEditBookGenerateSyncText(true);
+          if (has !== Boolean(book.hasTranscript)) {
+            setHistory(prev => prev.map(h => h.id === book.id ? { ...h, hasTranscript: has } : h));
+          }
+        })
+        .catch(() => { /* sem servidor: fica o que estava registrado */ });
+    }
   };
 
   const handleSaveBookEdits = async () => {
@@ -1592,23 +1632,34 @@ export function useAppState() {
           const newFiles = prevFiles.map((f): AppFile => {
             if (f.id === data.fileId) {
               if (data.type === 'progress') {
-                const currentProg = data.progress;
-                if (data.status === 'translating') {
-                  return { ...f, translationProgress: currentProg, status: 'translating', isTranslating: true, isEditing: false };
-                } else if (data.status === 'editing') {
-                  return { ...f, editingProgress: currentProg, status: 'editing', isEditing: true, isTranslating: false, translationProgress: 100 };
-                } else if (data.status === 'syncing') {
-                  return { ...f, progress: currentProg, status: 'syncing', syncMessage: data.message || 'Sincronizando áudio e texto...', editingProgress: 100, translationProgress: 100, isEditing: false, isTranslating: false };
-                } else {
-                  return { ...f, progress: currentProg, status: 'processing', syncMessage: undefined, stageMessage: data.message || (data.partsDone !== undefined ? undefined : f.stageMessage), editingProgress: 100, translationProgress: 100, isEditing: false, isTranslating: false, partsDone: data.partsDone !== undefined ? data.partsDone : f.partsDone, partsTotal: data.partsTotal || f.partsTotal };
-                }
+                // Uma porcentagem só para o livro todo (tradução, narração, volume, montagem e texto já embutidos);
+                // ao lado do tempo, a contagem da etapa atual (partes narradas, capítulos com volume ajustado...)
+                const status: AppFile['status'] = data.status === 'translating' || data.status === 'editing' || data.status === 'syncing' ? data.status : 'processing';
+                const hasCount = typeof data.partsTotal === 'number' && data.partsTotal > 0;
+                return {
+                  ...f,
+                  status,
+                  progress: typeof data.progress === 'number' ? data.progress : f.progress,
+                  stageMessage: data.message || f.stageMessage,
+                  syncMessage: status === 'syncing' ? (data.message || f.syncMessage) : undefined,
+                  partsDone: hasCount ? data.partsDone : undefined,
+                  partsTotal: hasCount ? data.partsTotal : undefined,
+                  partsUnit: hasCount ? (data.partsUnit || 'partes') : undefined,
+                  isTranslating: status === 'translating',
+                  isEditing: status === 'editing',
+                };
               } else if (data.type === 'done') {
+                // O React pode rodar esta atualização duas vezes (modo de desenvolvimento) e o servidor reenvia o
+                // último evento ao reconectar: o que acontece "uma vez por livro" só roda na primeira vez
+                const firstDone = !completedFileIdsRef.current.has(f.id);
+                completedFileIdsRef.current.add(f.id);
                 const bookCover = f.customCover || f.cover || getGenericBookCover(f.title, f.author, f.coverColor);
+                if (firstDone) {
                 triggerHistoryCoverBadge(bookCover, f.title);
 
                 // Adiciona imediatamente este audiobook concluído ao histórico
                 const completedHistoryItem: HistoryItem = {
-                  id: Math.random().toString(),
+                  id: `book-${f.id}`,
                   title: f.title,
                   author: f.author,
                   genre: f.genre,
@@ -1623,9 +1674,14 @@ export function useAppState() {
                   // Arquivos do audiobook (o texto salvo na biblioteca vira um item próprio em Textos)
                   files: (data.paths || []).filter((p: string) => !/\.(lrc|srt|vtt)$|\.sync\.json$/i.test(p)),
                   duration: data.finalDuration || f.durationEst,
-                  size: data.finalSize || f.audioSizeEst
+                  size: data.finalSize || f.audioSizeEst,
+                  // Texto sincronizado gerado junto: nos metadados do arquivo e/ou como .lrc na pasta
+                  hasTranscript: Boolean(data.syncText?.embedded || data.syncText?.savedToLibrary),
+                  transcriptFileName: data.syncText?.embedded
+                    ? undefined
+                    : (data.syncText?.files || []).find((p: string) => /\.lrc$/i.test(p))?.split(/[\\/]/).pop(),
                 };
-                setHistory(prev => [completedHistoryItem, ...prev]);
+                setHistory(prev => prev.some(h => h.id === completedHistoryItem.id) ? prev : [completedHistoryItem, ...prev]);
                 if (data.syncText?.savedToLibrary && data.syncText.content) {
                   addSyncTextToLibrary(f.title, f.author, f.coverColor, data.syncText.content, data.syncText.wordCount, data.syncText.files);
                 }
@@ -1641,6 +1697,7 @@ export function useAppState() {
                     return remaining;
                   });
                 }, 1000);
+                }
 
                 return { 
                   ...f, 
@@ -1737,6 +1794,7 @@ export function useAppState() {
             author: a || f.author,
             genre: data.genre || f.genre,
             subgenre: data.subgenre || f.subgenre,
+            year: f.year || data.year || undefined,
             language: data.language ? normalizeLanguageName(data.language) : f.language,
             cover: data.cover || f.cover,
           };
@@ -1794,6 +1852,7 @@ export function useAppState() {
               author: rawAuthor || 'Desconhecido',
               genre: data.genre || '',
               subgenre: data.subgenre || '',
+              year: f.year || data.year || '',
               narrator: data.narrator || '',
               language: detectedLang,
               charCount: typeof data.charCount === 'number' ? data.charCount : undefined,
@@ -1883,6 +1942,7 @@ export function useAppState() {
       author: f.author.trim() || 'Desconhecido',
       genre: f.genre || '',
       subgenre: f.subgenre || '',
+      year: f.year || '',
       narrator: f.narrator || '',
       language: normalizeLanguageName(f.language),
       voice: effectiveVoice(f, voiceCode),

@@ -59,6 +59,8 @@ export interface AppFile {
   /** Idioma (código de duas letras) para o qual o livro é traduzido antes de narrar */
   translateTo?: string;
   partsTotal?: number;
+  /** O que está sendo contado na etapa atual ("partes narradas", "capítulos com volume ajustado"...) */
+  partsUnit?: string;
   /** Velocidade real de download do áudio da narração (bytes por segundo) */
   speedBps?: number;
   /** Etapa atual da conversão depois da narração (volume dos capítulos, montagem do arquivo) */
