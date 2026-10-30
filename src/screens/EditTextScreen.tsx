@@ -2,7 +2,7 @@
 import { motion } from 'motion/react';
 import { Check, X } from 'lucide-react';
 import { transicaoConteudo } from '../navigation/transitions';
-import { GENERIC_COVER_COLORS, getGenericTextCover } from '../lib/covers';
+import { COVER_COLOR_PICKER, getGenericTextCover } from '../lib/covers';
 import { useApp } from '../app/AppContext';
 
 export function EditTextScreen() {
@@ -34,7 +34,7 @@ export function EditTextScreen() {
               Cor da capa
             </span>
             <div className="grid grid-cols-6 gap-x-3 gap-y-3.5 justify-items-center px-2.5 py-3 rounded-2xl bg-card/60 backdrop-blur-md border border-[var(--text-main)]/10 shadow-sm w-full">
-              {GENERIC_COVER_COLORS.map(c => {
+              {COVER_COLOR_PICKER.map(c => {
                 const isSelected = editTextColor.toLowerCase() === c.hex.toLowerCase();
                 return (
                   <button

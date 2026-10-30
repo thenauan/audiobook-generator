@@ -29,7 +29,7 @@ export const AUDIO_QUALITIES: { value: AudioQuality; label: string; description:
 ];
 
 export const isAudioFormat = (v: unknown): v is AudioFormat => AUDIO_FORMATS.some(f => f.value === v);
-export const audioFormatInfo = (v?: string | null) => AUDIO_FORMATS.find(f => f.value === v) || AUDIO_FORMATS[1];
+export const audioFormatInfo = (v?: string | null) => AUDIO_FORMATS.find(f => f.value === v) || AUDIO_FORMATS[0];
 export const audioQualityLabel = (v?: string | null) => AUDIO_QUALITIES.find(q => q.value === v)?.label || 'Alta';
 
 // Formato a partir da extensão de um arquivo já gerado (edição de audiobooks do histórico)

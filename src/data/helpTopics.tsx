@@ -78,7 +78,7 @@ export const HELP_TOPICS: HelpTopic[] = [
       { icon: Captions, title: 'Na pasta da biblioteca', text: 'Salva .lrc, .srt e .sync.json ao lado do áudio, e o texto aparece em "Meus textos".' },
     ],
     faq: [
-      { q: 'Onde escolho o destino do texto?', a: 'Em Ajustes › Conversão de Áudio › "Salvar texto sincronizado em".' },
+      { q: 'Onde escolho o destino do texto?', a: 'Em Ajustes › Conversão de áudio › "Salvar texto sincronizado em".' },
       { q: 'E audiobooks com um arquivo por capítulo?', a: 'Nesse caso o texto é sempre salvo na pasta da biblioteca, porque não há um arquivo único para guardá-lo.' },
       { q: 'Posso editar o texto depois?', a: 'Sim. Em "Meus textos", use "Editar dados" no menu do texto. Na edição de um audiobook também é possível trocar ou remover o texto anexado.' },
     ],
@@ -104,7 +104,7 @@ export const HELP_TOPICS: HelpTopic[] = [
       { icon: LayoutGrid, title: 'Barra de letras', text: 'Em "Ver todos", a barra à direita leva direto a cada letra, década ou faixa de duração.' },
     ],
     faq: [
-      { q: 'Excluir apaga o arquivo do computador?', a: 'Não. O item sai de Convertidos, mas o áudio e os textos continuam na pasta de salvamento.' },
+      { q: 'Excluir apaga o arquivo do computador?', a: 'Sim. O item sai de Convertidos e os arquivos (o áudio, a pasta de capítulos ou os arquivos do texto) vão para a Lixeira do computador, de onde dá para recuperar. Textos gerados antes da versão 1.1 só saem da lista.' },
       { q: 'Por que um audiobook não aparece?', a: 'Só aparecem os audiobooks convertidos com sucesso. Conversões com erro ficam no Conversor, com a opção de tentar de novo.' },
     ],
   },
@@ -116,12 +116,12 @@ export const HELP_TOPICS: HelpTopic[] = [
     icon: AudioWaveform,
     intro: 'A voz é gerada em alta qualidade, normalizada e guardada sem perdas antes de virar o arquivo final, que é codificado uma única vez. Assim, o formato e a qualidade escolhidos definem só o tamanho do arquivo e a compatibilidade, sem perdas acumuladas.',
     steps: [
-      { title: 'Escolha o formato padrão', text: 'Em Ajustes › Conversão de Áudio › "Formato do audiobook".' },
+      { title: 'Escolha o formato padrão', text: 'Em Ajustes › Conversão de áudio › "Formato do audiobook".' },
       { title: 'Escolha a qualidade', text: 'No mesmo lugar, em "Qualidade": Padrão, Alta ou Máxima.' },
       { title: 'Troque por livro, se quiser', text: 'A etiqueta de formato no card de cada e-book muda só aquele livro.' },
     ],
     features: [
-      { icon: FileAudio, title: 'M4B (AAC)', text: 'Um arquivo com capítulos e capa, o formato preferido dos apps de audiobook.' },
+      { icon: FileAudio, title: 'M4B (AAC)', text: 'Formato padrão do app. Um arquivo com capítulos e capa, o preferido dos apps de audiobook.' },
       { icon: Music4, title: 'MP3', text: 'Toca em qualquer aparelho. Leva capítulos e capa; também pode ser gerado como um MP3 por capítulo.' },
       { icon: Gauge, title: 'Opus', text: 'A melhor qualidade pelo menor tamanho, com capítulos e capa.' },
       { icon: Layers, title: 'FLAC e WAV', text: 'Sem perda. FLAC mantém capítulos e capa; WAV é para edição e não guarda capítulos.' },
@@ -150,6 +150,32 @@ export const HELP_TOPICS: HelpTopic[] = [
     ],
   },
   {
+    id: 'voices',
+    title: 'Vozes e idiomas',
+    subtitle: 'Mais de 300 vozes da Microsoft, em mais de 70 idiomas',
+    gradient: 'from-fuchsia-600 via-purple-600 to-indigo-600',
+    icon: Mic,
+    intro: 'O app usa as vozes neurais da Microsoft (as mesmas do "Ler em voz alta" do Edge): mais de 300 vozes em mais de 70 idiomas. A interface existe em português, inglês, espanhol, árabe e russo, mas dá para narrar audiobooks em qualquer idioma que tenha voz, como francês, alemão, italiano, japonês, chinês, coreano, grego, sueco, polonês, turco, hindi e muitos outros.',
+    steps: [
+      { title: 'Carregue o e-book', text: 'O app reconhece o idioma do livro e mostra só as vozes desse idioma na etiqueta de voz do card.' },
+      { title: 'Ouça antes de escolher', text: 'Nas listas de vozes, passe o mouse sobre uma voz e clique no botão de play para ouvir a amostra.' },
+      { title: 'Escolha a voz', text: 'Clique na voz. A escolha vale só para aquele livro; a voz padrão fica em Ajustes › Conversão de áudio.' },
+      { title: 'Idioma errado?', text: 'Na etiqueta de idioma do card, use "Corrigir idioma" e escolha ou digite o idioma certo (por exemplo, "Grego"). As vozes desse idioma aparecem em seguida.' },
+    ],
+    features: [
+      { icon: Languages, title: 'Idiomas da interface', text: 'Português (Brasil), English, Español, العربية (árabe) e Русский (russo). Troque em Ajustes › Interface › Idioma.' },
+      { icon: Globe, title: 'Narração em qualquer idioma', text: 'Livros em outros idiomas são narrados com as vozes daquele idioma, mesmo que a interface não esteja nele. Os títulos genéricos de capítulo também saem no idioma do livro.' },
+      { icon: Play, title: 'Amostras de voz', text: 'Todas as vozes de português, inglês, espanhol, árabe e russo têm amostra para ouvir. As vozes dos outros idiomas funcionam normalmente, só não têm amostra.' },
+      { icon: Mic, title: 'Vozes de outros idiomas', text: 'Na voz padrão (Ajustes), a lista mostra primeiro as vozes do idioma da interface; "Vozes de outros idiomas" abre todas as demais, agrupadas por idioma.' },
+    ],
+    faq: [
+      { q: 'Por que só aparecem vozes de um idioma?', a: 'A lista mostra as vozes do idioma do livro, para a narração soar natural. Se o idioma não for reconhecido, aparecem todas as vozes, agrupadas por idioma.' },
+      { q: 'Posso narrar um livro em francês com a interface em português?', a: 'Sim. A interface e a narração são independentes: o livro em francês é narrado por uma voz francesa.' },
+      { q: 'Quero ouvir o livro em outro idioma', a: 'Use "Traduzir para" na etiqueta de idioma do card. A tradução está disponível para os idiomas da interface (português, inglês, espanhol, árabe e russo).' },
+      { q: 'Preciso de internet?', a: 'Sim. As vozes são geradas pelo serviço da Microsoft durante a conversão.' },
+    ],
+  },
+  {
     id: 'folders',
     title: 'Pastas e arquivos',
     subtitle: 'Onde os audiobooks e textos são salvos',
@@ -157,7 +183,7 @@ export const HELP_TOPICS: HelpTopic[] = [
     icon: FolderOpen,
     intro: 'Tudo o que o app cria fica na pasta escolhida na configuração inicial. Os arquivos são seus: podem ser copiados para o celular, abertos em qualquer player ou movidos para outro lugar.',
     steps: [
-      { title: 'Veja a pasta atual', text: 'Em Ajustes › Armazenamento & Pastas.' },
+      { title: 'Veja a pasta atual', text: 'Em Ajustes › Armazenamento e pastas. O botão Ver pasta abre a pasta no explorador de arquivos.' },
       { title: 'Troque se quiser', text: 'Use "Alterar pasta". Os próximos audiobooks serão salvos no novo local.' },
       { title: 'Abra um audiobook no Explorer', text: 'Em Convertidos, use "Abrir na Pasta" no menu do audiobook, ou "Ver na pasta" em "Mais detalhes".' },
     ],

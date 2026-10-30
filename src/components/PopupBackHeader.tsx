@@ -20,7 +20,7 @@ export function PopupBackHeader({ title, onBack, backLabel = 'Voltar' }: { title
           <span>{backLabel}</span>
         </motion.button>
       )}
-      <h4 className="text-sm font-bold text-[var(--text-main)] truncate text-center">{title}</h4>
+      <h4 className="text-xl font-bold text-[var(--text-main)] truncate text-center">{title}</h4>
     </div>
   );
 }

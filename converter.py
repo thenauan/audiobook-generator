@@ -1,24 +1,86 @@
+"""
+Conversor de e-books em audiobooks.
+
+Fluxo de cada livro:
+  1. Capítulos: os enviados pelo app (detectados ao carregar e revisados pelo usuário) ou os do
+     book_structure (sumário do livro, títulos do HTML ou heurística).
+  2. Tradução (opcional), capítulo por capítulo, para o idioma da voz.
+  3. Texto para o narrador: dicionário de pronúncia, abreviações e pontuação (book_structure).
+  4. Síntese: blocos de até 2.500 caracteres, em paralelo entre todos os capítulos e livros (limite
+     global de conexões), cada bloco salvo em disco assim que chega (retomada sem perder nada).
+  5. Cada capítulo é normalizado (EBU R128) e guardado sem perda; o arquivo final é codificado uma vez.
+  6. Texto sincronizado (opcional) com o texto exato que foi narrado.
+"""
+import asyncio
+import hashlib
+import html
+import json
 import os
 import re
-import asyncio
 import shutil
-import zipfile
-import gc
-import json
 import sys
-import ebooklib
-from ebooklib import epub
-from bs4 import BeautifulSoup
-from pypdf import PdfReader
-import mobi
-from deep_translator import GoogleTranslator
-from langdetect import detect, DetectorFactory
+import tempfile
+import subprocess
+
+# O conversor roda fora do console do app (para o Ctrl+C não derrubá-lo). Sem console, cada programa que
+# ele abre (FFmpeg etc.) criaria uma janela própria na tela: no Windows, todos abrem sem janela.
+if os.name == "nt":
+    _popen_init = subprocess.Popen.__init__
+
+    def _popen_sem_janela(self, *args, **kwargs):
+        # CREATE_NO_WINDOW | BELOW_NORMAL_PRIORITY_CLASS: sem janela e sem disputar a CPU com o app
+        kwargs["creationflags"] = kwargs.get("creationflags", 0) | 0x08000000 | 0x00004000
+        _popen_init(self, *args, **kwargs)
+
+    subprocess.Popen.__init__ = _popen_sem_janela
+
+import urllib.error
+import urllib.parse
+import urllib.request
+
+try:
+    from deep_translator import GoogleTranslator
+except Exception:  # biblioteca opcional: o caminho principal não depende dela
+    GoogleTranslator = None
 from mutagen.mp3 import MP3
 from mutagen.id3 import ID3, TIT2, TALB, TRCK, TPE1, TPE2, TCON, APIC, CHAP, CTOC
+
 from audio_output import (FORMATOS, EXTENSOES_AUDIO, formato, qualidade, normalizar_capitulo, duracao_ms,
                           gerar_arquivo_unico, codificar_capitulo, obter_communicate)
+from book_structure import estruturar_livro, preparar_para_narracao, titulo_falado, limpar_texto, texto_completo, LivroIlegivel
 
-DetectorFactory.seed = 0
+# Conexões simultâneas com o serviço de voz (todas as conversões somadas) e conversões do FFmpeg ao mesmo tempo
+TTS_CONEXOES = 10  # medido: 10 conexões dobram a velocidade; acima disso o serviço limita
+FFMPEG_PARALELO = max(1, min(4, (os.cpu_count() or 2) // 2))
+TAMANHO_BLOCO = 2500
+PAUSA_INICIAL_S = 1.5  # pausa no começo de cada capítulo (normalizar_capitulo)
+_sem_tts = None
+_sem_ffmpeg = None
+_sem_traducao = None
+
+
+# Última etapa de cada livro (vai nos detalhes dos erros)
+_ETAPA = {}
+_NOMES_ETAPA = {"translating": "tradução", "editing": "preparação do texto", "processing": "narração",
+                "syncing": "montagem do áudio e texto sincronizado"}
+
+
+def emit(event):
+    # Eventos para o servidor (repassados ao app por Server-Sent Events)
+    fid = event.get("fileId")
+    if fid and event.get("status") in _NOMES_ETAPA:
+        _ETAPA[fid] = _NOMES_ETAPA[event["status"]]
+    if event.get("type") == "error" and fid and "details" not in event:
+        event = {**event, "details": f"Etapa: {_ETAPA.get(fid, 'início')}"}
+    print(json.dumps(event, ensure_ascii=False), flush=True)
+
+
+def _detalhes_erro(file_id, e, rastreio=None):
+    linhas = [f"Etapa: {_ETAPA.get(file_id, 'início')}", f"Erro: {type(e).__name__}: {e}"]
+    if rastreio:
+        linhas += ["", "Rastreio:", rastreio.strip()[-3000:]]
+    return "\n".join(linhas)
+
 
 def get_unique_path(base_path):
     if not os.path.exists(base_path):
@@ -29,406 +91,469 @@ def get_unique_path(base_path):
         counter += 1
     return f"{name} ({counter}){ext}"
 
-def limpar_texto_tts(texto: str) -> str:
-    """Filtro prévio de higienização de texto para TTS.
-    Remove quebras de linha com hífen, notas de rodapé, chamadas sobrescritas e números isolados."""
-    if not texto:
-        return ""
-    # 1. Remover soft hyphens (\u00ad) e caracteres invisíveis de diagramação
-    texto = texto.replace('\u00ad', '').replace('\ufeff', '').replace('\u200b', '')
 
-    # 2. Unificar palavras com quebra de linha com hífen (ex: transfor-\nmação -> transformação)
-    texto = re.sub(r'(\b[a-zA-ZÀ-ÿ]+)[-\u2010\u2011]\s*\r?\n\s*([a-zA-ZÀ-ÿ]+\b)', r'\1\2', texto)
+def extrair_texto(caminho):
+    """Texto inteiro do livro, já limpo (compatibilidade com módulos antigos)."""
+    try:
+        return texto_completo(caminho)
+    except Exception as e:
+        emit({"type": "log", "message": f"Erro ao extrair texto: {e}"})
+        return None
 
-    # 3. Remover blocos de notas de rodapé antes de limpar pontuação inline
-    texto = re.sub(r'(?m)^\s*(?:\[\s*\d{1,4}\s*\]|\d{1,4}\.|\*+|[-–—])?\s*(?:Nota\b|N\.\s*(?:do\s*T|da\s*E)|Nota do Tradutor|Nota da Edi[çc][ãa]o|Vide|Cf\.|Ibid|Op\.\s*cit).*$', '', texto, flags=re.IGNORECASE)
-    texto = re.sub(r'(?m)^\s*N\.\s*(?:do\s*T|da\s*E)\.?:?.*$', '', texto, flags=re.IGNORECASE)
 
-    # 4. Remover marcas de notas de rodapé inline entre colchetes, ex: [1], [23], [*], [a], [nota 2]
-    texto = re.sub(r'\[\s*(?:\d{1,4}|\*+|[a-zA-Z]{1,2}|†|‡|nota\s*\d*|note\s*\d*)\s*\]', '', texto, flags=re.IGNORECASE)
+def idioma_da_voz(voz: str) -> str:
+    return (voz or "pt-BR").split("-")[0].lower()
 
-    # 5. Remover dígitos sobrescritos (ex: ¹, ², ³, etc.) usados como chamada de nota
-    texto = re.sub(r'[¹²³⁴⁵⁶⁷⁸⁹⁰]+', '', texto)
 
-    # 6. Remover chamadas de notas entre parênteses coladas ao texto, ex: palavra(1) ou ponto.(2)
-    texto = re.sub(r'(?<=[a-zA-ZÀ-ÿ\.,;:?!])\(\d{1,3}\)', '', texto)
-
-    # 7. Remover números de página isolados em linhas próprias
-    texto = re.sub(r'(?m)^\s*\d{1,4}\s*$', '', texto)
-
-    # 8. Converter quebras de seção (***, * * *, ---, ___) em pausas naturais (. . . . .)
-    texto = re.sub(r'(?m)^\s*(?:\*{3,}|-{3,}|_{3,}|\*\s*\*\s*\*)\s*$', '\n\n. . . . .\n\n', texto)
-
-    # 9. Normalizar travessões no início de falas
-    texto = re.sub(r'^[–—]\s*', '— ', texto, flags=re.MULTILINE)
-
-    # 10. Normalizar espaços múltiplos e quebras de linha excessivas
-    texto = re.sub(r'[ \t]+', ' ', texto)
-    texto = re.sub(r'\r\n', '\n', texto)
-    texto = re.sub(r'\n{3,}', '\n\n', texto)
-
-    return texto.strip()
-
-def dividir_em_blocos_seguros(texto: str, max_chars: int = 2500) -> list:
-    """Divide o texto em blocos de até max_chars respeitando parágrafos e pontuação final.
-    Garante 100% de estabilidade no TTS sem cortar palavras ou frases ao meio."""
+def dividir_em_blocos_seguros(texto: str, max_chars: int = TAMANHO_BLOCO) -> list:
+    """Blocos de até max_chars respeitando parágrafos e frases (nunca corta palavras)."""
     if not texto:
         return []
     texto = texto.strip()
     if len(texto) <= max_chars:
         return [texto]
-    
-    paragrafos = [p.strip() for p in re.split(r'\n\s*\n', texto) if p.strip()]
-    blocos = []
-    bloco_atual = []
-    tamanho_atual = 0
-    
-    for p in paragrafos:
-        if tamanho_atual + len(p) + 2 <= max_chars:
-            bloco_atual.append(p)
-            tamanho_atual += len(p) + 2
-        else:
-            if bloco_atual:
-                blocos.append("\n\n".join(bloco_atual))
-                bloco_atual = []
-                tamanho_atual = 0
-            
-            if len(p) <= max_chars:
-                bloco_atual.append(p)
-                tamanho_atual = len(p)
-            else:
-                frases = re.split(r'(?<=[.!?…])\s+', p)
-                sub_bloco = []
-                sub_tam = 0
-                for f in frases:
-                    if sub_tam + len(f) + 1 <= max_chars:
-                        sub_bloco.append(f)
-                        sub_tam += len(f) + 1
-                    else:
-                        if sub_bloco:
-                            blocos.append(" ".join(sub_bloco))
-                            sub_bloco = []
-                            sub_tam = 0
-                        if len(f) <= max_chars:
-                            sub_bloco.append(f)
-                            sub_tam = len(f)
-                        else:
-                            palavras = f.split(" ")
-                            p_bloco = []
-                            p_tam = 0
-                            for w in palavras:
-                                if p_tam + len(w) + 1 <= max_chars:
-                                    p_bloco.append(w)
-                                    p_tam += len(w) + 1
-                                else:
-                                    if p_bloco:
-                                        blocos.append(" ".join(p_bloco))
-                                        p_bloco = []
-                                        p_tam = 0
-                                    p_bloco.append(w)
-                                    p_tam = len(w)
-                            if p_bloco:
-                                sub_bloco.append(" ".join(p_bloco))
-                                sub_tam += len(" ".join(p_bloco))
-                if sub_bloco:
-                    bloco_atual.append(" ".join(sub_bloco))
-                    tamanho_atual += len(" ".join(sub_bloco))
-                    
-    if bloco_atual:
-        blocos.append("\n\n".join(bloco_atual))
-        
-    return blocos
+    blocos, atual, tam = [], [], 0
+
+    def fecha():
+        nonlocal atual, tam
+        if atual:
+            blocos.append("\n\n".join(atual))
+        atual, tam = [], 0
+
+    for p in (p.strip() for p in re.split(r"\n\s*\n", texto)):
+        if not p:
+            continue
+        if tam + len(p) + 2 <= max_chars:
+            atual.append(p)
+            tam += len(p) + 2
+            continue
+        fecha()
+        if len(p) <= max_chars:
+            atual, tam = [p], len(p)
+            continue
+        # Parágrafo enorme: divide por frases e, em último caso, por palavras
+        frase_atual = ""
+        for f in re.split(r"(?<=[.!?…;:])\s+|(?<=[。！？；])", p):
+            if len(f) > max_chars:
+                for w in f.split(" "):
+                    # Escritas sem espaço entre palavras: corta no limite
+                    while len(w) > max_chars:
+                        if frase_atual.strip():
+                            blocos.append(frase_atual.strip())
+                            frase_atual = ""
+                        blocos.append(w[:max_chars])
+                        w = w[max_chars:]
+                    if len(frase_atual) + len(w) + 1 > max_chars:
+                        blocos.append(frase_atual.strip())
+                        frase_atual = ""
+                    frase_atual += " " + w
+                continue
+            if len(frase_atual) + len(f) + 1 > max_chars:
+                blocos.append(frase_atual.strip())
+                frase_atual = ""
+            frase_atual += " " + f
+        if frase_atual.strip():
+            atual, tam = [frase_atual.strip()], len(frase_atual)
+    fecha()
+    return [b for b in blocos if b.strip()]
+
 
 def formatar_nome_capitulo(tit_c: str, idx_f: int, total_caps: int) -> str:
-    """Garante numeração com zeros à esquerda (ex: 01 - Prefácio.mp3, 10 - Capítulo 9.mp3)
-    para evitar erros de ordenação lexicográfica em reprodutores automotivos e portáteis."""
-    pad_width = max(2, len(str(total_caps)))
-    m_num = re.match(r'^(\d+)\s*[-–—.]?\s*(.*)$', tit_c.strip())
-    if m_num:
-        num_val = int(m_num.group(1))
-        resto = m_num.group(2).strip() or f"Capítulo {num_val}"
-        prefixo = f"{num_val:0{pad_width}d}"
-        nome_final = f"{prefixo} - {resto}"
-    else:
-        prefixo = f"{idx_f:0{pad_width}d}"
-        nome_final = f"{prefixo} - {tit_c.strip()}"
-    return re.sub(r'[\\/*?:\'\"<>|]', '', nome_final).strip()
+    """'01 - Título' com zeros à esquerda, para a ordem certa em qualquer player."""
+    pad = max(2, len(str(total_caps)))
+    nome = f"{idx_f:0{pad}d} - {tit_c.strip()}"
+    return re.sub(r'[\\/*?:\'"<>|]', "", nome).strip()[:150]
 
-# Number representations across different languages for chapter parsing
-UNIDADES_PT = 'UM|DOIS|TRÊS|QUATRO|CINCO|SEIS|SETE|OITO|NOVE'
-DEZENAS_PT = 'DEZ|VINTE|TRINTA|QUARENTA|CINQUENTA|SESSENTA|SETENTA|OITENTA|NOVENTA'
-CENTENAS_PT = 'CEM|CENTO|DUZENTOS|TREZENTOS|QUATROCENTOS|QUINHENTOS|SEISCENTOS|SETECENTOS|OITOCENTOS|NOVECENTOS'
-ESPECIAIS_PT = 'ONZE|DOZE|TREZE|CATORZE|QUINZE|DEZESSEIS|DEZESSETE|DEZOITO|DEZENOVE'
 
-UNIDADES_EN = 'ONE|TWO|THREE|FOUR|FIVE|SIX|SEVEN|EIGHT|NINE'
-DEZENAS_EN = 'TEN|TWENTY|THIRTY|FORTY|FIFTY|SIXTY|SEVENTY|EIGHTY|NINETY'
-CENTENAS_EN = 'ONE HUNDRED|TWO HUNDRED|THREE HUNDRED|FOUR HUNDRED|FIVE HUNDRED|SIX HUNDRED|SEVEN HUNDRED|EIGHT HUNDRED|NINE HUNDRED'
-ESPECIAIS_EN = 'ELEVEN|TWELVE|THIRTEEN|FOURTEEN|FIFTEEN|SIXTEEN|SEVENTEEN|EIGHTEEN|NINETEEN'
+def _hash(*partes) -> str:
+    h = hashlib.sha1()
+    for p in partes:
+        h.update(str(p).encode("utf-8"))
+        h.update(b"\x00")
+    return h.hexdigest()[:20]
 
-UNIDADES_ES = 'UNO|DOS|TRES|CUATRO|CINCO|SEIS|SIETE|OCHO|NUEVE'
-DEZENAS_ES = 'DIEZ|VEINTE|TREINTA|CUARENTA|CINCUENTA|SESENTA|SETENTA|OCHENTA|NOVENTA'
-CENTENAS_ES = 'CIEN|CIENTO|DOSCIENTOS|TRESCIENTOS|CUATROCIENTOS|QUINIENTOS|SEISCIENTOS|SETECIENTOS|OCHOCIENTOS|NOVECIENTOS'
-ESPECIAIS_ES = 'ONCE|DOCE|TRECE|CATORCE|QUINCE|DIECISEIS|DIECISIETE|DIECIOCHO|DIECINUEVE|VEINTIUNO|VEINTIDOS|VEINTITRES|VEINTICUATRO|VEINTICINCO|VEINTISEIS|VEINTISIETE|VEINTIOCHO|VEINTINUEVE'
 
-UNIDADES_AR = 'واحد|اثنان|ثلاثة|أربعة|خمسة|ستة|سبعة|ثمانية|تسعة|عشرة'
+# ---------------------------------------------------------------------------------------------
+# Tradução
+# ---------------------------------------------------------------------------------------------
+class FalhaTraducao(RuntimeError):
+    pass
 
-UNIDADES = f'{UNIDADES_PT}|{UNIDADES_EN}|{UNIDADES_ES}|{UNIDADES_AR}'
-DEZENAS = f'{DEZENAS_PT}|{DEZENAS_EN}|{DEZENAS_ES}'
-CENTENAS = f'{CENTENAS_PT}|{CENTENAS_EN}|{CENTENAS_ES}'
-ESPECIAIS = f'{ESPECIAIS_PT}|{ESPECIAIS_EN}|{ESPECIAIS_ES}'
 
-EXTENSO_COMPLETO = rf'(?:(?:{CENTENAS})|(?:{DEZENAS})(?:\s+(?:E|AND|Y)\s+(?:{UNIDADES}))?|{UNIDADES}|{ESPECIAIS})'
+# O tradutor gratuito aceita ~5 pedidos por segundo: no máximo 3 ao mesmo tempo e um intervalo entre eles
+_INTERVALO_TRADUCAO_S = 0.4
+_ultimo_pedido = {"t": 0.0}
+_CACHE_TRADUCAO = os.path.join(tempfile.gettempdir(), "audiobook_generator_traducoes")
 
-PALAVRAS_CHAVE = [
-    'PRÓLOGO', 'PROLOGO', 'EPÍLOGO', 'EPILOGO', 'INTRODUÇÃO', 'CAPÍTULO', 'CAPITULO', 'PREFÁCIO',
-    'PROLOGUE', 'EPILOGUE', 'INTRODUCTION', 'CHAPTER', 'PREFACE',
-    'INTRODUCCIÓN', 'INTRODUCCION', 'PREFACIO',
-    'مقدمة', 'فصل', 'خاتمة', 'تمهيد', 'الفصل'
-]
 
-def emit(event):
-    # Sends Server-Sent Events (SSE) data to the Node.js frontend
-    print(json.dumps(event), flush=True)
-
-def extrair_texto(caminho):
-    # Extracts text content based on the file extension
-    ext = caminho.lower().split('.')[-1]
+def _traduzir_google(texto: str, alvo: str) -> str:
+    """Tradução pelo endpoint público do Google Tradutor (o mesmo do widget do navegador). Se ele
+    recusar, tenta pelo deep_translator, que usa outra página do Google."""
+    erro = None
     try:
-        if ext == 'txt':
-            with open(caminho, 'r', encoding='utf-8') as f: return f.read()
-        elif ext == 'epub':
-            try:
-                # Try reading proper EPUB structure
-                book = epub.read_epub(caminho)
-                return "\n\n".join([BeautifulSoup(i.get_content(), 'html.parser').get_text(separator='\n\n', strip=True) 
-                                    for i in book.get_items() if i.get_type() == 1])
-            except:
-                # Fallback to raw HTML extraction for badly formatted EPUBs
-                texto_fallback = []
-                with zipfile.ZipFile(caminho, 'r') as z:
-                    for item in z.namelist():
-                        if item.endswith(('.html', '.xhtml', '.htm')):
-                            soup = BeautifulSoup(z.read(item), 'html.parser')
-                            texto_fallback.append(soup.get_text(separator='\n\n', strip=True))
-                return "\n\n".join(texto_fallback)
-        elif ext == 'pdf':
-            return "\n\n".join([p.extract_text() for p in PdfReader(caminho).pages if p.extract_text()])
-        elif ext in ['mobi', 'azw']:
-            temp_dir, html_content = mobi.extract(caminho)
-            with open(html_content, 'r', encoding='utf-8') as f:
-                texto = BeautifulSoup(f.read(), 'html.parser').get_text(separator='\n\n', strip=True)
-            if os.path.exists(temp_dir): shutil.rmtree(temp_dir)
-            return texto
+        corpo = urllib.parse.urlencode({"q": texto}).encode("utf-8")
+        url = "https://translate.googleapis.com/translate_a/single?" + urllib.parse.urlencode(
+            {"client": "gtx", "sl": "auto", "tl": alvo, "dt": "t", "ie": "UTF-8", "oe": "UTF-8"})
+        req = urllib.request.Request(url, data=corpo, headers={
+            "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
+        })
+        with urllib.request.urlopen(req, timeout=40) as r:
+            dados = json.loads(r.read().decode("utf-8"))
+        res = "".join(seg[0] for seg in (dados[0] or []) if seg and seg[0])
+        if res.strip():
+            return res
+        erro = ValueError("tradução vazia")
+    except urllib.error.HTTPError as e:
+        erro = RuntimeError("TooManyRequests" if e.code == 429 else f"HTTP {e.code}")
     except Exception as e:
-        emit({"type": "log", "message": f"Extraction error: {e}"})
-        return None
+        erro = e
+    if GoogleTranslator is not None:
+        return GoogleTranslator(source="auto", target=alvo).translate(texto)
+    raise erro
 
-async def traduzir_bloco(idx, bloco, semaforo, file_id, total_blocos, progress_state, target_lang):
-    # Translates a single text block asynchronously with retries and timeout
-    async with semaforo:
-        espera = 3
-        for _ in range(4):
-            try:
-                tradutor = GoogleTranslator(source='auto', target=target_lang)
-                res = await asyncio.wait_for(
-                    asyncio.to_thread(tradutor.translate, bloco),
-                    timeout=45.0
-                )
-                progress_state['done'] += 1
-                emit({"type": "progress", "fileId": file_id, "status": "translating", "progress": (progress_state['done'] / total_blocos) * 100})
-                return idx, res
-            except asyncio.TimeoutError:
-                emit({"type": "log", "message": f"Timeout na tradução do bloco {idx} (tentativa {_ + 1})."})
-            except Exception as e:
-                emit({"type": "log", "message": f"Erro na tradução do bloco {idx} (tentativa {_ + 1}): {repr(e)}"})
-                
-            if _ == 3:
-                break
-            await asyncio.sleep(espera)
-            espera *= 2
-            
-        progress_state['done'] += 1
-        emit({"type": "progress", "fileId": file_id, "status": "translating", "progress": (progress_state['done'] / total_blocos) * 100})
-        return idx, bloco
 
-async def traduzir_texto(texto_bruto, file_id, target_lang):
-    # Splits text into smaller chunks (~3000 chars) to respect translation API limits
-    paragrafos = texto_bruto.split('\n\n')
-    blocos, bloco_atual, tam = [], [], 0
-    for p in paragrafos:
-        if tam + len(p) < 3000:
-            bloco_atual.append(p)
-            tam += len(p) + 2
-        else:
-            if bloco_atual: blocos.append("\n\n".join(bloco_atual))
-            bloco_atual, tam = [p], len(p)
-    if bloco_atual: blocos.append("\n\n".join(bloco_atual))
-
-    semaforo = asyncio.Semaphore(10)
-    progress_state = {'done': 0}
-    tasks = [traduzir_bloco(i, b, semaforo, file_id, len(blocos), progress_state, target_lang) for i, b in enumerate(blocos)]
-    resultados = await asyncio.gather(*tasks)
-    
-    resultados.sort(key=lambda x: x[0])
-    return "\n\n".join([r[1] for r in resultados])
-
-def identificar_marcos(linhas, idx, modo_romano):
-    # Identifies chapter markers based on keywords or roman numerals
-    linha = linhas[idx].strip()
-    if not linha: return False, None, 0
-    up = linha.upper()
-    for pw in PALAVRAS_CHAVE:
-        if up.startswith(pw):
-            reg = rf'^({pw}(?:\s+(?:\b(?:{EXTENSO_COMPLETO})\b|\d+))?)(.*)$'
-            m = re.match(reg, up, re.IGNORECASE)
-            if not m and modo_romano:
-                m = re.match(rf'^({pw}(?:\s+\b[IVXLCDM]+\b)?)(.*)$', up, re.IGNORECASE)
-            if m:
-                tit, resto = m.group(1).strip(), m.group(len(m.groups())).strip()
-                if not resto and idx + 1 < len(linhas):
-                    prox = linhas[idx+1].strip()
-                    if 0 < len(prox) < 45 and not prox.endswith(('.', '!', '?', ':')): 
-                        return True, f"{tit} {prox}".title(), 2
-                return True, tit.title(), 1
-    if re.match(r'^(\d+|[IVXLCDM]+)\.?\s*$', up): return True, f"Capítulo {up.replace('.', '')}", 1
-    return False, None, 0
-
-def estruturar_obra_nlp(texto_bruto, eh_traducao):
-    # Parses the raw text into a structured chapter list using NLP heuristics
-    linhas_raw = texto_bruto.split('\n')
-    contagem = {}
-    for l in linhas_raw:
-        if len(l.strip()) > 15: contagem[l.strip()] = contagem.get(l.strip(), 0) + 1
-    lixo = {l for l, c in contagem.items() if c > 3}
-    linhas = [l.strip() for l in linhas_raw if l.strip() not in lixo and l.strip()]
-    
-    score_romano = sum(5 for l in linhas[:1000] if re.search(r'\b(?:CAP[ÍI]TULO|CHAPTER|فصل|الفصل)\s+[IVXLC]+\b', l.upper()))
-    modo_romano = score_romano >= 10
-    capitulos = []
-    cap_atual = {"titulo": "00 - Introducao", "conteudo": []}
-    
-    i = 0
-    while i < len(linhas):
-        is_cap, tit, cons = identificar_marcos(linhas, i, modo_romano)
-        if is_cap:
-            if cap_atual["conteudo"]:
-                cap_atual["conteudo"] = "".join(cap_atual["conteudo"]).strip()
-                capitulos.append(cap_atual)
-            cap_atual = {"titulo": f"{len(capitulos):02d} - {tit}", "conteudo": []}
-            i += cons
-        else:
-            p = re.sub(r'([a-zA-Z])\1{3,}', r'\1\1', linhas[i].replace('“', '"').replace('”', '"'))
-            p = re.sub(r'^[-–—]\s*', '— ', p, flags=re.MULTILINE)
-            if eh_traducao or (p and p[-1] in ['.', '!', '?', ':', '"', '—']):
-                cap_atual["conteudo"].append(p + "\n\n")
-            else:
-                cap_atual["conteudo"].append(p + " ")
-            i += 1
-                
-    if cap_atual["conteudo"]:
-        cap_atual["conteudo"] = "".join(cap_atual["conteudo"]).strip()
-        capitulos.append(cap_atual)
-    return capitulos
-
-def dividir_capitulos_longos(capitulos, max_chars=35000):
-    """Detecta capítulos excessivamente longos (> ~6.000 palavras / 45 minutos de áudio)
-    e os divide automaticamente em partes (Parte 1, Parte 2) em quebras de parágrafos naturais."""
-    caps_finais = []
-    for cap in capitulos:
-        conteudo = cap.get("conteudo", "")
-        palavras = len(conteudo.split()) if conteudo else 0
-        if len(conteudo) > max_chars or palavras > 6000:
-            num_partes = max(2, (len(conteudo) + max_chars - 1) // max_chars)
-            paragrafos = [p.strip() for p in re.split(r'\n\s*\n', conteudo) if p.strip()]
-            partes_conteudo = [[] for _ in range(num_partes)]
-            tam_por_parte = len(conteudo) // num_partes
-            
-            p_idx = 0
-            cur_tam = 0
-            for p in paragrafos:
-                partes_conteudo[p_idx].append(p)
-                cur_tam += len(p)
-                if cur_tam >= tam_por_parte and p_idx < num_partes - 1:
-                    p_idx += 1
-                    cur_tam = 0
-                    
-            for idx_p, p_paras in enumerate(partes_conteudo, start=1):
-                p_text = "\n\n".join(p_paras).strip()
-                if p_text:
-                    orig_tit = cap.get("titulo", "Capítulo")
-                    caps_finais.append({
-                        "titulo": f"{orig_tit} - Parte {idx_p}",
-                        "conteudo": p_text
-                    })
-        else:
-            caps_finais.append(cap)
-    return caps_finais
-
-    # If the text has no chapters, split arbitrarily to prevent massive single files
-    if len(capitulos) == 1 and len(capitulos[0]["conteudo"]) > 50000:
-        texto_gigante = capitulos[0]["conteudo"]
-        novos_caps = []
-        for idx, start in enumerate(range(0, len(texto_gigante), 35000)):
-            novos_caps.append({"titulo": f"Parte {idx+1:02d}", "conteudo": texto_gigante[start:start+35000]})
-        return dividir_capitulos_longos(novos_caps)
-        
-    return dividir_capitulos_longos(capitulos)
-
-from text_processor import melhorar_pronuncia
-
-async def baixar_bloco_audio(idx, texto, voz, semaforo_tts, file_id, total_blocos, progress_state, sync_enabled=True, cache_dir=None, idx_f=1):
-    # Recupera áudio via Edge TTS com suporte a cache local para retomada automática
-    mult = 75 if sync_enabled else 100
-    chunk_cache_path = os.path.join(cache_dir, f"chunk_{idx_f}_{idx}_hq.mp3") if cache_dir else None
-
-    # 1. Verificar cache em disco do bloco individual (Prioridade 1: Resiliência)
-    if chunk_cache_path and os.path.exists(chunk_cache_path) and os.path.getsize(chunk_cache_path) > 150:
-        try:
-            with open(chunk_cache_path, "rb") as f:
-                data = f.read()
-            if len(data) > 150:
-                progress_state['done'] += 1
-                prog = (progress_state['done'] / total_blocos) * mult
-                emit({"type": "progress", "fileId": file_id, "status": "processing", "progress": prog, "partsDone": progress_state['done'], "partsTotal": total_blocos})
-                return idx, bytearray(data)
-        except Exception:
-            pass
-
-    async with semaforo_tts:
+async def _traduzir_bloco(bloco, alvo, ao_concluir):
+    """Traduz um trecho. Usa o cache (uma nova tentativa não traduz de novo o que já foi traduzido) e
+    espera mais a cada recusa do serviço. Se não conseguir, levanta FalhaTraducao: narrar o texto
+    original com a voz de outro idioma estragaria o audiobook."""
+    if not re.search(r"\w", bloco):
+        ao_concluir()
+        return bloco
+    cache = os.path.join(_CACHE_TRADUCAO, f"{alvo}_{_hash(alvo, bloco)}.txt")
+    try:
+        with open(cache, "r", encoding="utf-8") as f:
+            ao_concluir()
+            return f.read()
+    except OSError:
+        pass
+    async with _sem_traducao:
         espera = 5
-        for tentativa in range(6):
-            buf = bytearray()
+        ultimo = None
+        for tentativa in range(5):
+            atraso = _ultimo_pedido["t"] + _INTERVALO_TRADUCAO_S - asyncio.get_running_loop().time()
+            if atraso > 0:
+                await asyncio.sleep(atraso)
+            _ultimo_pedido["t"] = asyncio.get_running_loop().time()
             try:
-                async def fetch():
-                    comm = obter_communicate()(texto, voz)
-                    async for chunk in comm.stream():
-                        if chunk["type"] == "audio":
-                            buf.extend(chunk["data"])
-                await asyncio.wait_for(fetch(), timeout=60.0)
-                if len(buf) > 100:
-                    # Persistir bloco no cache imediatamente
-                    if chunk_cache_path:
-                        try:
-                            with open(chunk_cache_path, "wb") as f:
-                                f.write(buf)
-                        except Exception:
-                            pass
-                    progress_state['done'] += 1
-                    prog = (progress_state['done'] / total_blocos) * mult
-                    emit({"type": "progress", "fileId": file_id, "status": "processing", "progress": prog, "partsDone": progress_state['done'], "partsTotal": total_blocos})
-                    return idx, buf
-                raise ValueError("Vazio")
-            except (Exception, asyncio.TimeoutError) as e:
-                emit({"type": "log", "message": f"Aviso: TTS falhou no bloco {idx} (Tentativa {tentativa + 1}/6) - {repr(e)}"})
+                res = await asyncio.wait_for(asyncio.to_thread(_traduzir_google, bloco, alvo), timeout=90.0)
+                if res and res.strip():
+                    try:
+                        os.makedirs(_CACHE_TRADUCAO, exist_ok=True)
+                        with open(cache, "w", encoding="utf-8") as f:
+                            f.write(res)
+                    except OSError:
+                        pass
+                    ao_concluir()
+                    return res
+                raise ValueError("tradução vazia")
+            except Exception as e:
+                ultimo = e
+                emit({"type": "log", "message": f"Tradução: nova tentativa em {espera}s ({tentativa + 1}/5) - {type(e).__name__}"})
                 await asyncio.sleep(espera)
-                espera += 5
-                
-        emit({"type": "log", "message": f"Erro Critico: Bloco {idx} falhou apos 6 tentativas."})
-        progress_state['done'] += 1
-        prog = (progress_state['done'] / total_blocos) * mult
-        emit({"type": "progress", "fileId": file_id, "status": "processing", "progress": prog, "partsDone": progress_state['done'], "partsTotal": total_blocos})
-        return idx, bytearray()
+                espera = min(espera * 2, 60)
+    limite = "TooManyRequests" in type(ultimo).__name__ or "too many" in str(ultimo).lower()
+    raise FalhaTraducao(
+        "O serviço de tradução do Google recusou os pedidos por excesso de uso. Espere alguns minutos e converta de novo "
+        "(o que já foi traduzido fica guardado), ou converta sem traduzir."
+        if limite else
+        f"A tradução falhou ({type(ultimo).__name__}). Verifique a internet e converta de novo, ou converta sem traduzir.")
 
+
+def _blocos_traducao(texto: str, limite: int = 3000):
+    blocos, atual, tam = [], [], 0
+    for p in texto.split("\n\n"):
+        if tam + len(p) > limite and atual:
+            blocos.append("\n\n".join(atual))
+            atual, tam = [], 0
+        atual.append(p)
+        tam += len(p) + 2
+    if atual:
+        blocos.append("\n\n".join(atual))
+    return blocos
+
+
+async def traduzir_capitulos(caps, file_id, alvo):
+    """Traduz títulos e conteúdos de todos os capítulos, com um progresso único."""
+    blocos_cap = [_blocos_traducao(c["conteudo"]) for c in caps]
+    total = max(1, sum(len(b) for b in blocos_cap) + 1)
+    feitos = {"n": 0}
+
+    def ao_concluir():
+        feitos["n"] += 1
+        emit({"type": "progress", "fileId": file_id, "status": "translating", "progress": min(100, feitos["n"] / total * 100)})
+
+    # Títulos: um pedido só (uma linha por título); se o tradutor juntar ou separar linhas, traduz um por um
+    titulos = [c["titulo"].replace("\n", " ").strip() for c in caps]
+    traduzidos = (await _traduzir_bloco("\n".join(titulos), alvo, ao_concluir)).split("\n") if titulos else []
+    if len(traduzidos) != len(titulos):
+        traduzidos = [await _traduzir_bloco(t, alvo, lambda: None) for t in titulos]
+
+    async def conteudo(blocos):
+        return "\n\n".join(await asyncio.gather(*[_traduzir_bloco(b, alvo, ao_concluir) for b in blocos]))
+
+    textos = await asyncio.gather(*[conteudo(b) for b in blocos_cap])
+    for c, tit, txt in zip(caps, traduzidos, textos):
+        c["titulo"] = tit.strip() or c["titulo"]
+        c["conteudo"] = limpar_texto(txt)
+    return caps
+
+
+# ---------------------------------------------------------------------------------------------
+# Síntese de voz
+# ---------------------------------------------------------------------------------------------
+class FalhaSintese(RuntimeError):
+    pass
+
+
+def _ler_json(caminho, padrao):
+    try:
+        with open(caminho, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return padrao
+
+
+def _salvar_json(caminho, dados):
+    try:
+        with open(caminho, "w", encoding="utf-8") as f:
+            json.dump(dados, f, ensure_ascii=False)
+    except Exception:
+        pass
+
+
+def _duracao_mp3_s(caminho):
+    try:
+        return float(MP3(caminho).info.length)
+    except Exception:
+        return duracao_ms(caminho) / 1000.0
+
+
+_FIM_FRASE = re.compile(r"[.!?…。！？]")
+
+
+def _frases_de_palavras(texto, palavras):
+    """Monta as frases a partir dos tempos das palavras: cada palavra é localizada no texto do bloco e a
+    frase termina na pontuação final (ou na quebra de parágrafo) que vem depois dela. Assim uma única
+    narração dá os tempos das palavras e das frases. Formato de saída: [início, duração, texto]."""
+    frases, cursor, ini_txt, t0, t_fim = [], 0, None, 0.0, 0.0
+    for off, dur, palavra in palavras:
+        pos = texto.find(palavra, cursor) if palavra else -1
+        if pos < 0 or pos - cursor > 200:  # palavra normalizada pelo serviço (número, sigla): segue em frente
+            pos = cursor
+            fim = cursor
+        else:
+            fim = pos + len(palavra)
+        if ini_txt is None:
+            ini_txt, t0 = pos, off
+        t_fim = off + dur
+        cursor = fim
+        seguinte = re.match(r"[^\w]*", texto[cursor:]).group(0)
+        depois = texto[cursor + len(seguinte):cursor + len(seguinte) + 1]
+        # Reticências seguidas de minúscula continuam a mesma frase ("e então... ela saiu")
+        so_reticencias = re.fullmatch(r"\s*(?:\.\.\.|…)\s*", seguinte) and depois.islower()
+        if (_FIM_FRASE.search(seguinte) and not so_reticencias) or "\n" in seguinte:
+            corte = cursor + len(seguinte.rstrip())
+            txt = re.sub(r"\s+", " ", texto[ini_txt:corte]).strip()
+            if txt:
+                frases.append([round(t0, 3), round(t_fim - t0, 3), txt])
+            ini_txt = None
+    if ini_txt is not None:
+        txt = re.sub(r"\s+", " ", texto[ini_txt:]).strip()
+        if txt:
+            frases.append([round(t0, 3), round(t_fim - t0, 3), txt])
+    return frases
+
+
+# Conexões com o serviço de voz divididas por igual entre os livros sendo narrados (antes o primeiro livro
+# pegava todas e os outros ficavam parados em 0 partes). Quando um termina, os outros ganham a parte dele.
+_NARRANDO = set()
+_EM_USO = {}
+_vagas = None
+# Bytes de áudio recebidos por livro, para a velocidade real mostrada no card
+_BYTES = {}
+
+
+_TRAVAS = []
+
+
+def _processo_vivo(pid):
+    """Se o processo existe (sem encerrá-lo: no Windows, os.kill(pid, 0) o finalizaria)."""
+    try:
+        pid = int(pid)
+        if os.name == "nt":
+            import ctypes
+            k = ctypes.windll.kernel32
+            h = k.OpenProcess(0x1000, False, pid)  # PROCESS_QUERY_LIMITED_INFORMATION
+            if not h:
+                return False
+            codigo = ctypes.c_ulong()
+            k.GetExitCodeProcess(h, ctypes.byref(codigo))
+            k.CloseHandle(h)
+            return codigo.value == 259  # STILL_ACTIVE
+        os.kill(pid, 0)
+        return True
+    except Exception:
+        return False
+
+
+def _limite_por_livro():
+    return max(1, -(-TTS_CONEXOES // max(1, len(_NARRANDO))))
+
+
+async def _pegar_vaga(fid):
+    async with _vagas:
+        await _vagas.wait_for(lambda: _EM_USO.get(fid, 0) < _limite_por_livro())
+        _EM_USO[fid] = _EM_USO.get(fid, 0) + 1
+
+
+async def _soltar_vaga(fid):
+    async with _vagas:
+        _EM_USO[fid] = max(0, _EM_USO.get(fid, 0) - 1)
+        _vagas.notify_all()
+
+
+async def _mudar_narrando(fid, entra):
+    async with _vagas:
+        (_NARRANDO.add if entra else _NARRANDO.discard)(fid)
+        _vagas.notify_all()
+
+
+async def sintetizar_bloco(texto, voz, destino, ao_concluir, com_palavras=False, fid=None):
+    """Gera o áudio de um bloco direto em disco, com o tempo de cada frase (do próprio serviço de voz) e,
+    se pedido, de cada palavra. Usa o cache se já existir; tenta de novo se falhar."""
+    if os.path.exists(destino) and os.path.getsize(destino) > 150:
+        ao_concluir()
+        return destino
+    if fid is not None:
+        await _pegar_vaga(fid)
+    try:
+        return await _sintetizar_com_conexao(texto, voz, destino, ao_concluir, com_palavras, fid)
+    finally:
+        if fid is not None:
+            await _soltar_vaga(fid)
+
+
+async def _sintetizar_com_conexao(texto, voz, destino, ao_concluir, com_palavras, fid):
+    async with _sem_tts:
+        espera = 3
+        ultimo_erro = None
+        for tentativa in range(8):
+            parcial = destino + ".part"
+            try:
+                marcas = []
+
+                async def baixa():
+                    classe = obter_communicate()
+                    try:
+                        comm = classe(texto, voz, boundary="WordBoundary" if com_palavras else "SentenceBoundary")
+                    except TypeError:  # edge-tts antigo, sem a opção: só frases
+                        comm = classe(texto, voz)
+                    with open(parcial, "wb") as f:
+                        async for chunk in comm.stream():
+                            if chunk["type"] == "audio":
+                                f.write(chunk["data"])
+                                if fid is not None:
+                                    _BYTES[fid] = _BYTES.get(fid, 0) + len(chunk["data"])
+                            elif chunk["type"] in ("SentenceBoundary", "WordBoundary"):
+                                # offset e duração em unidades de 100 ns
+                                marcas.append([chunk["offset"] / 10_000_000, chunk["duration"] / 10_000_000,
+                                               html.unescape(chunk.get("text", "")), chunk["type"]])
+                await asyncio.wait_for(baixa(), timeout=120.0)
+                if os.path.getsize(parcial) > 150:
+                    palavras = [m[:3] for m in marcas if m[3] == "WordBoundary"]
+                    frases = [m[:3] for m in marcas if m[3] == "SentenceBoundary"]
+                    if palavras and not frases:
+                        frases = _frases_de_palavras(texto, palavras)
+                    _salvar_json(destino + ".json", {"frases": frases, "palavras": palavras})
+                    os.replace(parcial, destino)
+                    ao_concluir()
+                    return destino
+                raise ValueError("o serviço de voz não devolveu áudio")
+            except Exception as e:
+                ultimo_erro = e
+                emit({"type": "log", "message": f"Voz: nova tentativa {tentativa + 1}/8 em {espera}s - {type(e).__name__}: {str(e)[:120]}"})
+                await asyncio.sleep(espera)
+                espera = min(espera * 2, 40)
+            finally:
+                if os.path.exists(parcial):
+                    try:
+                        os.remove(parcial)
+                    except OSError:
+                        pass
+    raise FalhaSintese(f"O serviço de voz não respondeu depois de várias tentativas ({type(ultimo_erro).__name__}). "
+                       "Verifique a internet e converta de novo: o que já foi narrado fica salvo e a conversão continua de onde parou.")
+
+
+def _marcas_do_bloco(dados):
+    """Tempos salvos de um bloco: {"frases", "palavras"} (atual) ou a lista de frases (versões antigas)."""
+    if isinstance(dados, dict):
+        return dados.get("frases") or [], dados.get("palavras") or []
+    return dados or [], []
+
+
+async def montar_capitulo(idx_f, titulo_fala, texto, voz, cache_dir, progresso, com_palavras=False, fid=None, pronto=None):
+    """Sintetiza os blocos de um capítulo (em paralelo com os outros).
+    Devolve (arquivo do capítulo, frases e palavras com tempo em segundos a partir do início do capítulo)."""
+    partes = dividir_em_blocos_seguros(f"{titulo_fala}.\n\n{texto}" if texto else f"{titulo_fala}.")
+    partes = [p for p in partes if re.search(r"\w", p)]  # blocos só com pontuação não geram áudio
+    # O tempo das palavras exige outra narração (cache próprio); só frases mantém o cache de antes
+    extra = ("palavras",) if com_palavras else ()
+    chave = _hash(voz, *extra, *partes)
+    final = os.path.join(cache_dir, f"cap_{idx_f:03d}_{chave}.flac")
+    linha_tempo = final + ".json"
+    if os.path.exists(final) and os.path.getsize(final) > 1024:
+        progresso(len(partes))
+        if pronto:
+            pronto()
+        frases, palavras = _marcas_do_bloco(_ler_json(linha_tempo, []))
+        return final, frases, palavras
+
+    caminhos = await asyncio.gather(*[
+        sintetizar_bloco(p, voz, os.path.join(cache_dir, f"bloco_{_hash(voz, *extra, p)}.mp3"), lambda: progresso(1), com_palavras, fid)
+        for p in partes])
+
+    # Linha do tempo das frases e palavras: cada bloco começa onde o anterior terminou
+    frases, palavras, inicio_bloco = [], [], 0.0
+    for c, parte in zip(caminhos, partes):
+        marcas, marcas_palavras = _marcas_do_bloco(_ler_json(c + ".json", []))
+        dur = _duracao_mp3_s(c)
+        if not marcas:  # bloco sem tempos: uma frase só para o bloco inteiro
+            marcas = [[0.0, dur, re.sub(r"\s+", " ", parte).strip()]]
+        for off, d, txt in marcas:
+            if str(txt).strip():
+                frases.append([round(inicio_bloco + off, 3), round(inicio_bloco + off + d, 3), str(txt).strip()])
+        for off, d, txt in marcas_palavras:
+            if str(txt).strip():
+                palavras.append([round(inicio_bloco + off, 3), round(inicio_bloco + off + d, 3), str(txt).strip()])
+        inicio_bloco += dur
+
+    bruto = os.path.join(cache_dir, f"cap_{idx_f:03d}_{chave}.mp3")
+    with open(bruto, "wb") as saida:
+        for c in caminhos:
+            with open(c, "rb") as f:
+                shutil.copyfileobj(f, saida)
+    async with _sem_ffmpeg:
+        ok = await asyncio.to_thread(normalizar_capitulo, bruto, final)
+    if pronto:
+        pronto()
+    if not ok:
+        return bruto, frases, palavras  # sem FFmpeg funcional: usa a voz como veio (sem a pausa inicial)
+    frases = [[a + PAUSA_INICIAL_S, b + PAUSA_INICIAL_S, t] for a, b, t in frases]
+    palavras = [[a + PAUSA_INICIAL_S, b + PAUSA_INICIAL_S, t] for a, b, t in palavras]
+    _salvar_json(linha_tempo, {"frases": frases, "palavras": palavras})
+    for c in [bruto, *caminhos]:
+        for arq in (c, c + ".json"):
+            try:
+                os.remove(arq)
+            except OSError:
+                pass
+    return final, frases, palavras
+
+
+# ---------------------------------------------------------------------------------------------
+# Tags
+# ---------------------------------------------------------------------------------------------
 def embutir_capa_id3(audio, cover_base64):
     if not cover_base64:
         return
@@ -443,25 +568,17 @@ def embutir_capa_id3(audio, cover_base64):
             elif 'image/webp' in header:
                 mime = 'image/webp'
             elif 'image/svg+xml' in header:
-                mime = 'image/svg+xml'
-        raw_bytes = base64.b64decode(clean_b64)
-        audio.tags.add(
-            APIC(
-                encoding=3,
-                mime=mime,
-                type=3,
-                desc=u'Cover',
-                data=raw_bytes
-            )
-        )
+                return
+        audio.tags.add(APIC(encoding=3, mime=mime, type=3, desc=u'Cover', data=base64.b64decode(clean_b64)))
     except Exception as e:
         emit({"type": "log", "message": f"Aviso ao embutir capa ID3: {e}"})
 
+
 def aplicar_tags_capitulo_mp3(caminho, titulo, autor, album, faixa, cover_base64=None, genero=None, narrador=None):
-    # Tags ID3 de um capítulo (modo um arquivo por capítulo)
     try:
         audio = MP3(caminho, ID3=ID3)
-        if audio.tags is None: audio.add_tags()
+        if audio.tags is None:
+            audio.add_tags()
         audio.tags.add(TIT2(encoding=3, text=titulo))
         audio.tags.add(TALB(encoding=3, text=album))
         audio.tags.add(TRCK(encoding=3, text=str(faixa)))
@@ -475,11 +592,13 @@ def aplicar_tags_capitulo_mp3(caminho, titulo, autor, album, faixa, cover_base64
     except Exception as e:
         emit({"type": "log", "message": f"Erro tags ID3: {e}"})
 
+
 def aplicar_tags_arquivo_unico(caminho, titulo, autor, cover_base64, chapters_info, genero=None, narrador=None):
-    # Specifically embeds table of contents (TOC) and chapters markers into single-file outputs
+    """Tags, capa e capítulos (CHAP/CTOC) num MP3 único."""
     try:
         audio = MP3(caminho, ID3=ID3)
-        if audio.tags is None: audio.add_tags()
+        if audio.tags is None:
+            audio.add_tags()
         audio.tags.add(TIT2(encoding=3, text=titulo))
         audio.tags.add(TALB(encoding=3, text=titulo))
         audio.tags.add(TRCK(encoding=3, text="1"))
@@ -488,343 +607,403 @@ def aplicar_tags_arquivo_unico(caminho, titulo, autor, cover_base64, chapters_in
             audio.tags.add(TCON(encoding=3, text=str(genero)))
         if narrador:
             audio.tags.add(TPE2(encoding=3, text=str(narrador)))
-        
         embutir_capa_id3(audio, cover_base64)
-            
         if chapters_info:
-            child_ids = []
+            ids = []
             for ch in chapters_info:
-                child_id = ch["id"].encode('utf-8')
-                child_ids.append(child_id)
-                chap = CHAP(
-                    element_id=child_id,
-                    start_time=ch["start_time"],
-                    end_time=ch["end_time"],
-                    sub_frames=[TIT2(encoding=3, text=ch["title"])]
-                )
-                audio.tags.add(chap)
-                
-            ctoc = CTOC(element_id=b"toc", flags=3, child_element_ids=child_ids, sub_frames=[TIT2(encoding=3, text="Table of Contents")])
-            audio.tags.add(ctoc)
-            
+                cid = ch["id"].encode("utf-8")
+                ids.append(cid)
+                audio.tags.add(CHAP(element_id=cid, start_time=ch["start_time"], end_time=ch["end_time"],
+                                    sub_frames=[TIT2(encoding=3, text=ch["title"])]))
+            audio.tags.add(CTOC(element_id=b"toc", flags=3, child_element_ids=ids, sub_frames=[TIT2(encoding=3, text="Capítulos")]))
         audio.save(v2_version=3)
     except Exception as e:
         emit({"type": "log", "message": f"Erro tags ID3 arquivo unico: {e}"})
 
+
 async def upload_to_drive_async(file_path, folder_id, file_id, emit):
-    # Handles background asynchronous uploading to Google Drive
     try:
         from googleapiclient.discovery import build
         from googleapiclient.http import MediaFileUpload
         from google.oauth2.credentials import Credentials
-        
         if not os.path.exists('token.json'):
             return
-            
         creds = Credentials.from_authorized_user_file('token.json', ['https://www.googleapis.com/auth/drive.file', 'https://www.googleapis.com/auth/drive.metadata.readonly'])
         service = build('drive', 'v3', credentials=creds)
-        
-        file_name = os.path.basename(file_path)
-        file_metadata = {'name': file_name, 'parents': [folder_id]} if folder_id and folder_id != 'root' else {'name': file_name}
+        file_metadata = {'name': os.path.basename(file_path), 'parents': [folder_id]} if folder_id and folder_id != 'root' else {'name': os.path.basename(file_path)}
         media = MediaFileUpload(file_path, mimetype='audio/mpeg', resumable=True)
-        
+
         def upload():
             request = service.files().create(body=file_metadata, media_body=media, fields='id')
             response = None
-            while response is None: status, response = request.next_chunk()
-            
+            while response is None:
+                _, response = request.next_chunk()
         await asyncio.to_thread(upload)
     except Exception as e:
         emit({"type": "log", "message": f"Erro no upload para o Drive: {e}"})
 
+
+# ---------------------------------------------------------------------------------------------
+# Livro
+# ---------------------------------------------------------------------------------------------
+def _config_do_livro(file_info, config):
+    cfg = file_info.get("config") or config.get("config") or config
+    if isinstance(cfg, str):
+        try:
+            cfg = json.loads(cfg)
+        except json.JSONDecodeError:
+            cfg = {}
+    return cfg if isinstance(cfg, dict) else {}
+
+
+def _escolher(file_info, cfg, *chaves, padrao=None):
+    for fonte in (file_info, file_info.get("config") or {}, cfg):
+        if not isinstance(fonte, dict):
+            continue
+        for c in chaves:
+            v = fonte.get(c)
+            if v not in (None, ""):
+                return v
+    return padrao
+
+
 async def process_file(file_info, config):
-    # Main pipeline: Extract -> Translate -> Optimize -> Structure -> TTS -> Save -> Upload
+    file_id = file_info.get("id")
     try:
-        file_id = file_info["id"]
         caminho = file_info["path"]
-        titulo = file_info["title"]
-        autor = file_info["author"]
+        titulo = (file_info.get("title") or "").strip() or "Audiobook"
+        autor = (file_info.get("author") or "").strip() or "Desconhecido"
         genero = file_info.get("genre", "")
-        subgenero = file_info.get("subgenre", "")
         narrador = file_info.get("narrator", "")
-        eh_trad = file_info.get("translate", False)
-        
-        # --- Robust Configuration Parsing ---
-        # The most reliable config is the one embedded within the file's own info.
-        app_config = file_info.get("config", {})
+        cfg = _config_do_livro(file_info, config)
 
-        # If not embedded, try to find it in the root object from the backend.
-        if not app_config:
-            app_config = config.get("config", config)
-
-        # The config might be a JSON string that needs parsing.
-        if isinstance(app_config, str):
-            try:
-                app_config = json.loads(app_config.replace('\\', '/'))
-            except json.JSONDecodeError:
-                app_config = {} # Failed to parse, reset to empty dict
-
-        # Extract individual settings from the parsed config, with defaults.
-        pasta_destino = app_config.get("outputFolder") or app_config.get("output_dir")
-        voz_final = app_config.get("voice", "pt-BR-AntonioNeural")
-        modo_pasta = app_config.get("mode_folder", True)
-        target_lang = app_config.get("target_lang", "pt")
-
-        # --- Aggressive Fallback ---
-        # If pasta_destino is still missing, perform a raw regex search on the command line arguments.
+        pasta_destino = _escolher(file_info, cfg, "outputFolder", "output_dir")
         if not pasta_destino:
-            raw_args = sys.argv[1] if len(sys.argv) > 1 else ''
-            m = re.search(r'(?:outputFolder|output_dir).*?[:=]\s*\\?["\']?([^"\'},]+)', raw_args, re.IGNORECASE)
-            if m: pasta_destino = m.group(1).strip().replace('\\\\', '/').replace('\\', '/')
-        
-        if not pasta_destino:
-            raw_args_preview = (sys.argv[1] if len(sys.argv) > 1 else '')[:200]
-            emit({"type": "error", "fileId": file_id, "error": f"CRITICAL: Destination folder not found. Raw data: {raw_args_preview}..."})
+            emit({"type": "error", "fileId": file_id, "error": "Pasta de destino não definida. Escolha uma em Ajustes › Armazenamento e pastas."})
             return
-            
-        emit({"type": "progress", "fileId": file_id, "status": "processing", "progress": 0})
-        
-        texto = await asyncio.to_thread(extrair_texto, caminho)
-        if not texto:
-            emit({"type": "error", "fileId": file_id, "error": "Failed to extract text"})
-            return
-
-        # Prioridade 2 (Qualidade): Filtro prévio de limpeza para TTS (hífens de quebra de linha, notas de rodapé, números soltos)
-        texto = limpar_texto_tts(texto)
-
-        if eh_trad:
-            emit({"type": "progress", "fileId": file_id, "status": "translating", "progress": 0})
-            texto = await traduzir_texto(texto, file_id, target_lang)
-            texto = limpar_texto_tts(texto)
-            
-        pronunciation_map = file_info.get("pronunciationMap") or file_info.get("pronunciation_map") or app_config.get("pronunciation_map") or []
-        emit({"type": "progress", "fileId": file_id, "status": "editing", "progress": 0})
-        texto = await asyncio.to_thread(melhorar_pronuncia, texto, voz_final, pronunciation_map)
-        emit({"type": "progress", "fileId": file_id, "status": "editing", "progress": 100})
-        
-        user_chapters = file_info.get("chapters")
-        if user_chapters and isinstance(user_chapters, list) and len(user_chapters) > 0:
-            caps = []
-            for uc in user_chapters:
-                tit = (uc.get("title") or "").strip() or "Capítulo"
-                conteudo = limpar_texto_tts((uc.get("content") or uc.get("conteudo") or "").strip())
-                caps.append({"titulo": tit, "conteudo": conteudo})
-            # Se todos os conteúdos estiverem vazios (caso apenas títulos tenham sido enviados), preenche a partir de estruturar_obra_nlp
-            if not any(c["conteudo"] for c in caps):
-                raw_caps = await asyncio.to_thread(estruturar_obra_nlp, texto, eh_trad)
-                for idx, rc in enumerate(raw_caps):
-                    if idx < len(caps):
-                        caps[idx]["conteudo"] = limpar_texto_tts(rc["conteudo"])
-                    else:
-                        caps.append({"titulo": rc["titulo"], "conteudo": limpar_texto_tts(rc["conteudo"])})
-        else:
-            caps = await asyncio.to_thread(estruturar_obra_nlp, texto, eh_trad)
-            for c in caps:
-                c["conteudo"] = limpar_texto_tts(c["conteudo"])
-
-        # Divisão automática de capítulos longos (> 6.000 palavras / 45 min)
-        caps = dividir_capitulos_longos(caps, max_chars=35000)
-
-        nome_dir = re.sub(r'[\\/*?:\'\"<>|]', '', titulo).strip() or "Audiobook"
-        pasta_destino_limpa = pasta_destino.replace('\\', '/')
-
-        # Prioridade 3 (Formato): formato do arquivo (m4b, mp3 único, opus, flac, wav ou um mp3 por capítulo) e qualidade
-        file_cfg = file_info.get("config", {}) or {}
-        file_format = file_info.get("fileType") or file_info.get("file_format") or file_cfg.get("file_format") or file_cfg.get("fileType") or app_config.get("file_format") or app_config.get("fileType") or ("multiple" if modo_pasta else "single")
-        fmt_saida = formato(file_format)
-        qualidade_saida = qualidade(file_info.get("audio_quality") or file_cfg.get("audio_quality") or app_config.get("audio_quality"))
-        is_multiple = (fmt_saida == 'multiple')
+        voz = _escolher(file_info, cfg, "voice", padrao="pt-BR-AntonioNeural")
+        idioma = idioma_da_voz(voz)
+        fmt_saida = formato(_escolher(file_info, cfg, "fileType", "file_format", padrao="m4b"))
+        qualidade_saida = qualidade(_escolher(file_info, cfg, "audio_quality"))
+        gerar_sync = _escolher(file_info, cfg, "generate_sync_text", padrao=True)
+        gerar_sync = gerar_sync not in (False, "false", 0, "0")
+        # Separação do texto sincronizado: frases, palavras ou as duas
+        separacao = _escolher(file_info, cfg, "sync_text_granularity", padrao="sentences")
+        if separacao not in ("sentences", "words", "both"):
+            separacao = "sentences"
+        com_palavras = gerar_sync and separacao in ("words", "both")
+        is_multiple = fmt_saida == "multiple"
         ext_saida = FORMATOS[fmt_saida]["ext"]
 
-        dests = []
-        if is_multiple:
-            p_base = os.path.join(pasta_destino_limpa, f"{nome_dir} (Audiobook)")
-            p = get_unique_path(p_base)
-            os.makedirs(p, exist_ok=True)
-            dests.append(p)
-        else:
-            os.makedirs(pasta_destino_limpa, exist_ok=True)
-            dests.append(pasta_destino_limpa)
+        emit({"type": "progress", "fileId": file_id, "status": "processing", "progress": 0, "message": "Lendo o livro..."})
 
-        # Prioridade 1 (Resiliência): Cache persistente por livro para retomada transparente após falhas
-        safe_titulo_cache = re.sub(r'[\\/*?:\'\"<>|]', '_', titulo).strip() or "audiobook"
-        cache_base = os.path.join(pasta_destino_limpa, ".cache_audiobooks")
-        cache_dir = os.path.join(cache_base, safe_titulo_cache)
+        # 1) Capítulos
+        caps = []
+        for uc in file_info.get("chapters") or []:
+            conteudo = limpar_texto((uc.get("content") or uc.get("conteudo") or "").strip())
+            tit = (uc.get("title") or uc.get("titulo") or "").strip()
+            if conteudo:
+                caps.append({"titulo": tit or f"Capítulo {len(caps) + 1}", "conteudo": conteudo})
+        if not caps:
+            try:
+                caps = await asyncio.to_thread(estruturar_livro, caminho, idioma)
+            except LivroIlegivel as e:
+                emit({"type": "error", "fileId": file_id, "error": str(e)})
+                return
+        if not caps:
+            emit({"type": "error", "fileId": file_id, "error": "Não foi possível ler o texto deste arquivo (ele pode estar protegido ou ser só imagens)."})
+            return
+
+        # 2) Tradução para o idioma da voz
+        if file_info.get("translate"):
+            emit({"type": "progress", "fileId": file_id, "status": "translating", "progress": 0})
+            caps = await traduzir_capitulos(caps, file_id, {"zh": "zh-CN"}.get(idioma, idioma))
+
+        # 3) Texto do narrador (o texto sincronizado usa o texto sem esses ajustes)
+        emit({"type": "progress", "fileId": file_id, "status": "editing", "progress": 0})
+        mapa = file_info.get("pronunciationMap") or file_info.get("pronunciation_map") or cfg.get("pronunciation_map") or []
+        narracao = [(titulo_falado(c["titulo"]), preparar_para_narracao(c["conteudo"], voz, mapa)) for c in caps]
+        emit({"type": "progress", "fileId": file_id, "status": "editing", "progress": 100})
+
+        # 4) Síntese
+        pasta_destino = os.path.abspath(pasta_destino)
+        # A pasta precisa existir (ou poder ser criada) e aceitar gravação
+        try:
+            os.makedirs(pasta_destino, exist_ok=True)
+            teste = os.path.join(pasta_destino, f".teste_gravacao_{os.getpid()}")
+            with open(teste, "w") as f:
+                f.write("ok")
+            os.remove(teste)
+        except OSError:
+            emit({"type": "error", "fileId": file_id, "error": f"Não foi possível gravar na pasta de destino ({pasta_destino}). "
+                                                                "Verifique se ela existe (um HD externo pode ter sido desconectado) ou escolha outra em Ajustes › Armazenamento e pastas."})
+            return
+        # Espaço em disco: áudio final + cache sem perda durante a conversão
+        minutos = sum(len(x) for _, x in narracao) / 900
+        kbps = {"m4b": 256, "opus": 128, "flac": 210, "wav": 384}.get(fmt_saida, 320)
+        precisa_mb = minutos * 60 * (kbps + 250) / 8 / 1000 + 200
+        try:
+            livre_mb = shutil.disk_usage(pasta_destino).free / (1024 * 1024)
+            if livre_mb < precisa_mb:
+                emit({"type": "error", "fileId": file_id, "error": f"Espaço insuficiente na pasta de destino: são necessários cerca de "
+                                                                    f"{precisa_mb / 1024:.1f} GB e há {livre_mb / 1024:.1f} GB livres."})
+                return
+        except OSError:
+            pass
+        nome_base = re.sub(r'[\\/*?:\'"<>|]', "", titulo).strip() or "Audiobook"
+        cache_dir = os.path.join(pasta_destino, ".cache_audiobooks", re.sub(r'[\\/*?:\'"<>|]', "_", titulo).strip() or "audiobook")
         os.makedirs(cache_dir, exist_ok=True)
+        trava = os.path.join(cache_dir, ".convertendo")
+        dono = _ler_json(trava, {}).get("pid") if os.path.exists(trava) else None
+        if dono and dono != os.getpid() and _processo_vivo(dono):
+            emit({"type": "error", "fileId": file_id,
+                  "error": "Este livro já está sendo convertido em outra janela do app. Espere aquela conversão terminar "
+                           "(ou cancele-a) antes de converter de novo.",
+                  "details": f"Pasta de trabalho: {cache_dir}\nProcesso que está convertendo: {dono}"})
+            return
+        _salvar_json(trava, {"pid": os.getpid()})
+        _TRAVAS.append(trava)
 
-        jobs = []; total_p = 0
-        for c in caps:
-            tit_intro = f"{c['titulo']}."
-            conteudo_cap = c['conteudo']
-            texto_capitulo = f"{tit_intro}\n\n{conteudo_cap}" if conteudo_cap else tit_intro
-            # Chunking seguro respeitando parágrafos e pontuação final (2.000 a 2.500 caracteres)
-            partes = dividir_em_blocos_seguros(texto_capitulo, max_chars=2500)
-            if not partes:
-                partes = [tit_intro]
-            jobs.append((c['titulo'], partes))
-            total_p += len(partes)
+        total = max(1, sum(len([p for p in dividir_em_blocos_seguros(f"{t}.\n\n{x}") if re.search(r"\w", p)]) for t, x in narracao))
+        # Progresso: partes narradas 5-75%, volume dos capítulos 75-85%, arquivo final 85-98%
+        teto = 75
+        feitos = {"n": 0}
+        caps_prontos = {"n": 0}
 
-        total_p = max(1, total_p) # Ensure it does not divide by zero on the frontend
-        emit({"type": "progress", "fileId": file_id, "status": "processing", "progress": 5, "partsDone": 0, "partsTotal": total_p})
+        def progresso(n):
+            feitos["n"] += n
+            emit({"type": "progress", "fileId": file_id, "status": "processing", "progress": 5 + feitos["n"] / total * (teto - 5),
+                  "partsDone": feitos["n"], "partsTotal": total})
 
-        semaforo_g = asyncio.Semaphore(4)
-        progress_state = {'done': 0}
-        generated_files = []
+        def capitulo_pronto():
+            caps_prontos["n"] += 1
+            if feitos["n"] >= total:  # narração toda pronta: agora o que falta é o volume dos capítulos
+                emit({"type": "progress", "fileId": file_id, "status": "processing",
+                      "progress": teto + caps_prontos["n"] / max(1, len(narracao)) * 10,
+                      "message": f"Ajustando o volume dos capítulos ({caps_prontos['n']}/{len(narracao)})..."})
+
+        emit({"type": "progress", "fileId": file_id, "status": "processing", "progress": 5, "partsDone": 0, "partsTotal": total})
+
+        async def medir_velocidade():
+            """Velocidade real de download do áudio (média dos últimos segundos), enviada ao card."""
+            anterior, t_ant = _BYTES.get(file_id, 0), asyncio.get_running_loop().time()
+            amostras = []
+            while True:
+                await asyncio.sleep(1.5)
+                agora, t = _BYTES.get(file_id, 0), asyncio.get_running_loop().time()
+                amostras = (amostras + [(agora - anterior) / max(0.001, t - t_ant)])[-4:]
+                anterior, t_ant = agora, t
+                emit({"type": "speed", "fileId": file_id, "bytesPerSec": round(sum(amostras) / len(amostras))})
+
+        await _mudar_narrando(file_id, True)
+        medidor = asyncio.create_task(medir_velocidade())
+        try:
+            resultados = await asyncio.gather(*[
+                montar_capitulo(i, tf, tx, voz, cache_dir, progresso, com_palavras, file_id, capitulo_pronto)
+                for i, (tf, tx) in enumerate(narracao, start=1)])
+        finally:
+            medidor.cancel()
+            await _mudar_narrando(file_id, False)
+            emit({"type": "speed", "fileId": file_id, "bytesPerSec": 0})
+        arquivos_cap = [r[0] for r in resultados]
+        frases_cap = [r[1] for r in resultados]
+        palavras_cap = [r[2] for r in resultados]
+
+        # 5) Arquivo(s) final(is)
+        gerados = []
         chapters_info = []
-        current_time_ms = 0
+        nome_formato = ext_saida.lstrip(".").upper()
 
-        gerar_sync = file_info.get("generate_sync_text", file_cfg.get("generate_sync_text", app_config.get("generate_sync_text", True)))
-        if gerar_sync is None or gerar_sync == "":
-            gerar_sync = True
+        def progresso_final(fracao, rotulo=None):
+            emit({"type": "progress", "fileId": file_id, "status": "processing", "progress": round(85 + fracao * 13, 1),
+                  "message": rotulo or f"Montando o arquivo {nome_formato} ({round(fracao * 100)}%)..."})
 
-        for idx_f, (tit_c, pedacos) in enumerate(jobs, start=1):
-            # Capítulo normalizado e guardado sem perda (FLAC): o formato final é codificado uma única vez
-            chap_file = os.path.join(cache_dir, f"cap_{idx_f}.flac")
+        progresso_final(0)
+        if is_multiple:
+            pasta_livro = get_unique_path(os.path.join(pasta_destino, f"{nome_base} (Audiobook)"))
+            os.makedirs(pasta_livro, exist_ok=True)
 
-            if os.path.exists(chap_file) and os.path.getsize(chap_file) > 1024:
-                emit({"type": "log", "message": f"Capítulo {idx_f} recuperado do cache com sucesso."})
-                progress_state['done'] += len(pedacos)
-                mult = 75 if gerar_sync else 100
-                prog = (progress_state['done'] / total_p) * mult
-                emit({"type": "progress", "fileId": file_id, "status": "processing", "progress": prog, "partsDone": progress_state['done'], "partsTotal": total_p})
-            else:
-                tasks = [baixar_bloco_audio(idx, p, voz_final, semaforo_g, file_id, total_p, progress_state, gerar_sync, cache_dir, idx_f) for idx, p in enumerate(pedacos)]
-                res = await asyncio.gather(*tasks)
-                res.sort(key=lambda x: x[0])
-                raw_audio = bytearray()
-                for _, data in res:
-                    raw_audio.extend(data)
-                if len(raw_audio) <= 500:
-                    emit({"type": "log", "message": f"Aviso: capítulo {idx_f} ficou sem áudio e foi ignorado."})
-                    continue
+            async def um_capitulo(i, cap_file, cap):
+                destino = get_unique_path(os.path.join(pasta_livro, f"{formatar_nome_capitulo(cap['titulo'], i, len(caps))}{ext_saida}"))
+                async with _sem_ffmpeg:
+                    await asyncio.to_thread(codificar_capitulo, cap_file, destino, fmt_saida, qualidade_saida)
+                await asyncio.to_thread(aplicar_tags_capitulo_mp3, destino, cap["titulo"], autor, titulo, i, file_info.get("cover"), genero, narrador)
+                return destino
 
-                raw_cap_path = os.path.join(cache_dir, f"raw_cap_{idx_f}.mp3")
-                with open(raw_cap_path, "wb") as cf:
-                    cf.write(raw_audio)
-                # Normalização EBU R128 (-18 LUFS) e pausa de silêncio natural de 1.5s
-                if await asyncio.to_thread(normalizar_capitulo, raw_cap_path, chap_file):
-                    try:
-                        os.remove(raw_cap_path)
-                    except Exception:
-                        pass
-                else:
-                    chap_file = raw_cap_path  # sem ffmpeg funcional: usa a voz original
+            prontos_saida = {"n": 0}
 
-            if is_multiple:
-                for d in dests:
-                    nome_seguro = formatar_nome_capitulo(tit_c, idx_f, len(jobs))
-                    full_path = get_unique_path(os.path.join(d, f"{nome_seguro}{ext_saida}"))
-                    await asyncio.to_thread(codificar_capitulo, chap_file, full_path, fmt_saida, qualidade_saida)
-                    await asyncio.to_thread(aplicar_tags_capitulo_mp3, full_path, tit_c, autor, titulo, idx_f, file_info.get("cover"), genero, narrador)
-                    generated_files.append(full_path)
-            else:
-                dur_ms = await asyncio.to_thread(duracao_ms, chap_file)
-                if dur_ms > 0:
-                    chapters_info.append({"id": f"ch{idx_f}", "title": tit_c, "start_time": current_time_ms, "end_time": current_time_ms + dur_ms, "file": chap_file})
-                    current_time_ms += dur_ms
+            async def um_capitulo_com_progresso(i, f, c):
+                destino = await um_capitulo(i, f, c)
+                prontos_saida["n"] += 1
+                progresso_final(prontos_saida["n"] / len(caps), f"Gerando os arquivos dos capítulos ({prontos_saida['n']}/{len(caps)})...")
+                return destino
 
-        if not is_multiple:
-            emit({"type": "progress", "fileId": file_id, "status": "processing", "progress": 72, "message": f"Compilando audiobook {ext_saida} com capítulos..."})
-            nome_seguro_unico = re.sub(r'[\\/*?:\'\"<>|]', '', titulo).strip() or "Audiobook"
-            for d in dests:
-                saida_unica = get_unique_path(os.path.join(d, f"{nome_seguro_unico}{ext_saida}"))
-                await asyncio.to_thread(gerar_arquivo_unico, saida_unica, fmt_saida, qualidade_saida, chapters_info, titulo, autor, genero, narrador, file_info.get("cover"), cache_dir)
-                if ext_saida == ".mp3":
-                    await asyncio.to_thread(aplicar_tags_arquivo_unico, saida_unica, titulo, autor, file_info.get("cover"), chapters_info, genero, narrador)
-                generated_files.append(saida_unica)
+            gerados = list(await asyncio.gather(*[um_capitulo_com_progresso(i, f, c) for i, (f, c) in enumerate(zip(arquivos_cap, caps), start=1)]))
+        else:
+            inicio = 0
+            for i, (cap_file, cap) in enumerate(zip(arquivos_cap, caps), start=1):
+                dur = await asyncio.to_thread(duracao_ms, cap_file)
+                if dur > 0:
+                    chapters_info.append({"id": f"ch{i}", "title": cap["titulo"], "start_time": inicio, "end_time": inicio + dur, "file": cap_file})
+                    inicio += dur
+            os.makedirs(pasta_destino, exist_ok=True)
+            saida = get_unique_path(os.path.join(pasta_destino, f"{nome_base}{ext_saida}"))
+            await asyncio.to_thread(gerar_arquivo_unico, saida, fmt_saida, qualidade_saida, chapters_info, titulo, autor, genero, narrador,
+                                    file_info.get("cover"), cache_dir, progresso_final)
+            if ext_saida == ".mp3":
+                await asyncio.to_thread(aplicar_tags_arquivo_unico, saida, titulo, autor, file_info.get("cover"), chapters_info, genero, narrador)
+            gerados.append(saida)
 
-        # --- ETAPA DE SINCRONIZAÇÃO DE TEXTO COM O AUDIOBOOK ---
-        # Uma única passada do motor gera o texto; o destino (metadados, biblioteca ou ambos) vem dos Ajustes.
+        # 6) Texto sincronizado: os tempos de cada frase vêm da própria síntese (sem transcrever o áudio)
         sync_text_info = None
         if gerar_sync:
-            emit({"type": "progress", "fileId": file_id, "status": "syncing", "progress": 78, "message": "Iniciando alinhamento de texto e áudio..."})
+            emit({"type": "progress", "fileId": file_id, "status": "syncing", "progress": 90, "message": "Gerando o texto sincronizado..."})
             try:
-                from sync_text_tools import generate_sync_text
-
-                destino_texto = file_info.get("sync_text_destination", file_cfg.get("sync_text_destination", app_config.get("sync_text_destination", "both")))
-                dest_dir = dests[0] if dests else pasta_destino_limpa
-                audios = [p for p in generated_files if os.path.splitext(p)[1].lower() in EXTENSOES_AUDIO]
-                main_audio_path = audios[0] if audios else None
-                # Um arquivo por capítulo: o texto do livro inteiro não cabe nas tags de cada parte
-                alvos_metadados = audios if not is_multiple else []
-
-                emit({"type": "progress", "fileId": file_id, "status": "syncing", "progress": 85, "message": "Estruturando capítulos, frases e timestamps..."})
-                resultado = generate_sync_text(
-                    audio_path=main_audio_path,
-                    ebook_path=caminho,
-                    out_dir=dest_dir,
-                    title=titulo,
-                    author=autor,
-                    destination=destino_texto,
-                    custom_chapters=caps,
-                    embed_targets=alvos_metadados,
-                    log=lambda m: emit({"type": "log", "message": m}),
-                )
-                generated_files.extend(resultado["files"])
+                from sync_text_tools import save_sync_text
+                destino_texto = _escolher(file_info, cfg, "sync_text_destination", padrao="both")
+                audios = [p for p in gerados if os.path.splitext(p)[1].lower() in EXTENSOES_AUDIO]
+                segmentos, lista_palavras, capitulos_sync, deslocamento = [], [], [], 0.0
+                for i, (cap, frases, palavras, cap_file) in enumerate(zip(caps, frases_cap, palavras_cap, arquivos_cap)):
+                    dur = (chapters_info[i]["end_time"] - chapters_info[i]["start_time"]) / 1000 if not is_multiple and i < len(chapters_info) else duracao_ms(cap_file) / 1000
+                    if not is_multiple and i < len(chapters_info):
+                        deslocamento = chapters_info[i]["start_time"] / 1000
+                    capitulos_sync.append({"title": cap["titulo"], "start": round(deslocamento, 3), "end": round(deslocamento + dur, 3)})
+                    for ini, fim, txt in frases:
+                        segmentos.append({"start": round(deslocamento + ini, 3), "end": round(deslocamento + fim, 3), "text": txt, "chapter": i + 1})
+                    for ini, fim, txt in palavras:
+                        lista_palavras.append({"start": round(deslocamento + ini, 3), "end": round(deslocamento + fim, 3), "text": txt, "chapter": i + 1})
+                    if is_multiple:
+                        deslocamento += dur
+                # Só palavras: o texto é dividido palavra por palavra; ambas: frases + palavras de cada frase
+                if separacao == "words" and lista_palavras:
+                    segmentos = []
+                elif separacao == "sentences":
+                    lista_palavras = []
+                sync_data = {"audio": os.path.basename(audios[0]) if audios else titulo, "title": titulo, "author": autor,
+                             "sync_source": "tts_word_timing" if lista_palavras else "tts_sentence_timing",
+                             "granularity": separacao, "chapters": capitulos_sync, "segments": segmentos}
+                if lista_palavras:
+                    sync_data["words"] = lista_palavras
+                resultado = await asyncio.to_thread(
+                    save_sync_text, sync_data, audios[0] if audios else None,
+                    os.path.dirname(audios[0]) if audios else pasta_destino, titulo, autor, destino_texto,
+                    audios if not is_multiple else [], lambda m: emit({"type": "log", "message": m}))
+                gerados.extend(resultado["files"])
                 if resultado.get("fallbackToLibrary"):
                     emit({"type": "log", "message": "Este formato não guarda texto nos metadados: o texto foi salvo na pasta da biblioteca."})
-                sync_text_info = {
-                    "content": resultado["content"],
-                    "format": resultado["format"],
-                    "wordCount": resultado["wordCount"],
-                    "savedToLibrary": resultado["savedToLibrary"],
-                    "embedded": len(resultado["embedded"]) > 0,
-                }
-                emit({"type": "progress", "fileId": file_id, "status": "syncing", "progress": 99, "message": "Texto sincronizado com sucesso!"})
+                sync_text_info = {"content": resultado["content"], "format": resultado["format"], "wordCount": resultado["wordCount"],
+                                  "files": resultado.get("files") or [],
+                                  "savedToLibrary": resultado["savedToLibrary"], "embedded": len(resultado["embedded"]) > 0}
+                emit({"type": "progress", "fileId": file_id, "status": "syncing", "progress": 99, "message": "Texto sincronizado pronto."})
             except Exception as se:
                 emit({"type": "log", "message": f"Aviso sincronização texto: {se}"})
 
         drive_folder_id = config.get("driveFolderId")
         if drive_folder_id and os.path.exists('token.json'):
-            for f in generated_files:
+            for f in gerados:
                 await upload_to_drive_async(f, drive_folder_id, file_id, emit)
 
-        # --- CALCULATE FINAL METRICS FOR UI ---
-        final_size_bytes = sum(os.path.getsize(p) for p in generated_files if os.path.exists(p))
-        final_size_mb = final_size_bytes / (1024 * 1024)
-        final_size_str = f"{final_size_mb:.2f} MB"
+        tamanho = sum(os.path.getsize(p) for p in gerados if os.path.exists(p)) / (1024 * 1024)
+        dur_total = sum(duracao_ms(p) for p in gerados if os.path.exists(p) and os.path.splitext(p)[1].lower() in EXTENSOES_AUDIO)
+        s = int(dur_total / 1000)
+        dur_str = (f"{s // 3600}h {(s % 3600) // 60}m" if s >= 3600 else f"{s // 60}m" if s >= 60 else f"{s}s") if s else ""
+        emit({"type": "done", "fileId": file_id, "paths": gerados, "finalSize": f"{tamanho:.2f} MB", "finalDuration": dur_str, "syncText": sync_text_info})
 
-        final_duration_ms = sum(duracao_ms(p) for p in generated_files
-                                if os.path.exists(p) and os.path.splitext(p)[1].lower() in EXTENSOES_AUDIO)
-
-        final_duration_str = ""
-        if final_duration_ms > 0:
-            s = int(final_duration_ms / 1000)
-            h = s // 3600
-            m = (s % 3600) // 60
-            final_duration_str = f"{h}h {m}m" if h > 0 else f"{m}m"
-
-        emit({"type": "done", "fileId": file_id, "paths": generated_files, "finalSize": final_size_str, "finalDuration": final_duration_str, "syncText": sync_text_info})
-
-        # Limpeza do cache do livro após conclusão com 100% de sucesso
-        try:
-            shutil.rmtree(cache_dir, ignore_errors=True)
-            if os.path.exists(cache_base) and not os.listdir(cache_base):
-                os.rmdir(cache_base)
-        except Exception:
-            pass
+        # Concluído: o cache deste livro não é mais necessário
+        shutil.rmtree(cache_dir, ignore_errors=True)
+        base_cache = os.path.dirname(cache_dir)
+        if os.path.isdir(base_cache) and not os.listdir(base_cache):
+            os.rmdir(base_cache)
+    except (FalhaSintese, FalhaTraducao) as e:
+        emit({"type": "error", "fileId": file_id, "error": str(e), "details": _detalhes_erro(file_id, e)})
     except Exception as e:
         import traceback
-        emit({"type": "log", "message": f"Erro em '{file_info.get('title', '')}': {traceback.format_exc()[-1500:]}"})
-        emit({"type": "error", "fileId": file_info["id"], "error": str(e)})
+        rastreio = traceback.format_exc()
+        emit({"type": "log", "message": f"Erro em '{file_info.get('title', '')}': {rastreio[-1500:]}"})
+        etapa = _ETAPA.get(file_id, "início")
+        emit({"type": "error", "fileId": file_id,
+              "error": f"A conversão falhou na etapa de {etapa} ({type(e).__name__}): {e}",
+              "details": _detalhes_erro(file_id, e, rastreio)})
+
 
 async def main():
+    global _sem_tts, _sem_ffmpeg, _sem_traducao
     if len(sys.argv) < 2:
-        print("Uso: python converter.py '<json_config>'")
+        print("Uso: python converter.py <config.json>")
         sys.exit(1)
-        
-    config_arg = sys.argv[1]
-    
-    # Permite ler arquivo JSON ou string diretamente (à prova de limite de caracteres)
-    if config_arg.endswith('.json') and os.path.exists(config_arg):
-        with open(config_arg, 'r', encoding='utf-8') as f:
+    arg = sys.argv[1]
+    if arg.endswith(".json") and os.path.exists(arg):
+        with open(arg, "r", encoding="utf-8") as f:
             config = json.load(f)
     else:
-        config = json.loads(config_arg)
-    
-    files = config.get("files", [])
-    
-    await asyncio.gather(*[process_file(f, config) for f in files])
+        config = json.loads(arg)
+    _sem_tts = asyncio.Semaphore(TTS_CONEXOES)
+    _sem_ffmpeg = asyncio.Semaphore(FFMPEG_PARALELO)
+    global _vagas
+    _vagas = asyncio.Condition()
+    _sem_traducao = asyncio.Semaphore(3)
+    try:
+        await asyncio.gather(*[process_file(f, config) for f in config.get("files", [])])
+    finally:
+        for trava in _TRAVAS:
+            try:
+                os.remove(trava)
+            except OSError:
+                pass
+
+
+def _proteger_contra_sinais():
+    """Ctrl+C e o fechamento de janelas de console chegam a todos os processos do mesmo console no
+    Windows e derrubavam a conversão sem aviso (código 0xC000013A). Quem encerra a conversão é o app
+    (botão Cancelar, que finaliza o processo): os sinais do console são ignorados."""
+    import signal
+    for nome in ("SIGINT", "SIGBREAK"):
+        sinal = getattr(signal, nome, None)
+        if sinal is not None:
+            try:
+                signal.signal(sinal, signal.SIG_IGN)
+            except (OSError, ValueError):
+                pass
+
+
+def _encerrar_se_o_app_fechar():
+    """O servidor do app mantém a entrada deste processo aberta. Se ele fechar (app encerrado), a
+    entrada termina e a conversão para também, em vez de ficar rodando sozinha. O que já foi narrado
+    fica no cache e a conversão continua de onde parou na próxima vez."""
+    import threading
+
+    def vigiar():
+        try:
+            while sys.stdin.read(1024):
+                pass
+        except Exception:
+            pass
+        os._exit(1)
+
+    if not sys.stdin or sys.stdin.isatty():
+        return
+    threading.Thread(target=vigiar, daemon=True).start()
+
+
+def _prioridade_baixa():
+    """A conversão roda com prioridade abaixo do normal: o app (carregar livros, capas) e o resto do
+    computador continuam rápidos; a conversão usa a CPU que sobra, que costuma ser quase toda."""
+    try:
+        if os.name == "nt":
+            import ctypes
+            ctypes.windll.kernel32.SetPriorityClass(ctypes.windll.kernel32.GetCurrentProcess(), 0x00004000)
+        else:
+            os.nice(5)
+    except Exception:
+        pass
+
 
 if __name__ == "__main__":
+    try:
+        sys.stdout.reconfigure(encoding="utf-8")
+    except Exception:
+        pass
+    _prioridade_baixa()
+    _proteger_contra_sinais()
+    _encerrar_se_o_app_fechar()
     asyncio.run(main())

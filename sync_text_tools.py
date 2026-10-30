@@ -123,13 +123,30 @@ def generate_sync_text(
         custom_chapters=custom_chapters,
         log_callback=log,
     )
+    return save_sync_text(sync_data, audio_path, out_dir, title, author, destination, embed_targets, log)
+
+
+def save_sync_text(
+    sync_data: Dict[str, Any],
+    audio_path: Optional[str],
+    out_dir: str,
+    title: str,
+    author: str,
+    destination: str = "both",
+    embed_targets: Optional[List[str]] = None,
+    log: Optional[Callable[[str], None]] = None,
+) -> Dict[str, Any]:
+    """Grava um texto já sincronizado (segments com start/end em segundos) conforme o destino."""
+    from ebook_audiobook_converter import export_sync_data_to_format
+    if destination not in DESTINATIONS:
+        destination = "both"
     lrc_text = build_lrc(sync_data, title, author)
 
     # 1) Metadados do áudio
     embedded: List[str] = []
     not_embedded: List[str] = []
     if destination in ("metadata", "both"):
-        for target in (embed_targets if embed_targets is not None else [audio_path]):
+        for target in (embed_targets if embed_targets is not None else ([audio_path] if audio_path else [])):
             try:
                 (embedded if embed_in_audio(target, sync_data, lrc_text) else not_embedded).append(target)
             except Exception as e:  # o arquivo pode estar aberto em outro programa

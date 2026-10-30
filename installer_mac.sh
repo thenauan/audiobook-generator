@@ -31,7 +31,7 @@ echo "Installing Node.js dependencies..."
 npm install
 
 echo "Installing Python dependencies..."
-python3 -m pip install ebooklib beautifulsoup4 pypdf pdfplumber mobi deep-translator langdetect mutagen edge-tts tqdm colorama faster-whisper
+python3 -m pip install ebooklib beautifulsoup4 lxml pypdf pdfplumber mobi deep-translator langdetect mutagen edge-tts tqdm colorama faster-whisper
 
 echo "Creating executable app (.app) on Desktop..."
 APP_DIR="$HOME/Desktop/Audiobook Generator with AI.app"

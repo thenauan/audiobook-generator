@@ -29,7 +29,7 @@ export function ConfirmPanel({
 }) {
   return (
     <div className="flex flex-col p-4 text-left rtl:text-right">
-      <h4 className="text-sm font-bold text-[var(--text-main)] px-1 mb-1.5">{title}</h4>
+      <h4 className="text-xl font-bold text-[var(--text-main)] px-1 mb-1.5">{title}</h4>
       {description && <p className="text-xs text-[var(--text-muted)] px-1 mb-4 leading-relaxed">{description}</p>}
       {children}
       <div className="flex items-center justify-end gap-2.5 pt-1">

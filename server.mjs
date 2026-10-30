@@ -2,11 +2,32 @@
 import express from "express";
 import path from "path";
 import multer from "multer";
-import { spawn, execFile } from "child_process";
+import { spawn, execFile, execFileSync } from "child_process";
 import fs from "fs";
 import net from "net";
+import os from "os";
 import https from "https";
 import http from "http";
+var PYTHON_CMD = process.platform === "win32" ? "python" : "python3";
+var PY_ENV = { ...process.env, PYTHONIOENCODING: "utf-8", PYTHONUTF8: "1" };
+process.on("uncaughtException", (err) => console.error("Erro n\xE3o tratado:", err));
+process.on("unhandledRejection", (err) => console.error("Promessa rejeitada sem tratamento:", err));
+function explainPythonFailure(stderr, code) {
+  if (code === 3221225786 || code === -1073741510) {
+    return "A convers\xE3o foi interrompida por um sinal do Windows (Ctrl+C ou uma janela de console fechada). Converta de novo: o que j\xE1 foi narrado fica salvo e a convers\xE3o continua de onde parou.";
+  }
+  const missing = stderr.match(/No module named '([^']+)'/);
+  if (missing) return `Falta a biblioteca do Python "${missing[1]}". Rode o instalador de novo (ou: pip install ${missing[1].replace(/_/g, "-")}).`;
+  if (/ENOENT|not recognized|não é reconhecido/i.test(stderr)) return "Python n\xE3o encontrado. Rode o instalador de novo.";
+  if (/No space left|ENOSPC|espaço insuficiente/i.test(stderr)) return "Sem espa\xE7o em disco na pasta de destino.";
+  if (/Permission denied|EACCES|PermissionError/i.test(stderr)) return "Sem permiss\xE3o para gravar na pasta de destino. Escolha outra pasta em Ajustes \u203A Armazenamento e pastas.";
+  if (/MemoryError|out of memory/i.test(stderr)) return "Faltou mem\xF3ria para converter este livro. Feche outros programas e converta de novo: o que j\xE1 foi narrado fica salvo.";
+  const last = stderr.trim().split("\n").filter(Boolean).pop();
+  if (!last) {
+    return "A convers\xE3o foi interrompida pelo sistema. Converta de novo: o que j\xE1 foi narrado fica salvo e a convers\xE3o continua de onde parou.";
+  }
+  return `A convers\xE3o parou inesperadamente${code !== null ? ` (c\xF3digo ${code})` : ""}: ${last.slice(0, 200)}`;
+}
 var HOST = process.env.HOST || "127.0.0.1";
 var AUDIO_EXTENSIONS = /* @__PURE__ */ new Set([".mp3", ".m4a", ".m4b", ".aac", ".ogg", ".opus", ".wav", ".flac"]);
 function isPortFree(port, host) {
@@ -35,19 +56,31 @@ async function getAvailablePort(startPort, extraHosts = []) {
 }
 var upload = multer({
   dest: path.join(process.cwd(), "uploads/"),
-  limits: { fileSize: 1024 * 1024 * 1024 }
-  // 1GB limit para suportar audiolivros completos
+  limits: {
+    fileSize: 1024 * 1024 * 1024,
+    // 1GB limit para suportar audiolivros completos
+    // Os dados dos livros (capítulos com o texto inteiro e a capa em base64) vão num campo só;
+    // o padrão de 1 MB por campo recusava livros longos ou com capa grande ("Field value too long")
+    fieldSize: 512 * 1024 * 1024
+  }
 });
 if (!fs.existsSync("uploads")) {
   fs.mkdirSync("uploads");
 }
 async function startServer() {
   const app = express();
-  const PORT = await getAvailablePort(3e3);
+  const PORT = await getAvailablePort(Number(process.env.PORT) || 3e3);
   const hmrPort = await getAvailablePort(24678, ["::1"]);
   const uploadsDir = path.join(process.cwd(), "uploads");
   if (!fs.existsSync(uploadsDir)) {
     fs.mkdirSync(uploadsDir, { recursive: true });
+  }
+  try {
+    for (const name of fs.readdirSync(process.cwd())) {
+      if (/^config_\d+\.json$/.test(name)) fs.rmSync(path.join(process.cwd(), name), { force: true });
+    }
+    for (const name of fs.readdirSync(uploadsDir)) fs.rmSync(path.join(uploadsDir, name), { force: true, recursive: true });
+  } catch {
   }
   try {
     fs.accessSync(uploadsDir, fs.constants.W_OK);
@@ -79,16 +112,40 @@ async function startServer() {
     res.setHeader("Connection", "keep-alive");
     res.flushHeaders();
     clients.add(res);
+    for (const event of lastEventByFile.values()) {
+      try {
+        res.write(`data: ${JSON.stringify(event)}
+
+`);
+      } catch {
+      }
+    }
+    const ping = setInterval(() => {
+      try {
+        res.write(": ping\n\n");
+      } catch {
+      }
+    }, 25e3);
     req.on("close", () => {
+      clearInterval(ping);
       clients.delete(res);
     });
   });
+  const lastEventByFile = /* @__PURE__ */ new Map();
   function broadcastProgress(data) {
+    if (data && data.fileId && data.type !== "log" && data.type !== "speed") {
+      lastEventByFile.set(data.fileId, data);
+      if (lastEventByFile.size > 200) lastEventByFile.delete(lastEventByFile.keys().next().value);
+    }
     const message = `data: ${JSON.stringify(data)}
 
 `;
     for (const client of clients) {
-      client.write(message);
+      try {
+        client.write(message);
+      } catch {
+        clients.delete(client);
+      }
     }
   }
   app.get("/api/backup", (req, res) => {
@@ -197,6 +254,23 @@ async function startServer() {
     }
     res.json({ path: null });
   });
+  const META_PARALELO = Math.max(2, Math.min(4, Math.floor(os.cpus().length / 2)));
+  let metaAtivos = 0;
+  const metaFila = [];
+  const metaEntrar = () => new Promise((resolve) => {
+    if (metaAtivos < META_PARALELO) {
+      metaAtivos++;
+      resolve();
+    } else metaFila.push(() => {
+      metaAtivos++;
+      resolve();
+    });
+  });
+  const metaSair = () => {
+    metaAtivos = Math.max(0, metaAtivos - 1);
+    const proximo = metaFila.shift();
+    if (proximo) proximo();
+  };
   app.post("/api/metadata", (req, res, next) => {
     console.log("Incoming metadata request...");
     upload.single("file")(req, res, (err) => {
@@ -206,7 +280,7 @@ async function startServer() {
       }
       next();
     });
-  }, (req, res) => {
+  }, async (req, res) => {
     console.log("Received metadata request for:", req.file?.originalname);
     try {
       if (!req.file) {
@@ -216,81 +290,107 @@ async function startServer() {
       const originalExt = path.extname(req.body.filename || req.file.originalname);
       const newPath = req.file.path + originalExt;
       fs.renameSync(req.file.path, newPath);
-      const pythonProcess = spawn("python3", ["extract_metadata.py", newPath]);
+      const originalName = String(req.body.filename || req.file.originalname || "");
+      await metaEntrar();
+      let saiu = false;
+      const liberar = () => {
+        if (!saiu) {
+          saiu = true;
+          metaSair();
+        }
+      };
+      const pythonProcess = spawn(PYTHON_CMD, ["extract_metadata.py", newPath, originalName], { env: PY_ENV, windowsHide: true });
+      const metaTimer = setTimeout(() => {
+        try {
+          pythonProcess.kill();
+        } catch {
+        }
+      }, 18e4);
       console.log("Spawned python process for metadata extraction");
       pythonProcess.on("error", (err) => {
+        liberar();
         console.error("Failed to start python process:", err);
         if (!res.headersSent) {
-          res.status(500).json({ error: "Failed to start metadata extraction" });
+          res.status(500).json({ error: `N\xE3o foi poss\xEDvel iniciar o Python (${PYTHON_CMD}): ${err.message}` });
         }
       });
-      let output = "";
+      let buffer = "";
       let errorOutput = "";
+      let sentAny = false;
+      let gotFinal = false;
+      const sendLine = (line) => {
+        const text = line.trim();
+        if (!text.startsWith("{")) return;
+        try {
+          const obj = JSON.parse(text);
+          if (!obj.partial) gotFinal = true;
+        } catch {
+          return;
+        }
+        if (!sentAny) {
+          res.status(200).setHeader("Content-Type", "application/x-ndjson; charset=utf-8");
+          sentAny = true;
+        }
+        res.write(text + "\n");
+      };
+      pythonProcess.stdout.setEncoding("utf8");
       pythonProcess.stdout.on("data", (data) => {
-        output += data.toString();
+        buffer += data;
+        const lines = buffer.split("\n");
+        buffer = lines.pop() || "";
+        lines.forEach(sendLine);
       });
       pythonProcess.stderr.on("data", (data) => {
         errorOutput += data.toString();
       });
       pythonProcess.on("close", (code) => {
+        liberar();
+        clearTimeout(metaTimer);
         console.log(`Python process closed with code ${code}`);
         if (errorOutput) console.error("Python stderr:", errorOutput);
         try {
-          if (fs.existsSync(newPath)) {
-            fs.unlinkSync(newPath);
-          }
+          if (fs.existsSync(newPath)) fs.unlinkSync(newPath);
         } catch (e) {
           console.error("Failed to delete temp file:", newPath);
         }
-        if (code === 0) {
-          try {
-            const lines = output.trim().split("\n");
-            const lastLine = lines[lines.length - 1];
-            const metadata = JSON.parse(lastLine);
-            res.json(metadata);
-          } catch (e) {
-            console.error("Failed to parse metadata output:", output);
-            res.status(500).json({ error: "Failed to parse metadata" });
-          }
-        } else {
-          console.error("Metadata extraction failed with code:", code, "Output:", output, "Error:", errorOutput);
-          res.status(500).json({ error: "Metadata extraction failed" });
+        if (buffer) sendLine(buffer);
+        if (gotFinal) return res.end();
+        const ultima = errorOutput.trim().split("\n").filter(Boolean).pop() || "";
+        const message = code === 0 ? "a leitura do arquivo terminou incompleta" : code === null ? "a leitura demorou demais e foi interrompida" : `o leitor de e-books falhou (c\xF3digo ${code}${ultima ? `: ${ultima.slice(0, 160)}` : ""})`;
+        if (sentAny) {
+          res.write(JSON.stringify({ error: message }) + "\n");
+          return res.end();
         }
+        console.error("Metadata extraction failed with code:", code, "Error:", errorOutput);
+        res.status(500).json({ error: message });
       });
     } catch (error) {
       console.error("Error extracting metadata:", error);
       res.status(500).json({ error: "Internal server error" });
     }
   });
-  let currentPythonProcess = null;
+  const runningPythonProcesses = /* @__PURE__ */ new Set();
   app.post("/api/cancel", (req, res) => {
-    let killed = false;
-    if (currentPythonProcess && currentPythonProcess.pid) {
-      const pid = currentPythonProcess.pid;
-      killed = true;
+    const killed = runningPythonProcesses.size > 0;
+    for (const proc of runningPythonProcesses) {
+      proc.__cancelled = true;
+      const pid = proc.pid;
+      if (!pid) continue;
       if (process.platform === "win32") {
-        import("child_process").then(({ exec }) => {
-          exec(`taskkill /pid ${pid} /T /F`, (err) => {
-            if (err) console.error("taskkill PID error:", err);
-          });
-          exec("taskkill /IM ffmpeg.exe /F", () => {
-          });
-        });
+        spawn("taskkill", ["/pid", String(pid), "/T", "/F"], { stdio: "ignore", windowsHide: true }).on("error", (err) => console.error("taskkill error:", err));
       } else {
         try {
-          process.kill(-pid, "SIGKILL");
+          proc.kill("SIGKILL");
         } catch (e) {
-          currentPythonProcess.kill("SIGKILL");
+          console.error("kill error:", e);
         }
       }
-      currentPythonProcess = null;
-    } else {
-      if (process.platform === "win32") {
-        import("child_process").then(({ exec }) => {
-          exec("taskkill /IM ffmpeg.exe /F", () => {
-          });
-        });
-      }
+    }
+    runningPythonProcesses.clear();
+    lastEventByFile.clear();
+    if (process.platform === "win32") {
+      spawn("taskkill", ["/IM", "ffmpeg.exe", "/F"], { stdio: "ignore", windowsHide: true }).on("error", () => {
+      });
     }
     broadcastProgress({ type: "log", message: "Processo cancelado e recursos liberados imediatamente." });
     res.json({ success: true, message: killed ? "Process tree and FFmpeg killed" : "Cleaned up" });
@@ -393,12 +493,88 @@ async function startServer() {
       res.status(500).json({ success: false, error: String(error) });
     }
   });
+  const DELETABLE_EXT = /* @__PURE__ */ new Set([...AUDIO_EXTENSIONS, ".lrc", ".srt", ".vtt", ".json"]);
+  const isDeletableFile = (p) => {
+    const lower = p.toLowerCase();
+    return DELETABLE_EXT.has(path.extname(lower)) && (!lower.endsWith(".json") || lower.endsWith(".sync.json"));
+  };
+  const sendToTrash = (targets) => new Promise((resolve, reject) => {
+    if (targets.length === 0) return resolve();
+    if (process.platform === "win32") {
+      const script = "$ErrorActionPreference='Stop'; Add-Type -AssemblyName Microsoft.VisualBasic; $itens = [Console]::In.ReadToEnd() | ConvertFrom-Json; foreach ($p in $itens) { if (Test-Path -LiteralPath $p -PathType Container) { [Microsoft.VisualBasic.FileIO.FileSystem]::DeleteDirectory($p, 'OnlyErrorDialogs', 'SendToRecycleBin') } elseif (Test-Path -LiteralPath $p) { [Microsoft.VisualBasic.FileIO.FileSystem]::DeleteFile($p, 'OnlyErrorDialogs', 'SendToRecycleBin') } }";
+      const child = spawn("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", script], { windowsHide: true });
+      let err = "";
+      child.stderr.on("data", (d) => {
+        err += d.toString();
+      });
+      child.on("error", reject);
+      child.on("close", (code) => code === 0 ? resolve() : reject(new Error(err.trim() || `c\xF3digo ${code}`)));
+      child.stdin.end(JSON.stringify(targets));
+    } else {
+      const trash = process.platform === "darwin" ? null : "gio";
+      if (trash) {
+        execFile(trash, ["trash", ...targets], (e) => {
+          if (!e) return resolve();
+          try {
+            targets.forEach((t) => fs.rmSync(t, { recursive: true, force: true }));
+            resolve();
+          } catch (e2) {
+            reject(e2);
+          }
+        });
+      } else {
+        const script = targets.map((t) => `tell application "Finder" to delete (POSIX file ${JSON.stringify(t)})`);
+        execFile("osascript", script.flatMap((l) => ["-e", l]), (e) => {
+          if (!e) return resolve();
+          try {
+            targets.forEach((t) => fs.rmSync(t, { recursive: true, force: true }));
+            resolve();
+          } catch (e2) {
+            reject(e2);
+          }
+        });
+      }
+    }
+  });
+  app.post("/api/delete-files", express.json(), async (req, res) => {
+    const pedidos = Array.isArray(req.body?.paths) ? req.body.paths.filter((p) => typeof p === "string" && p.trim()) : [];
+    const targets = [];
+    const skipped = [];
+    for (const raw of pedidos) {
+      const p = path.resolve(raw);
+      if (!fs.existsSync(p)) continue;
+      const st = fs.statSync(p);
+      if (st.isDirectory()) {
+        const nome = path.basename(p);
+        const conteudo = fs.readdirSync(p);
+        if (/\(Audiobook\)( \(\d+\))?$/.test(nome) && conteudo.every((f) => isDeletableFile(f))) targets.push(p);
+        else skipped.push(p);
+      } else if (isDeletableFile(p)) {
+        targets.push(p);
+      } else {
+        skipped.push(p);
+      }
+    }
+    try {
+      await sendToTrash([...new Set(targets)]);
+      res.json({ success: true, deleted: targets.length, skipped });
+    } catch (e) {
+      res.status(500).json({ error: `N\xE3o foi poss\xEDvel excluir os arquivos: ${e?.message || e}`, skipped });
+    }
+  });
   app.post("/api/open-folder", express.json(), (req, res) => {
     try {
       let folderPath = req.body.path || path.join(process.cwd(), "meus audiobooks");
       folderPath = path.normalize(String(folderPath));
       if (folderPath.includes('"')) return res.status(400).json({ success: false });
       const isFile = req.body.isFile;
+      if (!isFile && !fs.existsSync(folderPath)) {
+        try {
+          fs.mkdirSync(folderPath, { recursive: true });
+        } catch {
+          return res.status(404).json({ success: false });
+        }
+      }
       let program;
       let args;
       if (process.platform === "win32") {
@@ -425,30 +601,80 @@ async function startServer() {
     }
   });
   app.all("/api/select-folder", (req, res) => {
+    let program;
+    let args;
     if (process.platform === "win32") {
-      const psScript = `
-        Add-Type -AssemblyName System.windows.forms;
-        $f = New-Object System.Windows.Forms.FolderBrowserDialog;
-        $f.ShowNewFolderButton = $true;
-        $f.Description = 'Selecione a pasta de destino';
-        if($f.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK){
-            $f.SelectedPath
-        }
-      `;
-      const child = spawn("powershell.exe", ["-NoProfile", "-STA", "-Command", psScript]);
-      let output = "";
-      child.stdout.on("data", (data) => output += data.toString());
-      child.on("close", () => {
-        const path2 = output.trim();
-        if (path2) {
-          res.json({ path: path2 });
-        } else {
-          res.json({ cancelled: true });
-        }
-      });
+      const psScript = [
+        "[Console]::OutputEncoding = [System.Text.Encoding]::UTF8",
+        "Add-Type -AssemblyName System.Windows.Forms",
+        "$owner = New-Object System.Windows.Forms.Form -Property @{ TopMost = $true; ShowInTaskbar = $false }",
+        "$f = New-Object System.Windows.Forms.FolderBrowserDialog",
+        "$f.ShowNewFolderButton = $true",
+        "$f.Description = 'Selecione a pasta onde os audiobooks ser\xE3o salvos'",
+        "if ($f.ShowDialog($owner) -eq [System.Windows.Forms.DialogResult]::OK) { [Console]::Out.Write($f.SelectedPath) }"
+      ].join("; ");
+      program = "powershell.exe";
+      args = ["-NoProfile", "-STA", "-Command", psScript];
+    } else if (process.platform === "darwin") {
+      program = "osascript";
+      args = ["-e", 'POSIX path of (choose folder with prompt "Selecione a pasta onde os audiobooks ser\xE3o salvos")'];
     } else {
-      res.status(501).json({ error: "Folder selection is only supported on Windows" });
+      program = "zenity";
+      args = ["--file-selection", "--directory", "--title=Selecione a pasta dos audiobooks"];
     }
+    const child = spawn(program, args);
+    let output = "";
+    child.stdout.setEncoding("utf8");
+    child.stdout.on("data", (data) => output += data);
+    child.on("error", () => {
+      if (!res.headersSent) res.status(501).json({ error: "Seletor de pastas indispon\xEDvel neste sistema" });
+    });
+    child.on("close", () => {
+      if (res.headersSent) return;
+      const selected = output.trim().replace(/[\\/]+$/, "");
+      res.json(selected ? { path: selected } : { cancelled: true });
+    });
+  });
+  app.post("/api/default-folder", (req, res) => {
+    const home = process.env.USERPROFILE || process.env.HOME || process.cwd();
+    let documents = "";
+    if (process.platform === "win32") {
+      try {
+        documents = String(execFileSync("powershell.exe", [
+          "-NoProfile",
+          "-Command",
+          "[Console]::OutputEncoding=[Text.Encoding]::UTF8; [Environment]::GetFolderPath('MyDocuments')"
+        ], { timeout: 15e3 })).trim();
+      } catch {
+        documents = "";
+      }
+    }
+    const candidates = [documents, path.join(home, "Documents"), path.join(home, "Documentos"), home].filter(Boolean);
+    for (const base of candidates) {
+      try {
+        if (!fs.existsSync(base)) continue;
+        const folder = path.join(base, "Audiobook Generator");
+        fs.mkdirSync(folder, { recursive: true });
+        fs.accessSync(folder, fs.constants.W_OK);
+        return res.json({ path: folder });
+      } catch {
+      }
+    }
+    res.status(500).json({ error: "N\xE3o foi poss\xEDvel criar a pasta padr\xE3o." });
+  });
+  app.get("/api/health", (req, res) => {
+    const check = [
+      "import importlib.util as u, json, shutil, sys",
+      'print(json.dumps({"python": sys.version.split()[0], "edgeTts": bool(u.find_spec("edge_tts")), "ffmpeg": bool(shutil.which("ffmpeg")), "whisper": bool(u.find_spec("faster_whisper"))}))'
+    ].join("\n");
+    execFile(PYTHON_CMD, ["-c", check], { timeout: 15e3, env: PY_ENV }, (err, stdout) => {
+      if (err) return res.json({ python: null, edgeTts: false, ffmpeg: false, whisper: false });
+      try {
+        res.json(JSON.parse(String(stdout).trim()));
+      } catch {
+        res.json({ python: null, edgeTts: false, ffmpeg: false, whisper: false });
+      }
+    });
   });
   const handleProcessRequest = (req, res) => {
     try {
@@ -466,14 +692,15 @@ async function startServer() {
           voice: req.body.voice,
           outputFolder: req.body.outputFolder,
           mode_folder: req.body.fileType === "multiple" || req.body.mode_folder === true || req.body.mode_folder === "true",
-          file_format: req.body.fileType || "single",
+          file_format: req.body.fileType || "m4b",
           target_lang: req.body.target_lang || "pt"
         };
       }
-      const fileFormat = config.file_format || config.fileType || req.body.fileType || (config.mode_folder ? "multiple" : "single");
+      const fileFormat = config.file_format || config.fileType || req.body.fileType || (config.mode_folder ? "multiple" : "m4b");
       const isMultiple = fileFormat === "multiple" || config.mode_folder === true || config.mode_folder === "true";
       const generateSyncText = config.generate_sync_text !== void 0 ? config.generate_sync_text : req.body.generate_sync_text !== void 0 ? req.body.generate_sync_text === true || req.body.generate_sync_text === "true" : true;
       const syncTextDestination = ["metadata", "library", "both"].includes(config.sync_text_destination) ? config.sync_text_destination : "both";
+      const syncTextGranularity = ["sentences", "words", "both"].includes(config.sync_text_granularity) ? config.sync_text_granularity : "sentences";
       const files = req.files.map((file, index) => {
         const info = filesInfo[index] || {};
         const originalExt = path.extname(info.filename || file.originalname);
@@ -488,6 +715,8 @@ async function startServer() {
           subgenre: info.subgenre || "",
           narrator: info.narrator || "",
           language: info.language || "",
+          voice: info.voice || config.voice || "pt-BR-AntonioNeural",
+          audio_quality: config.audio_quality,
           translate: info.requiresTranslation || info.translate || false,
           cover: info.cover || null,
           chapters: info.chapters || [],
@@ -496,7 +725,8 @@ async function startServer() {
           pronunciation_map: info.pronunciationMap || info.pronunciation_map || [],
           generate_sync_text: info.generate_sync_text !== void 0 ? info.generate_sync_text : generateSyncText,
           sync_text_destination: syncTextDestination,
-          config: { ...info.config || config, file_format: info.fileType || fileFormat, pronunciation_map: info.pronunciationMap || info.pronunciation_map || [], generate_sync_text: info.generate_sync_text !== void 0 ? info.generate_sync_text : generateSyncText, sync_text_destination: syncTextDestination }
+          sync_text_granularity: syncTextGranularity,
+          config: { ...info.config || config, file_format: info.fileType || fileFormat, pronunciation_map: info.pronunciationMap || info.pronunciation_map || [], generate_sync_text: info.generate_sync_text !== void 0 ? info.generate_sync_text : generateSyncText, sync_text_destination: syncTextDestination, sync_text_granularity: syncTextGranularity }
         };
       });
       const pythonConfig = {
@@ -507,20 +737,37 @@ async function startServer() {
         mode_folder: isMultiple,
         file_format: fileFormat,
         generate_sync_text: generateSyncText,
-        sync_text_destination: syncTextDestination
+        sync_text_destination: syncTextDestination,
+        sync_text_granularity: syncTextGranularity
       };
       const configPath = path.join(process.cwd(), `config_${Date.now()}.json`);
       fs.writeFileSync(configPath, JSON.stringify(pythonConfig));
-      const pythonCmd = process.platform === "win32" ? "python" : "python3";
-      currentPythonProcess = spawn(pythonCmd, ["-u", "converter.py", configPath], { stdio: ["pipe", "pipe", "pipe"] });
-      currentPythonProcess.on("error", (err) => {
+      for (const f of files) lastEventByFile.delete(f.id);
+      const pythonProc = spawn(PYTHON_CMD, ["-u", "converter.py", configPath], {
+        stdio: ["pipe", "pipe", "pipe"],
+        env: PY_ENV,
+        detached: process.platform === "win32",
+        windowsHide: true
+      });
+      runningPythonProcesses.add(pythonProc);
+      const pending = new Set(files.map((f) => f.id));
+      let stderrTail = "";
+      const failPending = (message, details) => {
+        for (const id of pending) broadcastProgress({ type: "error", fileId: id, error: message, details });
+        pending.clear();
+      };
+      pythonProc.on("error", (err) => {
+        runningPythonProcesses.delete(pythonProc);
+        failPending(explainPythonFailure(String(err), null), `N\xE3o foi poss\xEDvel iniciar o Python (${PYTHON_CMD}).
+${String(err)}`);
         console.error("Failed to start python backend process:", err);
         if (!res.headersSent) {
           res.status(500).json({ error: "Failed to start processing" });
         }
       });
       let stdoutBuffer = "";
-      currentPythonProcess.stdout.on("data", (data) => {
+      pythonProc.stdout.setEncoding("utf8");
+      pythonProc.stdout.on("data", (data) => {
         stdoutBuffer += data.toString();
         const lines = stdoutBuffer.split("\n");
         stdoutBuffer = lines.pop() || "";
@@ -528,6 +775,7 @@ async function startServer() {
           if (line.trim()) {
             try {
               const event = JSON.parse(line);
+              if ((event.type === "done" || event.type === "error") && event.fileId) pending.delete(event.fileId);
               broadcastProgress(event);
             } catch (e) {
               console.log("Python stdout parse error:", line);
@@ -535,12 +783,22 @@ async function startServer() {
           }
         }
       });
-      currentPythonProcess.stderr.on("data", (data) => {
-        console.error("Python stderr:", data.toString());
+      pythonProc.stderr.on("data", (data) => {
+        const text = data.toString();
+        stderrTail = (stderrTail + text).slice(-4e3);
+        console.error("Python stderr:", text);
       });
-      currentPythonProcess.on("close", (code) => {
+      pythonProc.on("close", (code) => {
         console.log(`Python process exited with code ${code}`);
-        currentPythonProcess = null;
+        runningPythonProcesses.delete(pythonProc);
+        if (pythonProc.__cancelled) pending.clear();
+        else if (pending.size > 0) failPending(
+          explainPythonFailure(stderrTail, code),
+          `O processo de convers\xE3o terminou com c\xF3digo ${code} antes de concluir.
+
+\xDAltimas linhas do erro:
+${stderrTail.trim().split("\n").slice(-25).join("\n") || "(nenhuma mensagem)"}`
+        );
         for (const file of files) {
           try {
             if (fs.existsSync(file.path)) {
@@ -606,8 +864,7 @@ async function startServer() {
         destination
       ];
       if (ebookPath) args.push("--ebook", ebookPath);
-      const pythonCmd = process.platform === "win32" ? "python" : "python3";
-      const child = spawn(pythonCmd, args, { stdio: ["ignore", "pipe", "pipe"], env: { ...process.env, PYTHONIOENCODING: "utf-8" } });
+      const child = spawn(PYTHON_CMD, args, { stdio: ["ignore", "pipe", "pipe"], env: PY_ENV, windowsHide: true });
       let stdout = "";
       let stderr = "";
       child.stdout.on("data", (d) => {
@@ -664,8 +921,7 @@ async function startServer() {
       }
       const tempJson = path.join(process.cwd(), `meta_inject_${Date.now()}.json`);
       fs.writeFileSync(tempJson, JSON.stringify(data), "utf-8");
-      const pythonCmd = process.platform === "win32" ? "python" : "python3";
-      const child = spawn(pythonCmd, ["-u", "inject_metadata.py", tempJson]);
+      const child = spawn(PYTHON_CMD, ["-u", "inject_metadata.py", tempJson], { env: PY_ENV, windowsHide: true });
       let stdout = "";
       let stderr = "";
       child.stdout.on("data", (d) => stdout += d.toString());
@@ -701,7 +957,23 @@ async function startServer() {
     const react = (await import("@vitejs/plugin-react")).default;
     const tailwindcss = (await import("@tailwindcss/vite")).default;
     const vite = await createViteServer({
-      server: { middlewareMode: true, hmr: process.env.DISABLE_HMR !== "true" ? { port: hmrPort } : false },
+      server: {
+        middlewareMode: true,
+        // Recarga automática (HMR) só para quem edita o código: com ela, uma página em segundo plano
+        // que perdia a conexão com o servidor recarregava sozinha ao voltar (e perdia o estado da tela)
+        hmr: process.env.HMR === "true" ? { port: hmrPort } : false,
+        ws: process.env.HMR === "true" ? void 0 : false,
+        // Só o código da interface recarrega a página. Sem isso, os arquivos que a conversão grava na pasta
+        // do app (uploads, config_*.json, cache) faziam a página recarregar no meio da conversão.
+        watch: {
+          ignored: (p) => {
+            const rel = path.relative(process.cwd(), p);
+            if (!rel) return false;
+            if (rel.startsWith("..")) return true;
+            return !["src", "public", "index.html"].includes(rel.split(/[\\/]/)[0]);
+          }
+        }
+      },
       appType: "spa",
       configFile: false,
       plugins: [react(), tailwindcss()]
@@ -716,8 +988,24 @@ async function startServer() {
   }
   app.use((err, req, res, next) => {
     console.error("Unhandled error:", err);
+    const limites = {
+      LIMIT_FILE_SIZE: "O arquivo \xE9 grande demais para enviar (limite de 1 GB).",
+      LIMIT_FIELD_VALUE: "Os dados do livro (texto dos cap\xEDtulos e capa) passaram do limite de envio.",
+      LIMIT_FIELD_COUNT: "O pedido tem campos demais.",
+      LIMIT_FILE_COUNT: "Arquivos demais num pedido s\xF3. Converta em lotes menores.",
+      LIMIT_UNEXPECTED_FILE: "O app enviou um arquivo num campo inesperado."
+    };
+    if (err?.code && limites[err.code]) {
+      return res.status(413).json({ error: limites[err.code], details: `${err.code}: ${err.message}${err.field ? ` (campo ${err.field})` : ""}` });
+    }
     res.status(500).json({ error: err.message || "Internal server error" });
   });
+  if (HOST === "127.0.0.1") {
+    const v6 = http.createServer(app);
+    v6.on("error", () => {
+    });
+    v6.listen(PORT, "::1");
+  }
   app.listen(PORT, HOST, async () => {
     console.log(`Server running on http://localhost:${PORT}`);
     const url = `http://localhost:${PORT}`;

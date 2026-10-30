@@ -34,7 +34,7 @@ function roundedFadeMask(w: number, h: number): React.CSSProperties {
 }
 
 export function ConverterScreen() {
-  const { accentColor, resolvedTheme, t, showToast, playingSnippet, toggleSnippet, phase, setPhase, files, setFiles, fileInputRef, coverColorsMap, outputFolder, fileTypeOption, selectedVoice, setSelectedVoice, setShowCancelModal, cancelModalAnchor, setCancelModalAnchor, setEditingCoverFileId, coverFileInputRef, handleOpenMetadataModal, activeSettingSelector, setActiveSettingSelector, handleFileUpload, handleRetryFile, availableVoices } = useApp();
+  const { accentColor, resolvedTheme, t, showToast, playingSnippet, toggleSnippet, phase, setPhase, files, setFiles, fileInputRef, coverColorsMap, outputFolder, fileTypeOption, selectedVoice, setSelectedVoice, setShowCancelModal, cancelModalAnchor, setCancelModalAnchor, setEditingCoverFileId, coverFileInputRef, handleOpenMetadataModal, activeSettingSelector, setActiveSettingSelector, handleFileUpload, handleRetryFile, handleRetryAllFailed, availableVoices } = useApp();
   // Sem e-books: a área de arrastar ocupa todo o conteúdo, alinhando a base com a do menu lateral (16 px da borda)
   const showDropzone = phase === 0 || (phase === 1 && files.length === 0);
   const [dropHover, setDropHover] = useState(false);
@@ -250,6 +250,27 @@ export function ConverterScreen() {
                     Convertendo
                   </h3>
 
+                  <div className="flex items-center gap-2">
+                  {/* Algum livro falhou: tentar todos de novo (mesmo visual do "Tentar novamente" do card) */}
+                  <AnimatePresence initial={false}>
+                    {convertingFiles.some(f => f.status === 'error') && (
+                      <motion.button
+                        key="retry-all"
+                        type="button"
+                        initial={{ opacity: 0, scale: 0.85 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.85 }}
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        onClick={(e) => { e.stopPropagation(); handleRetryAllFailed(); }}
+                        className="h-8 px-3.5 rounded-full bg-card/75 backdrop-blur-3xl border border-[var(--text-main)]/15 text-[var(--text-main)] hover:text-white hover:bg-white/20 hover:border-white/35 hover:shadow-[0_0_14px_rgba(255,255,255,0.35)] flex items-center gap-1.5 text-xs font-semibold transition-all cursor-pointer shadow-sm [&_svg]:text-inherit"
+                        title="Tentar de novo todos os que falharam"
+                      >
+                        <RotateCcw size={13} />
+                        <span>Tentar todos novamente</span>
+                      </motion.button>
+                    )}
+                  </AnimatePresence>
                   <motion.button
                     whileHover={{ scale: 1.06 }}
                     whileTap={{ scale: 0.94 }}
@@ -266,6 +287,7 @@ export function ConverterScreen() {
                     <span>Cancelar todos</span>
                     <X size={13} />
                   </motion.button>
+                  </div>
                 </div>
 
                 <div className="space-y-4 w-full">

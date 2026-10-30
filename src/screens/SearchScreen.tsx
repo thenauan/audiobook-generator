@@ -1,12 +1,12 @@
 // ===== Tela: search =====
 import { motion, AnimatePresence } from 'motion/react';
-import { Search, Clock, Code2, Trash2, Power } from 'lucide-react';
+import { Search, Clock, Trash2 } from 'lucide-react';
 import { HeaderActionButtons } from '../components/HeaderActionButtons';
 import { transicaoConteudo } from '../navigation/transitions';
 import { useApp } from '../app/AppContext';
 
 export function SearchScreen() {
-  const { t, showToast, recentSearches, setRecentSearches, searchInputRef, setSearchQuery, isDevModeActive, handleExitDevMode, devModeOptions } = useApp();
+  const { t, showToast, recentSearches, setRecentSearches, searchInputRef, setSearchQuery } = useApp();
   return (
     <motion.div
       key="screen-search"
@@ -53,7 +53,7 @@ export function SearchScreen() {
                   setSearchQuery(term);
                   searchInputRef.current?.focus();
                 }}
-                className="group flex items-center justify-between h-[52px] pl-[18px] pr-5 rounded-full hover:bg-[var(--button-secondary-bg)]/50 border border-transparent cursor-pointer transition-all w-full select-none"
+                className="group flex items-center justify-between h-[52px] pl-[18px] pr-5 rounded-full hover:bg-[var(--button-secondary-bg)]/50 cursor-pointer transition-all w-full select-none"
               >
                 <div className="flex items-center gap-4 min-w-0">
                   <div className="relative w-4 h-4 flex items-center justify-center shrink-0">
@@ -74,46 +74,6 @@ export function SearchScreen() {
         )}
       </div>
 
-      {/* PAINEL MODO DE DESENVOLVEDOR (se dev mode estiver ativo) */}
-      {isDevModeActive && (
-        <div className="p-6 rounded-3xl bg-card/80 backdrop-blur-3xl border border-amber-500/30 shadow-2xl space-y-4">
-          <div className="flex items-center justify-between pb-3 border-b border-amber-500/20">
-            <div className="flex items-center gap-2.5 text-amber-400 font-bold text-sm">
-              <Code2 size={18} className="animate-pulse" />
-              <span>Painel de Simulação do Modo Desenvolvedor</span>
-            </div>
-            <button
-              onClick={handleExitDevMode}
-              className="h-8 px-4 rounded-full bg-amber-500/15 border border-amber-500/35 hover:bg-amber-500/25 hover:border-amber-500/60 text-amber-300 text-xs font-semibold shadow-sm transition-all cursor-pointer inline-flex items-center gap-1.5"
-            >
-              <Power size={13} className="shrink-0" />
-              <span>Desativar</span>
-            </button>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 pt-1">
-            {devModeOptions.map((opt, idx) => (
-              <button
-                key={idx}
-                onClick={opt.onClick}
-                className="p-3.5 rounded-2xl bg-card/75 border border-[var(--text-main)]/10 hover:border-amber-500/40 hover:bg-amber-500/10 text-left transition-all flex items-start gap-3 cursor-pointer shadow-sm group select-none"
-              >
-                <div className="mt-0.5 shrink-0">
-                  {opt.icon}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="text-xs font-bold text-[var(--text-main)] group-hover:text-amber-300 transition-colors truncate">
-                    {opt.title}
-                  </p>
-                  <p className="text-[11px] text-[var(--text-muted)] line-clamp-2 mt-0.5 leading-snug">
-                    {opt.desc}
-                  </p>
-                </div>
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
     </motion.div>
   );
 }

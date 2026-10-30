@@ -111,7 +111,7 @@ namespace AudiobookInstaller
                 await RunCommand("npm", "install");
 
                 lblStatus.Text = "Installing Python dependencies (This may take a while)...";
-                await RunCommand("python", "-m pip install ebooklib beautifulsoup4 pypdf pdfplumber mobi deep-translator langdetect mutagen edge-tts tqdm colorama faster-whisper");
+                await RunCommand("python", "-m pip install ebooklib beautifulsoup4 lxml pypdf pdfplumber mobi deep-translator langdetect mutagen edge-tts tqdm colorama faster-whisper");
 
                 if (chkCreateShortcut.Checked)
                 {

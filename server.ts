@@ -2,11 +2,40 @@ import express from "express";
 import { createServer as createViteServer } from "vite";
 import path from "path";
 import multer from "multer";
-import { spawn, execFile } from "child_process";
+import { spawn, execFile, execFileSync } from "child_process";
 import fs from "fs";
 import net from "net";
+import os from "os";
 import https from "https";
 import http from "http";
+
+// Python do sistema (no Windows "python3" costuma não existir ou abrir a Microsoft Store) e saída em UTF-8
+const PYTHON_CMD = process.platform === 'win32' ? 'python' : 'python3';
+const PY_ENV = { ...process.env, PYTHONIOENCODING: 'utf-8', PYTHONUTF8: '1' };
+
+// Um erro inesperado em uma rota não pode derrubar o servidor (e com ele as conversões em andamento)
+process.on('uncaughtException', (err) => console.error('Erro não tratado:', err));
+process.on('unhandledRejection', (err) => console.error('Promessa rejeitada sem tratamento:', err));
+
+// Mensagem clara a partir do erro do Python
+function explainPythonFailure(stderr: string, code: number | null): string {
+  // 0xC000013A: o Windows encerrou o processo com Ctrl+C ou ao fechar uma janela de console
+  if (code === 3221225786 || code === -1073741510) {
+    return 'A conversão foi interrompida por um sinal do Windows (Ctrl+C ou uma janela de console fechada). Converta de novo: o que já foi narrado fica salvo e a conversão continua de onde parou.';
+  }
+  const missing = stderr.match(/No module named '([^']+)'/);
+  if (missing) return `Falta a biblioteca do Python "${missing[1]}". Rode o instalador de novo (ou: pip install ${missing[1].replace(/_/g, '-')}).`;
+  if (/ENOENT|not recognized|não é reconhecido/i.test(stderr)) return 'Python não encontrado. Rode o instalador de novo.';
+  if (/No space left|ENOSPC|espaço insuficiente/i.test(stderr)) return 'Sem espaço em disco na pasta de destino.';
+  if (/Permission denied|EACCES|PermissionError/i.test(stderr)) return 'Sem permissão para gravar na pasta de destino. Escolha outra pasta em Ajustes › Armazenamento e pastas.';
+  if (/MemoryError|out of memory/i.test(stderr)) return 'Faltou memória para converter este livro. Feche outros programas e converta de novo: o que já foi narrado fica salvo.';
+  const last = stderr.trim().split('\n').filter(Boolean).pop();
+  if (!last) {
+    // Encerrado sem mensagem (pelo sistema, antivírus ou falta de memória)
+    return 'A conversão foi interrompida pelo sistema. Converta de novo: o que já foi narrado fica salvo e a conversão continua de onde parou.';
+  }
+  return `A conversão parou inesperadamente${code !== null ? ` (código ${code})` : ''}: ${last.slice(0, 200)}`;
+}
 
 // Só o próprio computador acessa o servidor (ele abre pastas e lê arquivos locais).
 // Para usar pela rede local de propósito, inicie com HOST=0.0.0.0.
@@ -43,7 +72,12 @@ async function getAvailablePort(startPort: number, extraHosts: string[] = []): P
 
 const upload = multer({ 
   dest: path.join(process.cwd(), 'uploads/'),
-  limits: { fileSize: 1024 * 1024 * 1024 } // 1GB limit para suportar audiolivros completos
+  limits: {
+    fileSize: 1024 * 1024 * 1024, // 1GB limit para suportar audiolivros completos
+    // Os dados dos livros (capítulos com o texto inteiro e a capa em base64) vão num campo só;
+    // o padrão de 1 MB por campo recusava livros longos ou com capa grande ("Field value too long")
+    fieldSize: 512 * 1024 * 1024,
+  }
 });
 
 // Ensure uploads directory exists
@@ -53,7 +87,7 @@ if (!fs.existsSync('uploads')) {
 
 async function startServer() {
   const app = express();
-  const PORT = await getAvailablePort(3000);
+  const PORT = await getAvailablePort(Number(process.env.PORT) || 3000);
   // A recarga do Vite abre em "localhost", que no Windows pode ser o IPv6 (::1)
   const hmrPort = await getAvailablePort(24678, ['::1']);
 
@@ -62,6 +96,13 @@ async function startServer() {
   if (!fs.existsSync(uploadsDir)) {
     fs.mkdirSync(uploadsDir, { recursive: true });
   }
+  // Sobras de conversões interrompidas (app fechado no meio): nenhuma conversão roda antes do servidor subir
+  try {
+    for (const name of fs.readdirSync(process.cwd())) {
+      if (/^config_\d+\.json$/.test(name)) fs.rmSync(path.join(process.cwd(), name), { force: true });
+    }
+    for (const name of fs.readdirSync(uploadsDir)) fs.rmSync(path.join(uploadsDir, name), { force: true, recursive: true });
+  } catch { /* limpeza opcional */ }
   try {
     fs.accessSync(uploadsDir, fs.constants.W_OK);
     console.log("Uploads directory is writable:", uploadsDir);
@@ -100,16 +141,30 @@ async function startServer() {
     res.flushHeaders();
 
     clients.add(res);
+    // Reconexão: o app recebe de novo o último estado de cada livro (nenhum "concluído" se perde)
+    for (const event of lastEventByFile.values()) {
+      try { res.write(`data: ${JSON.stringify(event)}\n\n`); } catch { /* conexão já fechada */ }
+    }
+    // Mantém a conexão viva atrás de proxies e antivírus que derrubam conexões ociosas
+    const ping = setInterval(() => { try { res.write(': ping\n\n'); } catch { /* fechada */ } }, 25000);
 
     req.on("close", () => {
+      clearInterval(ping);
       clients.delete(res);
     });
   });
 
+  // Último evento de cada livro (progresso, concluído ou erro), para quem reconectar
+  const lastEventByFile = new Map<string, any>();
+
   function broadcastProgress(data: any) {
+    if (data && data.fileId && data.type !== 'log' && data.type !== 'speed') {
+      lastEventByFile.set(data.fileId, data);
+      if (lastEventByFile.size > 200) lastEventByFile.delete(lastEventByFile.keys().next().value as string);
+    }
     const message = `data: ${JSON.stringify(data)}\n\n`;
     for (const client of clients) {
-      client.write(message);
+      try { client.write(message); } catch { clients.delete(client); }
     }
   }
 
@@ -240,6 +295,21 @@ async function startServer() {
     res.json({ path: null });
   });
 
+  // Leitura de e-books em fila: no máximo alguns ao mesmo tempo. Carregar 20 livros de uma vez abria 20
+  // processos Python juntos (memória e CPU), e com uma conversão rodando alguns falhavam.
+  const META_PARALELO = Math.max(2, Math.min(4, Math.floor(os.cpus().length / 2)));
+  let metaAtivos = 0;
+  const metaFila: Array<() => void> = [];
+  const metaEntrar = () => new Promise<void>((resolve) => {
+    if (metaAtivos < META_PARALELO) { metaAtivos++; resolve(); }
+    else metaFila.push(() => { metaAtivos++; resolve(); });
+  });
+  const metaSair = () => {
+    metaAtivos = Math.max(0, metaAtivos - 1);
+    const proximo = metaFila.shift();
+    if (proximo) proximo();
+  };
+
   app.post("/api/metadata", (req, res, next) => {
     console.log("Incoming metadata request...");
     upload.single('file')(req, res, (err) => {
@@ -249,7 +319,7 @@ async function startServer() {
       }
       next();
     });
-  }, (req, res) => {
+  }, async (req, res) => {
     console.log("Received metadata request for:", req.file?.originalname);
     try {
       if (!req.file) {
@@ -261,51 +331,77 @@ async function startServer() {
       const newPath = req.file.path + originalExt;
       fs.renameSync(req.file.path, newPath);
 
-      const pythonProcess = spawn('python3', ['extract_metadata.py', newPath]);
+      // O nome original vai junto: livros sem título nos metadados usam o nome do arquivo (não o nome temporário)
+      const originalName = String(req.body.filename || req.file.originalname || '');
+      await metaEntrar();
+      let saiu = false;
+      const liberar = () => { if (!saiu) { saiu = true; metaSair(); } };
+      const pythonProcess = spawn(PYTHON_CMD, ['extract_metadata.py', newPath, originalName], { env: PY_ENV, windowsHide: true });
+      // Um arquivo problemático não pode deixar o pedido pendurado para sempre
+      const metaTimer = setTimeout(() => { try { pythonProcess.kill(); } catch { /* já terminou */ } }, 180000);
       console.log("Spawned python process for metadata extraction");
       
       pythonProcess.on('error', (err) => {
+        liberar();
         console.error("Failed to start python process:", err);
         if (!res.headersSent) {
-          res.status(500).json({ error: "Failed to start metadata extraction" });
+          res.status(500).json({ error: `Não foi possível iniciar o Python (${PYTHON_CMD}): ${err.message}` });
         }
       });
 
-      let output = '';
+      // Cada linha JSON do Python vai para o app assim que sai: primeiro capa/título/autor, depois os capítulos
+      let buffer = '';
       let errorOutput = '';
+      let sentAny = false;
+      let gotFinal = false;
+      const sendLine = (line: string) => {
+        const text = line.trim();
+        if (!text.startsWith('{')) return;
+        try {
+          const obj = JSON.parse(text);
+          if (!obj.partial) gotFinal = true;
+        } catch { return; }
+        if (!sentAny) {
+          res.status(200).setHeader('Content-Type', 'application/x-ndjson; charset=utf-8');
+          sentAny = true;
+        }
+        res.write(text + '\n');
+      };
+      pythonProcess.stdout.setEncoding('utf8');
       pythonProcess.stdout.on('data', (data) => {
-        output += data.toString();
+        buffer += data;
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+        lines.forEach(sendLine);
       });
       pythonProcess.stderr.on('data', (data) => {
         errorOutput += data.toString();
       });
 
       pythonProcess.on('close', (code) => {
+        liberar();
+        clearTimeout(metaTimer);
         console.log(`Python process closed with code ${code}`);
         if (errorOutput) console.error("Python stderr:", errorOutput);
         try {
-          if (fs.existsSync(newPath)) {
-            fs.unlinkSync(newPath);
-          }
+          if (fs.existsSync(newPath)) fs.unlinkSync(newPath);
         } catch (e) {
           console.error("Failed to delete temp file:", newPath);
         }
-
-        if (code === 0) {
-          try {
-            // Find the last line that looks like JSON to avoid issues with warnings
-            const lines = output.trim().split('\n');
-            const lastLine = lines[lines.length - 1];
-            const metadata = JSON.parse(lastLine);
-            res.json(metadata);
-          } catch (e) {
-            console.error("Failed to parse metadata output:", output);
-            res.status(500).json({ error: "Failed to parse metadata" });
-          }
-        } else {
-          console.error("Metadata extraction failed with code:", code, "Output:", output, "Error:", errorOutput);
-          res.status(500).json({ error: "Metadata extraction failed" });
+        if (buffer) sendLine(buffer);
+        if (gotFinal) return res.end();
+        const ultima = errorOutput.trim().split('\n').filter(Boolean).pop() || '';
+        const message = code === 0
+          ? 'a leitura do arquivo terminou incompleta'
+          : code === null
+            ? 'a leitura demorou demais e foi interrompida'
+            : `o leitor de e-books falhou (código ${code}${ultima ? `: ${ultima.slice(0, 160)}` : ''})`;
+        if (sentAny) {
+          res.write(JSON.stringify({ error: message }) + '\n');
+          return res.end();
         }
+        console.error("Metadata extraction failed with code:", code, "Error:", errorOutput);
+        res.status(500).json({ error: message });
       });
     } catch (error) {
       console.error("Error extracting metadata:", error);
@@ -313,35 +409,27 @@ async function startServer() {
     }
   });
 
-  let currentPythonProcess: ReturnType<typeof spawn> | null = null;
+  // Todas as conversões em andamento (uma por pedido); "Cancelar" encerra todas
+  const runningPythonProcesses = new Set<ReturnType<typeof spawn>>();
 
   app.post("/api/cancel", (req, res) => {
-    let killed = false;
-    if (currentPythonProcess && currentPythonProcess.pid) {
-      const pid = currentPythonProcess.pid;
-      killed = true;
+    const killed = runningPythonProcesses.size > 0;
+    for (const proc of runningPythonProcesses) {
+      (proc as any).__cancelled = true;
+      const pid = proc.pid;
+      if (!pid) continue;
       if (process.platform === 'win32') {
-        import('child_process').then(({ exec }) => {
-          exec(`taskkill /pid ${pid} /T /F`, (err) => {
-            if (err) console.error("taskkill PID error:", err);
-          });
-          // Força o encerramento imediato de instâncias órfãs do FFmpeg para liberar CPU e RAM
-          exec('taskkill /IM ffmpeg.exe /F', () => {});
-        });
+        // Encerra o Python e todos os filhos (ffmpeg, etc.)
+        spawn('taskkill', ['/pid', String(pid), '/T', '/F'], { stdio: 'ignore', windowsHide: true }).on('error', (err) => console.error("taskkill error:", err));
       } else {
-        try {
-          process.kill(-pid, 'SIGKILL');
-        } catch (e) {
-          currentPythonProcess.kill('SIGKILL');
-        }
+        try { proc.kill('SIGKILL'); } catch (e) { console.error("kill error:", e); }
       }
-      currentPythonProcess = null;
-    } else {
-      if (process.platform === 'win32') {
-        import('child_process').then(({ exec }) => {
-          exec('taskkill /IM ffmpeg.exe /F', () => {});
-        });
-      }
+    }
+    runningPythonProcesses.clear();
+    lastEventByFile.clear(); // os livros cancelados voltam para a fila no app; nada de estado antigo
+    if (process.platform === 'win32') {
+      // Força o encerramento de instâncias órfãs do FFmpeg para liberar CPU e RAM
+      spawn('taskkill', ['/IM', 'ffmpeg.exe', '/F'], { stdio: 'ignore', windowsHide: true }).on('error', () => {});
     }
     broadcastProgress({ type: "log", message: "Processo cancelado e recursos liberados imediatamente." });
     res.json({ success: true, message: killed ? "Process tree and FFmpeg killed" : "Cleaned up" });
@@ -453,12 +541,82 @@ async function startServer() {
     }
   });
 
+  // Exclui do computador os arquivos de um audiobook ou texto de Convertidos. Vão para a Lixeira (dá para
+  // recuperar). Só aceita arquivos de áudio e de texto sincronizado, e pastas "(Audiobook)" que tenham só isso.
+  const DELETABLE_EXT = new Set([...AUDIO_EXTENSIONS, '.lrc', '.srt', '.vtt', '.json']);
+  const isDeletableFile = (p: string) => {
+    const lower = p.toLowerCase();
+    return DELETABLE_EXT.has(path.extname(lower)) && (!lower.endsWith('.json') || lower.endsWith('.sync.json'));
+  };
+  const sendToTrash = (targets: string[]) => new Promise<void>((resolve, reject) => {
+    if (targets.length === 0) return resolve();
+    if (process.platform === 'win32') {
+      const script = "$ErrorActionPreference='Stop'; Add-Type -AssemblyName Microsoft.VisualBasic; " +
+        "$itens = [Console]::In.ReadToEnd() | ConvertFrom-Json; foreach ($p in $itens) { " +
+        "if (Test-Path -LiteralPath $p -PathType Container) { [Microsoft.VisualBasic.FileIO.FileSystem]::DeleteDirectory($p, 'OnlyErrorDialogs', 'SendToRecycleBin') } " +
+        "elseif (Test-Path -LiteralPath $p) { [Microsoft.VisualBasic.FileIO.FileSystem]::DeleteFile($p, 'OnlyErrorDialogs', 'SendToRecycleBin') } }";
+      const child = spawn('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', script], { windowsHide: true });
+      let err = '';
+      child.stderr.on('data', (d) => { err += d.toString(); });
+      child.on('error', reject);
+      child.on('close', (code) => (code === 0 ? resolve() : reject(new Error(err.trim() || `código ${code}`))));
+      child.stdin.end(JSON.stringify(targets));
+    } else {
+      // macOS/Linux: lixeira do sistema quando disponível; senão, exclui
+      const trash = process.platform === 'darwin' ? null : 'gio';
+      if (trash) {
+        execFile(trash, ['trash', ...targets], (e) => {
+          if (!e) return resolve();
+          try { targets.forEach(t => fs.rmSync(t, { recursive: true, force: true })); resolve(); } catch (e2) { reject(e2); }
+        });
+      } else {
+        const script = targets.map(t => `tell application "Finder" to delete (POSIX file ${JSON.stringify(t)})`);
+        execFile('osascript', script.flatMap(l => ['-e', l]), (e) => {
+          if (!e) return resolve();
+          try { targets.forEach(t => fs.rmSync(t, { recursive: true, force: true })); resolve(); } catch (e2) { reject(e2); }
+        });
+      }
+    }
+  });
+
+  app.post("/api/delete-files", express.json(), async (req, res) => {
+    const pedidos: string[] = Array.isArray(req.body?.paths) ? req.body.paths.filter((p: any) => typeof p === 'string' && p.trim()) : [];
+    const targets: string[] = [];
+    const skipped: string[] = [];
+    for (const raw of pedidos) {
+      const p = path.resolve(raw);
+      if (!fs.existsSync(p)) continue; // já não existe: nada a fazer
+      const st = fs.statSync(p);
+      if (st.isDirectory()) {
+        // Pasta de "um arquivo por capítulo": só se tiver apenas áudio/texto do audiobook
+        const nome = path.basename(p);
+        const conteudo = fs.readdirSync(p);
+        if (/\(Audiobook\)( \(\d+\))?$/.test(nome) && conteudo.every(f => isDeletableFile(f))) targets.push(p);
+        else skipped.push(p);
+      } else if (isDeletableFile(p)) {
+        targets.push(p);
+      } else {
+        skipped.push(p);
+      }
+    }
+    try {
+      await sendToTrash([...new Set(targets)]);
+      res.json({ success: true, deleted: targets.length, skipped });
+    } catch (e: any) {
+      res.status(500).json({ error: `Não foi possível excluir os arquivos: ${e?.message || e}`, skipped });
+    }
+  });
+
   app.post("/api/open-folder", express.json(), (req, res) => {
     try {
       let folderPath = req.body.path || path.join(process.cwd(), 'meus audiobooks');
       folderPath = path.normalize(String(folderPath)); // Higieniza as barras pro Windows Explorer não se perder
       if (folderPath.includes('"')) return res.status(400).json({ success: false });
       const isFile = req.body.isFile;
+      // A pasta de salvamento pode ter sido apagada: recria em vez de abrir outro lugar
+      if (!isFile && !fs.existsSync(folderPath)) {
+        try { fs.mkdirSync(folderPath, { recursive: true }); } catch { return res.status(404).json({ success: false }); }
+      }
       
       // Programa + argumentos separados (sem shell): o caminho nunca é interpretado como comando
       let program: string;
@@ -488,30 +646,74 @@ async function startServer() {
   });
 
   app.all("/api/select-folder", (req, res) => {
+    // Caixa de seleção de pasta do sistema (usada quando o app roda no navegador; no Electron o seletor é nativo)
+    let program: string;
+    let args: string[];
     if (process.platform === 'win32') {
-      const psScript = `
-        Add-Type -AssemblyName System.windows.forms;
-        $f = New-Object System.Windows.Forms.FolderBrowserDialog;
-        $f.ShowNewFolderButton = $true;
-        $f.Description = 'Selecione a pasta de destino';
-        if($f.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK){
-            $f.SelectedPath
-        }
-      `;
-      const child = spawn('powershell.exe', ['-NoProfile', '-STA', '-Command', psScript]);
-      let output = '';
-      child.stdout.on('data', (data) => output += data.toString());
-      child.on('close', () => {
-        const path = output.trim();
-        if (path) {
-          res.json({ path });
-        } else {
-          res.json({ cancelled: true });
-        }
-      });
+      const psScript = [
+        '[Console]::OutputEncoding = [System.Text.Encoding]::UTF8',
+        'Add-Type -AssemblyName System.Windows.Forms',
+        '$owner = New-Object System.Windows.Forms.Form -Property @{ TopMost = $true; ShowInTaskbar = $false }',
+        '$f = New-Object System.Windows.Forms.FolderBrowserDialog',
+        '$f.ShowNewFolderButton = $true',
+        "$f.Description = 'Selecione a pasta onde os audiobooks serão salvos'",
+        'if ($f.ShowDialog($owner) -eq [System.Windows.Forms.DialogResult]::OK) { [Console]::Out.Write($f.SelectedPath) }',
+      ].join('; ');
+      program = 'powershell.exe';
+      args = ['-NoProfile', '-STA', '-Command', psScript];
+    } else if (process.platform === 'darwin') {
+      program = 'osascript';
+      args = ['-e', 'POSIX path of (choose folder with prompt "Selecione a pasta onde os audiobooks serão salvos")'];
     } else {
-      res.status(501).json({ error: "Folder selection is only supported on Windows" });
+      program = 'zenity';
+      args = ['--file-selection', '--directory', '--title=Selecione a pasta dos audiobooks'];
     }
+    const child = spawn(program, args);
+    let output = '';
+    child.stdout.setEncoding('utf8');
+    child.stdout.on('data', (data) => output += data);
+    child.on('error', () => { if (!res.headersSent) res.status(501).json({ error: 'Seletor de pastas indisponível neste sistema' }); });
+    child.on('close', () => {
+      if (res.headersSent) return;
+      const selected = output.trim().replace(/[\\/]+$/, '');
+      res.json(selected ? { path: selected } : { cancelled: true });
+    });
+  });
+
+  // Pasta padrão dos audiobooks (Documentos/Audiobook Generator), criada quando o usuário não escolhe uma
+  app.post("/api/default-folder", (req, res) => {
+    const home = process.env.USERPROFILE || process.env.HOME || process.cwd();
+    let documents = '';
+    if (process.platform === 'win32') {
+      try {
+        // A pasta Documentos de verdade (pode estar no OneDrive ou ter outro nome no idioma do sistema)
+        documents = String(execFileSync('powershell.exe', ['-NoProfile', '-Command',
+          "[Console]::OutputEncoding=[Text.Encoding]::UTF8; [Environment]::GetFolderPath('MyDocuments')"], { timeout: 15000 })).trim();
+      } catch { documents = ''; }
+    }
+    const candidates = [documents, path.join(home, 'Documents'), path.join(home, 'Documentos'), home].filter(Boolean);
+    for (const base of candidates) {
+      try {
+        if (!fs.existsSync(base)) continue;
+        const folder = path.join(base, 'Audiobook Generator');
+        fs.mkdirSync(folder, { recursive: true });
+        fs.accessSync(folder, fs.constants.W_OK);
+        return res.json({ path: folder });
+      } catch { /* tenta o próximo lugar */ }
+    }
+    res.status(500).json({ error: 'Não foi possível criar a pasta padrão.' });
+  });
+
+  // Estado do motor de conversão: Python, voz (edge-tts), FFmpeg e alinhamento (faster-whisper)
+  app.get("/api/health", (req, res) => {
+    const check = [
+      'import importlib.util as u, json, shutil, sys',
+      'print(json.dumps({"python": sys.version.split()[0], "edgeTts": bool(u.find_spec("edge_tts")), "ffmpeg": bool(shutil.which("ffmpeg")), "whisper": bool(u.find_spec("faster_whisper"))}))',
+    ].join('\n');
+    execFile(PYTHON_CMD, ['-c', check], { timeout: 15000, env: PY_ENV }, (err, stdout) => {
+      if (err) return res.json({ python: null, edgeTts: false, ffmpeg: false, whisper: false });
+      try { res.json(JSON.parse(String(stdout).trim())); } catch { res.json({ python: null, edgeTts: false, ffmpeg: false, whisper: false }); }
+    });
   });
 
   const handleProcessRequest = (req: express.Request, res: express.Response) => {
@@ -531,12 +733,12 @@ async function startServer() {
           voice: req.body.voice,
           outputFolder: req.body.outputFolder,
           mode_folder: req.body.fileType === 'multiple' || req.body.mode_folder === true || req.body.mode_folder === 'true',
-          file_format: req.body.fileType || 'single',
+          file_format: req.body.fileType || 'm4b',
           target_lang: req.body.target_lang || 'pt'
         };
       }
       
-      const fileFormat = config.file_format || config.fileType || req.body.fileType || (config.mode_folder ? 'multiple' : 'single');
+      const fileFormat = config.file_format || config.fileType || req.body.fileType || (config.mode_folder ? 'multiple' : 'm4b');
       const isMultiple = fileFormat === 'multiple' || config.mode_folder === true || config.mode_folder === 'true';
 
       const generateSyncText = config.generate_sync_text !== undefined 
@@ -544,6 +746,7 @@ async function startServer() {
         : (req.body.generate_sync_text !== undefined ? (req.body.generate_sync_text === true || req.body.generate_sync_text === 'true') : true);
       // Onde guardar o texto sincronizado: metadados do áudio, pasta da biblioteca ou ambos
       const syncTextDestination = ['metadata', 'library', 'both'].includes(config.sync_text_destination) ? config.sync_text_destination : 'both';
+      const syncTextGranularity = ['sentences', 'words', 'both'].includes(config.sync_text_granularity) ? config.sync_text_granularity : 'sentences';
 
       const files = (req.files as Express.Multer.File[]).map((file, index) => {
         const info = filesInfo[index] || {};
@@ -560,6 +763,8 @@ async function startServer() {
           subgenre: info.subgenre || '',
           narrator: info.narrator || '',
           language: info.language || '',
+          voice: info.voice || config.voice || 'pt-BR-AntonioNeural',
+          audio_quality: config.audio_quality,
           translate: info.requiresTranslation || info.translate || false,
           cover: info.cover || null,
           chapters: info.chapters || [],
@@ -568,7 +773,8 @@ async function startServer() {
           pronunciation_map: info.pronunciationMap || info.pronunciation_map || [],
           generate_sync_text: info.generate_sync_text !== undefined ? info.generate_sync_text : generateSyncText,
           sync_text_destination: syncTextDestination,
-          config: { ...(info.config || config), file_format: info.fileType || fileFormat, pronunciation_map: info.pronunciationMap || info.pronunciation_map || [], generate_sync_text: info.generate_sync_text !== undefined ? info.generate_sync_text : generateSyncText, sync_text_destination: syncTextDestination }
+          sync_text_granularity: syncTextGranularity,
+          config: { ...(info.config || config), file_format: info.fileType || fileFormat, pronunciation_map: info.pronunciationMap || info.pronunciation_map || [], generate_sync_text: info.generate_sync_text !== undefined ? info.generate_sync_text : generateSyncText, sync_text_destination: syncTextDestination, sync_text_granularity: syncTextGranularity }
         };
       });
 
@@ -580,17 +786,36 @@ async function startServer() {
         mode_folder: isMultiple,
         file_format: fileFormat,
         generate_sync_text: generateSyncText,
-        sync_text_destination: syncTextDestination
+        sync_text_destination: syncTextDestination,
+        sync_text_granularity: syncTextGranularity
       };
 
       // Write configuration payload to a temp JSON file to completely bypass Windows CLI string limits
       const configPath = path.join(process.cwd(), `config_${Date.now()}.json`);
       fs.writeFileSync(configPath, JSON.stringify(pythonConfig));
 
-      const pythonCmd = process.platform === 'win32' ? 'python' : 'python3';
-      currentPythonProcess = spawn(pythonCmd, ['-u', 'converter.py', configPath], { stdio: ['pipe', 'pipe', 'pipe'] });
+      for (const f of files) lastEventByFile.delete(f.id); // nova tentativa: esquece o resultado anterior
+      // Grupo de processos próprio (detached + janela oculta): Ctrl+C ou o fechamento de um console no
+      // Windows não derrubam mais a conversão. A entrada (stdin) fica aberta: se o servidor fechar, ela
+      // termina e o conversor se encerra sozinho (não fica rodando órfão).
+      const pythonProc = spawn(PYTHON_CMD, ['-u', 'converter.py', configPath], {
+        stdio: ['pipe', 'pipe', 'pipe'],
+        env: PY_ENV,
+        detached: process.platform === 'win32',
+        windowsHide: true,
+      });
+      runningPythonProcesses.add(pythonProc);
+      // Livros deste processo que ainda não terminaram (nem com sucesso nem com erro)
+      const pending = new Set<string>(files.map(f => f.id));
+      let stderrTail = '';
+      const failPending = (message: string, details?: string) => {
+        for (const id of pending) broadcastProgress({ type: 'error', fileId: id, error: message, details });
+        pending.clear();
+      };
 
-      currentPythonProcess.on('error', (err) => {
+      pythonProc.on('error', (err) => {
+        runningPythonProcesses.delete(pythonProc);
+        failPending(explainPythonFailure(String(err), null), `Não foi possível iniciar o Python (${PYTHON_CMD}).\n${String(err)}`);
         console.error("Failed to start python backend process:", err);
         if (!res.headersSent) {
           res.status(500).json({ error: "Failed to start processing" });
@@ -598,7 +823,8 @@ async function startServer() {
       });
 
       let stdoutBuffer = '';
-      currentPythonProcess.stdout.on('data', (data) => {
+      pythonProc.stdout.setEncoding('utf8');
+      pythonProc.stdout.on('data', (data) => {
         stdoutBuffer += data.toString();
         const lines = stdoutBuffer.split('\n');
         stdoutBuffer = lines.pop() || '';
@@ -607,6 +833,7 @@ async function startServer() {
           if (line.trim()) {
             try {
               const event = JSON.parse(line);
+              if ((event.type === 'done' || event.type === 'error') && event.fileId) pending.delete(event.fileId);
               broadcastProgress(event);
             } catch (e) {
               console.log("Python stdout parse error:", line);
@@ -615,13 +842,21 @@ async function startServer() {
         }
       });
 
-      currentPythonProcess.stderr.on('data', (data) => {
-        console.error("Python stderr:", data.toString());
+      pythonProc.stderr.on('data', (data) => {
+        const text = data.toString();
+        stderrTail = (stderrTail + text).slice(-4000);
+        console.error("Python stderr:", text);
       });
 
-      currentPythonProcess.on('close', (code) => {
+      pythonProc.on('close', (code) => {
         console.log(`Python process exited with code ${code}`);
-        currentPythonProcess = null;
+        runningPythonProcesses.delete(pythonProc);
+        // Cancelado pelo usuário: o app já voltou os livros para a fila. Senão, nenhum livro fica "convertendo" para sempre.
+        if ((pythonProc as any).__cancelled) pending.clear();
+        else if (pending.size > 0) failPending(
+          explainPythonFailure(stderrTail, code),
+          `O processo de conversão terminou com código ${code} antes de concluir.\n\nÚltimas linhas do erro:\n${stderrTail.trim().split('\n').slice(-25).join('\n') || '(nenhuma mensagem)'}`
+        );
         // Clean up uploaded files
         for (const file of files) {
           try {
@@ -686,8 +921,7 @@ async function startServer() {
         '--author', String(req.body.author || ''), '--destination', destination];
       if (ebookPath) args.push('--ebook', ebookPath);
 
-      const pythonCmd = process.platform === 'win32' ? 'python' : 'python3';
-      const child = spawn(pythonCmd, args, { stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, PYTHONIOENCODING: 'utf-8' } });
+      const child = spawn(PYTHON_CMD, args, { stdio: ['ignore', 'pipe', 'pipe'], env: PY_ENV, windowsHide: true });
       let stdout = '';
       let stderr = '';
       child.stdout.on('data', d => { stdout += d.toString(); });
@@ -735,8 +969,7 @@ async function startServer() {
       const tempJson = path.join(process.cwd(), `meta_inject_${Date.now()}.json`);
       fs.writeFileSync(tempJson, JSON.stringify(data), 'utf-8');
 
-      const pythonCmd = process.platform === 'win32' ? 'python' : 'python3';
-      const child = spawn(pythonCmd, ['-u', 'inject_metadata.py', tempJson]);
+      const child = spawn(PYTHON_CMD, ['-u', 'inject_metadata.py', tempJson], { env: PY_ENV, windowsHide: true });
 
       let stdout = '';
       let stderr = '';
@@ -775,7 +1008,23 @@ async function startServer() {
     const tailwindcss = (await import('@tailwindcss/vite')).default;
     
     const vite = await createViteServer({
-      server: { middlewareMode: true, hmr: process.env.DISABLE_HMR !== 'true' ? { port: hmrPort } : false },
+      server: {
+        middlewareMode: true,
+        // Recarga automática (HMR) só para quem edita o código: com ela, uma página em segundo plano
+        // que perdia a conexão com o servidor recarregava sozinha ao voltar (e perdia o estado da tela)
+        hmr: process.env.HMR === 'true' ? { port: hmrPort } : false,
+        ws: process.env.HMR === 'true' ? undefined : false,
+        // Só o código da interface recarrega a página. Sem isso, os arquivos que a conversão grava na pasta
+        // do app (uploads, config_*.json, cache) faziam a página recarregar no meio da conversão.
+        watch: {
+          ignored: (p: string) => {
+            const rel = path.relative(process.cwd(), p);
+            if (!rel) return false;
+            if (rel.startsWith('..')) return true;
+            return !['src', 'public', 'index.html'].includes(rel.split(/[\\/]/)[0]);
+          },
+        },
+      },
       appType: "spa",
       configFile: false,
       plugins: [react(), tailwindcss()],
@@ -792,8 +1041,27 @@ async function startServer() {
   // Error handler
   app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
     console.error("Unhandled error:", err);
+    // Limites do envio de arquivos (multer): explica em vez de mostrar a mensagem técnica em inglês
+    const limites: Record<string, string> = {
+      LIMIT_FILE_SIZE: 'O arquivo é grande demais para enviar (limite de 1 GB).',
+      LIMIT_FIELD_VALUE: 'Os dados do livro (texto dos capítulos e capa) passaram do limite de envio.',
+      LIMIT_FIELD_COUNT: 'O pedido tem campos demais.',
+      LIMIT_FILE_COUNT: 'Arquivos demais num pedido só. Converta em lotes menores.',
+      LIMIT_UNEXPECTED_FILE: 'O app enviou um arquivo num campo inesperado.',
+    };
+    if (err?.code && limites[err.code]) {
+      return res.status(413).json({ error: limites[err.code], details: `${err.code}: ${err.message}${err.field ? ` (campo ${err.field})` : ''}` });
+    }
     res.status(500).json({ error: err.message || "Internal server error" });
   });
+
+  // "localhost" pode apontar para o IPv4 (127.0.0.1) ou para o IPv6 (::1), conforme o sistema.
+  // Escuta nos dois endereços locais para a janela do app sempre conectar (e nunca na rede externa).
+  if (HOST === '127.0.0.1') {
+    const v6 = http.createServer(app);
+    v6.on('error', () => { /* sem IPv6 nesta máquina: o IPv4 basta */ });
+    v6.listen(PORT, '::1');
+  }
 
   app.listen(PORT, HOST, async () => {
     console.log(`Server running on http://localhost:${PORT}`);

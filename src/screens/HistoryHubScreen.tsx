@@ -7,6 +7,7 @@ import { clearButtonCoverAnchorCache } from '../components/Popovers';
 import { getGenericTextCover } from '../lib/covers';
 import { UniversalCard } from '../components/cards/UniversalCard';
 import { useApp } from '../app/AppContext';
+import { TextTile } from '../components/cards/TextTile';
 import { SelectionCheck } from '../components/SelectionCheck';
 import { AiStarsIcon } from '../components/AppGlyph';
 
@@ -109,66 +110,8 @@ export function HistoryHubScreen() {
                   </motion.button>
                 </div>
 
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 mobile-row">
-                  {generatedTexts.map((text) => {
-                    const isMenuOpen = activeTextMenu?.item.id === text.id;
-                    const coverUrl = text.cover || getGenericTextCover(text.title, text.author, text.coverColor);
-                    return (
-                      <div 
-                        key={text.id} 
-                        onClick={(e) => {
-                          if (selectingConverted) { toggleConvertedSelection(`text:${text.id}`); return; }
-                          setViewingTextAnchor(e.currentTarget);
-                          setViewingTextModal(text);
-                        }}
-                        className="flex flex-col group/textcard relative cursor-pointer"
-                      >
-                        <div className="aspect-square w-full rounded-[24px] shadow-lg group-hover/textcard:scale-[1.02] transition-all relative overflow-hidden bg-card/60">
-                          <SelectionCheck active={selectingConverted} selected={selectedConverted.includes(`text:${text.id}`)} onToggle={() => toggleConvertedSelection(`text:${text.id}`)} rounded="rounded-[24px]" />
-                          <img
-                            src={coverUrl}
-                            alt={text.title}
-                            className="w-full h-full aspect-square object-cover rounded-[24px] transition-transform duration-500 group-hover/textcard:scale-105"
-                          />
-                        </div>
-
-                        <div className="flex items-start justify-between gap-1.5 mt-2.5 px-0.5 relative">
-                          <div className="flex-1 min-w-0 pr-1">
-                            <h4 
-                              title={text.title}
-                              className="font-bold text-sm text-[var(--text-main)] truncate group-hover/textcard:text-winblue transition-colors"
-                            >
-                              {text.title}
-                            </h4>
-                            <p 
-                              title={`${text.author ? `${text.author} • ` : ''}${text.genre} • ${text.wordCount} palavras`}
-                              className="text-xs text-[var(--text-muted)] truncate mt-0.5"
-                            >
-                              {text.author ? `${text.author} • ` : ''}{text.genre} • {text.wordCount} palavras
-                            </p>
-                          </div>
-
-                          <div className={`relative w-8 h-8 shrink-0 ${selectingConverted ? 'invisible' : isMenuOpen ? 'opacity-100' : 'opacity-0 group-hover/textcard:opacity-100'} transition-opacity duration-200`}>
-                            <motion.button
-                              whileHover={{ scale: 1.15 }}
-                              whileTap={{ scale: 0.92 }}
-                              animate={isMenuOpen ? { scale: 1.22, opacity: 0, pointerEvents: 'none' } : { scale: 1, opacity: 1, pointerEvents: 'auto' }}
-                              transition={{ type: "spring", stiffness: 500, damping: 30 }}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                clearButtonCoverAnchorCache(e.currentTarget);
-                                setActiveTextMenu({ item: text, anchorEl: e.currentTarget });
-                              }}
-                              className="w-8 h-8 flex items-center justify-center rounded-full backdrop-blur-3xl border border-[var(--text-main)]/10 text-[var(--text-main)] bg-card/75 hover:bg-white/15 hover:border-white/25 hover:shadow-[0_0_12px_rgba(255,255,255,0.2)] transition-all cursor-pointer"
-                              title="Opções do Texto"
-                            >
-                              <MoreHorizontal size={16} />
-                            </motion.button>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
+                <div className="grid grid-cols-6 gap-4">
+                  {generatedTexts.map((text) => <TextTile key={text.id} text={text} />)}
                 </div>
               </section>
             )}

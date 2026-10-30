@@ -5,6 +5,7 @@ import { transicaoConteudo } from '../navigation/transitions';
 import { clearButtonCoverAnchorCache } from '../components/Popovers';
 import { getGenericTextCover } from '../lib/covers';
 import { useApp } from '../app/AppContext';
+import { TextTile } from '../components/cards/TextTile';
 import { SelectionCheck } from '../components/SelectionCheck';
 import { AiStarsIcon } from '../components/AppGlyph';
 
@@ -63,84 +64,8 @@ export function AllTextsScreen() {
                 <h2 className="text-xl font-bold text-[var(--text-main)]">
                   {group.title}
                 </h2>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {group.items.map((item) => {
-                    const isMenuOpen = activeTextMenu?.item.id === item.id;
-                    const coverUrl = item.cover || getGenericTextCover(item.title, item.author, item.coverColor);
-                    return (
-                      <div
-                        key={item.id}
-                        onClick={(e) => {
-                          if (selectingConverted) { toggleConvertedSelection(`text:${item.id}`); return; }
-                          setViewingTextAnchor(e.currentTarget);
-                          setViewingTextModal(item);
-                        }}
-                        className="p-5 rounded-3xl bg-card/75 backdrop-blur-3xl border border-[var(--text-main)]/10 shadow-md hover:shadow-xl transition-all cursor-pointer flex flex-col justify-between group/textcard relative"
-                      >
-                        <SelectionCheck active={selectingConverted} selected={selectedConverted.includes(`text:${item.id}`)} onToggle={() => toggleConvertedSelection(`text:${item.id}`)} />
-                        <div>
-                          <div className="flex items-center justify-between mb-3">
-                            <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-winblue/15 text-winblue">
-                              {item.genre}
-                            </span>
-                            <div className="flex items-center gap-2">
-                              <span className="text-[11px] text-[var(--text-muted)]">{item.date}</span>
-                              <motion.button
-                                whileHover={{ scale: 1.15 }}
-                                whileTap={{ scale: 0.92 }}
-                                animate={isMenuOpen ? { scale: 1.22, opacity: 0, pointerEvents: 'none' } : { scale: 1, opacity: 1, pointerEvents: 'auto' }}
-                                transition={{ type: "spring", stiffness: 500, damping: 30 }}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  clearButtonCoverAnchorCache(e.currentTarget);
-                                  setActiveTextMenu({ item, anchorEl: e.currentTarget });
-                                }}
-                                className="w-7 h-7 flex items-center justify-center rounded-full border border-[var(--text-main)]/10 text-[var(--text-main)] bg-card/75 hover:bg-white/15 hover:border-white/25 hover:shadow-[0_0_12px_rgba(255,255,255,0.2)] transition-all cursor-pointer [&_svg]:text-inherit"
-                                title="Opções do Texto"
-                              >
-                                <MoreHorizontal size={14} />
-                              </motion.button>
-                            </div>
-                          </div>
-
-                          <div className="flex items-start gap-3.5 mb-2.5">
-                            <img
-                              src={coverUrl}
-                              alt={item.title}
-                              className="w-16 h-16 aspect-square rounded-2xl object-cover shrink-0 shadow-md border border-white/10 group-hover/textcard:scale-105 transition-transform"
-                            />
-                            <div className="flex-1 min-w-0">
-                              <h4 className="text-base font-bold text-[var(--text-main)] group-hover/textcard:text-winblue transition-colors line-clamp-1">
-                                {item.title}
-                              </h4>
-                              {item.author && (
-                                <p className="text-xs font-semibold text-[var(--text-muted)] truncate mt-0.5">
-                                  {item.author}
-                                </p>
-                              )}
-                              <p className="text-xs text-[var(--text-muted)] line-clamp-2 mt-1 leading-relaxed">
-                                {item.content}
-                              </p>
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="mt-4 pt-3 flex items-center justify-between text-xs">
-                          <span className="text-[var(--text-muted)]">{item.wordCount} palavras</span>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              sendGeneratedTextToConverter(item.content, item.title);
-                            }}
-                            className="h-7 px-3 rounded-full bg-card/75 border border-winblue/40 text-winblue font-semibold text-[11px] hover:bg-winblue/15 hover:border-winblue/60 hover:shadow-[0_0_12px_rgba(var(--winblue-rgb),0.3)] shadow-sm flex items-center gap-1 transition-all cursor-pointer [&_svg]:text-inherit"
-                          >
-                            <AiStarsIcon size={13} />
-                            <span>Converter</span>
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  })}
+                <div className="grid grid-cols-6 gap-4">
+                  {group.items.map((item) => <TextTile key={item.id} text={item} />)}
                 </div>
               </motion.section>
             ))}
@@ -189,8 +114,8 @@ export function AllTextsScreen() {
                                 : 'w-full h-7 px-1 rounded-[12px] text-[10px] tracking-tight'
                             } ${
                               isSelected
-                                ? 'bg-winblue/20 text-winblue border border-winblue ring-1 ring-winblue/40 shadow-[0_0_14px_rgba(var(--winblue-rgb),0.45)] hover:bg-winblue/25 hover:shadow-[0_0_18px_rgba(var(--winblue-rgb),0.6)]'
-                                : 'text-[var(--text-muted)] border border-transparent hover:text-[var(--text-main)] hover:bg-white/20 hover:border-white/35 hover:shadow-[0_0_12px_rgba(255,255,255,0.25)]'
+                                ? 'bg-winblue/20 text-winblue shadow-[0_0_14px_rgba(var(--winblue-rgb),0.45)] hover:bg-winblue/25 hover:shadow-[0_0_18px_rgba(var(--winblue-rgb),0.6)]'
+                                : 'text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-white/20 hover:shadow-[0_0_12px_rgba(255,255,255,0.25)]'
                             }`}
                     title={group.title}
                   >

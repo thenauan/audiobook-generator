@@ -19,9 +19,9 @@ export function SelectionCheck({ active, selected, onToggle, rounded = 'rounded-
           aria-pressed={selected}
           aria-label={selected ? 'Desmarcar' : 'Selecionar'}
           className={cn(
-            'absolute inset-0 z-20 cursor-pointer border-2 transition-[background-color,border-color,box-shadow] duration-200',
+            'absolute inset-0 z-20 cursor-pointer transition-[background-color,box-shadow] duration-200',
             rounded,
-            selected ? 'bg-winblue/20 border-winblue shadow-[0_0_18px_rgba(var(--winblue-rgb),0.45)]' : 'bg-black/25 border-transparent hover:bg-black/15'
+            selected ? 'bg-winblue/20 shadow-[0_0_18px_rgba(var(--winblue-rgb),0.45)]' : 'bg-black/25 hover:bg-black/15'
           )}
         >
           <motion.span

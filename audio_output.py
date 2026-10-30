@@ -81,7 +81,40 @@ def argumentos_codec(fmt: str, q: str) -> List[str]:
 
 
 def _rodar(cmd: List[str]) -> subprocess.CompletedProcess:
-    return subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding="utf-8", errors="replace")
+    # Sem janela no Windows (o FFmpeg é um programa de console)
+    flags = 0x08000000 if os.name == "nt" else 0
+    return subprocess.run(cmd, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+                          encoding="utf-8", errors="replace", creationflags=flags)
+
+
+def _rodar_com_progresso(cmd: List[str], total_ms: int, ao_progresso=None) -> subprocess.CompletedProcess:
+    """Roda o FFmpeg informando quanto do áudio já foi gerado (fração de 0 a 1), lendo o -progress dele."""
+    if not ao_progresso or total_ms <= 0:
+        return _rodar(cmd)
+    flags = 0x08000000 if os.name == "nt" else 0
+    cmd = cmd[:1] + ["-progress", "pipe:1", "-nostats"] + cmd[1:]
+    proc = subprocess.Popen(cmd, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+                            encoding="utf-8", errors="replace", creationflags=flags)
+    import threading
+    erros: List[str] = []
+    leitor = threading.Thread(target=lambda: erros.append(proc.stderr.read()), daemon=True)
+    leitor.start()
+    ultimo = -1.0
+    for linha in proc.stdout:
+        if linha.startswith("out_time_us=") or linha.startswith("out_time_ms="):
+            try:
+                fracao = min(1.0, int(linha.split("=", 1)[1]) / 1000 / total_ms)
+            except ValueError:
+                continue
+            if fracao - ultimo >= 0.01:
+                ultimo = fracao
+                try:
+                    ao_progresso(fracao)
+                except Exception:
+                    pass
+    proc.wait()
+    leitor.join(timeout=5)
+    return subprocess.CompletedProcess(cmd, proc.returncode, "", "".join(erros))
 
 
 # ----- Capítulos -----
@@ -94,7 +127,7 @@ def normalizar_capitulo(entrada_mp3: str, saida_flac: str) -> bool:
     if res.returncode == 0 and os.path.exists(saida_flac) and os.path.getsize(saida_flac) > 1000:
         return True
     # Sem o filtro (ex.: áudio curto demais para o loudnorm): só converte sem perda
-    res = _rodar(["ffmpeg", "-y", "-i", entrada_mp3, "-c:a", "flac", "-ac", "1", saida_flac])
+    res = _rodar(["ffmpeg", "-y", "-i", entrada_mp3, "-af", "adelay=1500|1500", "-c:a", "flac", "-ac", "1", saida_flac])
     return res.returncode == 0 and os.path.exists(saida_flac) and os.path.getsize(saida_flac) > 1000
 
 
@@ -192,7 +225,8 @@ def aplicar_tags_vorbis(caminho: str, titulo: str, autor: str, genero: Optional[
 
 
 def gerar_arquivo_unico(saida: str, fmt: str, q: str, capitulos: List[Dict[str, Any]], titulo: str, autor: str,
-                        genero: Optional[str], narrador: Optional[str], cover_base64: Optional[str], cache_dir: str) -> None:
+                        genero: Optional[str], narrador: Optional[str], cover_base64: Optional[str], cache_dir: str,
+                        ao_progresso=None) -> None:
     """Junta os capítulos (FLAC do cache) num arquivo só, no formato escolhido, com capítulos e capa."""
     fmt = formato(fmt)
     meta_path = os.path.join(cache_dir, "metadata.txt")
@@ -200,10 +234,15 @@ def gerar_arquivo_unico(saida: str, fmt: str, q: str, capitulos: List[Dict[str, 
     concat_path = os.path.join(cache_dir, "concat.txt")
     with open(concat_path, "w", encoding="utf-8") as f:
         for ch in capitulos:
-            f.write("file '{}'\n".format(ch["file"].replace("\\", "/").replace("'", "'\\''")))
+            # Caminho absoluto: o concat do FFmpeg resolve caminhos relativos a partir da pasta deste arquivo
+            f.write("file '{}'\n".format(os.path.abspath(ch["file"]).replace("\\", "/").replace("'", "'\\''")))
 
     base = ["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", concat_path, "-i", meta_path]
     codec = argumentos_codec(fmt, q)
+    total_ms = int(capitulos[-1]["end_time"]) if capitulos else 0
+
+    def rodar(cmd):
+        return _rodar_com_progresso(cmd, total_ms, ao_progresso)
 
     if fmt == "m4b":
         dados, mime = capa_bytes(cover_base64)
@@ -214,16 +253,16 @@ def gerar_arquivo_unico(saida: str, fmt: str, q: str, capitulos: List[Dict[str, 
                 cf.write(dados)
         cmd = base + (["-i", capa, "-map", "0:a", "-map", "2:v", "-c:v", "copy", "-disposition:v:0", "attached_pic"] if capa else ["-map", "0:a"])
         cmd += ["-map_metadata", "1", "-map_chapters", "1"] + codec + ["-movflags", "+faststart", "-f", "mp4", saida]
-        res = _rodar(cmd)
+        res = rodar(cmd)
         if res.returncode != 0 and capa:  # capa incompatível: gera sem ela
-            res = _rodar(base + ["-map", "0:a", "-map_metadata", "1", "-map_chapters", "1"] + codec + ["-f", "mp4", saida])
+            res = rodar(base + ["-map", "0:a", "-map_metadata", "1", "-map_chapters", "1"] + codec + ["-f", "mp4", saida])
     elif fmt in ("opus", "flac"):
-        res = _rodar(base + ["-map", "0:a", "-map_metadata", "1", "-map_chapters", "-1"] + codec + [saida])
+        res = rodar(base + ["-map", "0:a", "-map_metadata", "1", "-map_chapters", "-1"] + codec + [saida])
         if res.returncode == 0:
             aplicar_tags_vorbis(saida, titulo, autor, genero, narrador, cover_base64, capitulos)
     else:
         # MP3 (capítulos e capa entram depois via ID3) e WAV (só título/autor: o formato não guarda capítulos)
-        res = _rodar(base + ["-map", "0:a", "-map_metadata", "1", "-map_chapters", "-1"] + codec + [saida])
+        res = rodar(base + ["-map", "0:a", "-map_metadata", "1", "-map_chapters", "-1"] + codec + [saida])
 
     if res.returncode != 0:
         raise RuntimeError(f"FFmpeg falhou ao gerar {FORMATOS[fmt]['ext']}: {res.stderr[-300:]}")

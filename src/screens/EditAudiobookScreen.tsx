@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 // ===== Tela: edit-audiobook =====
 import React from 'react';
 import { createPortal } from 'react-dom';
@@ -9,12 +10,13 @@ import { LuFileAudio, LuFolderDown } from 'react-icons/lu';
 import { RiTranslateAi2 } from 'react-icons/ri';
 import { transicaoConteudo } from '../navigation/transitions';
 import { getButtonCoverPopupStyle, clearButtonCoverAnchorCache } from '../components/Popovers';
-import { GENERIC_COVER_COLORS, getGenericBookCover } from '../lib/covers';
+import { COVER_COLOR_PICKER, getGenericBookCover } from '../lib/covers';
 import { SettingToggle } from '../components/cards/SettingToggle';
 import { useApp } from '../app/AppContext';
+import { voicesFor, languageCode, voiceLang, hasSample } from '../data/voices';
 
 export function EditAudiobookScreen() {
-  const { showToast, playingVoiceCode, toggleVoiceSample, editingBook, editBookTitle, setEditBookTitle, editBookAuthor, setEditBookAuthor, editBookCategory, setEditBookCategory, editBookSubgenre, setEditBookSubgenre, editBookNarrator, setEditBookNarrator, editBookLanguage, setEditBookLanguage, editBookYear, setEditBookYear, editBookVoice, setEditBookVoice, editBookFileType, setEditBookFileType, editBookGenerateSyncText, setEditBookGenerateSyncText, editBookRequiresTranslation, setEditBookRequiresTranslation, editBookCover, setEditBookCover, editCoverColor, setEditCoverColor, editBookDescription, setEditBookDescription, editBookChapters, setEditBookChapters, editBookPronunciationMap, setEditBookPronunciationMap, pronOrigInput, setPronOrigInput, pronRepInput, setPronRepInput, previewChapter, setPreviewChapter, previewChapterAnchor, setPreviewChapterAnchor, editBookHasTranscript, setEditBookHasTranscript, editBookTranscriptFileName, setEditBookTranscriptFileName, editBookCoverInputRef, editBookTranscriptInputRef, pronTagsScrollRef, handlePronMouseDown, handlePronMouseLeaveOrUp, handlePronMouseMove, handleSplitLongChapter, availableVoices, editingFileId } = useApp();
+  const { showToast, playingVoiceCode, toggleVoiceSample, editingBook, editBookTitle, setEditBookTitle, editBookAuthor, setEditBookAuthor, editBookCategory, setEditBookCategory, editBookSubgenre, setEditBookSubgenre, editBookNarrator, setEditBookNarrator, editBookLanguage, setEditBookLanguage, editBookYear, setEditBookYear, editBookVoice, setEditBookVoice, editBookFileType, setEditBookFileType, editBookGenerateSyncText, setEditBookGenerateSyncText, editBookRequiresTranslation, setEditBookRequiresTranslation, editBookCover, setEditBookCover, editCoverColor, setEditCoverColor, editBookDescription, setEditBookDescription, editBookChapters, setEditBookChapters, editBookPronunciationMap, setEditBookPronunciationMap, pronOrigInput, setPronOrigInput, pronRepInput, setPronRepInput, previewChapter, setPreviewChapter, previewChapterAnchor, setPreviewChapterAnchor, editBookHasTranscript, setEditBookHasTranscript, editBookTranscriptFileName, setEditBookTranscriptFileName, editBookCoverInputRef, editBookTranscriptInputRef, pronTagsScrollRef, handlePronMouseDown, handlePronMouseLeaveOrUp, handlePronMouseMove, handleSplitLongChapter, availableVoices, editingFileId, defaultVoice } = useApp();
   // Editando um e-book da lista do Conversor (ainda não convertido) ou um audiobook pronto do Histórico
   const isPendingConversion = Boolean(editingFileId);
   return (() => {
@@ -30,9 +32,17 @@ export function EditAudiobookScreen() {
       return s;
     };
 
-    const voiceLangFamily = (editBookVoice || 'pt-BR').split('-')[0].toLowerCase();
-    const bookLangFamily = getLangFamily(editBookLanguage || 'Português (Brasil)');
-    const canTranslate = bookLangFamily !== voiceLangFamily;
+    // Tradução faz sentido quando o livro não está no idioma da voz padrão; com ela, as vozes são as do idioma da voz padrão
+    const bookLang = languageCode(editBookLanguage);
+    const canTranslate = bookLang !== voiceLang(defaultVoice);
+    const narrLang = editBookRequiresTranslation && canTranslate ? voiceLang(defaultVoice) : bookLang;
+    const voiceOptions = voicesFor(narrLang);
+    // Se a voz escolhida não é do idioma narrado (mudou o idioma ou a tradução), passa para uma voz desse idioma
+    useEffect(() => {
+      if (!voiceOptions.some(v => v.code === editBookVoice)) {
+        setEditBookVoice(voiceOptions.some(v => v.code === defaultVoice) ? defaultVoice : voiceOptions[0].code);
+      }
+    }, [narrLang]);
 
     const selectedVoiceObj = availableVoices.find(v => v.code === editBookVoice);
     const selectedVoiceName = selectedVoiceObj
@@ -112,7 +122,7 @@ export function EditAudiobookScreen() {
                 Cor da capa
               </span>
               <div className="grid grid-cols-6 gap-x-3 gap-y-3.5 justify-items-center px-2.5 py-3 rounded-2xl bg-card/60 backdrop-blur-md border border-[var(--text-main)]/10 shadow-sm w-full">
-                {GENERIC_COVER_COLORS.map(c => {
+                {COVER_COLOR_PICKER.map(c => {
                   const isSelected = editCoverColor.toLowerCase() === c.hex.toLowerCase();
                   return (
                     <button
@@ -333,7 +343,9 @@ export function EditAudiobookScreen() {
                   { val: 'Espanhol', label: '🇪🇸 Espanhol' },
                   { val: 'Francês', label: '🇫🇷 Francês' },
                   { val: 'Alemão', label: '🇩🇪 Alemão' },
-                  { val: 'Italiano', label: '🇮🇹 Italiano' }
+                  { val: 'Italiano', label: '🇮🇹 Italiano' },
+                  { val: 'Russo', label: '🇷🇺 Russo' },
+                  { val: 'Árabe', label: '🇸🇦 Árabe' }
                 ].map(l => (
                   <button
                     key={l.val}
@@ -366,7 +378,7 @@ export function EditAudiobookScreen() {
             </label>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
-            {availableVoices.map((v) => {
+            {voiceOptions.map((v) => {
               const isSelected = editBookVoice === v.code;
               const isPlaying = playingVoiceCode === v.code;
               return (
@@ -389,7 +401,7 @@ export function EditAudiobookScreen() {
                       <span className="text-[10px] text-[var(--text-muted)] truncate">{v.label.split(' - ')[0] || ''}</span>
                     </div>
                   </div>
-                  <motion.button
+                  {hasSample(v.code) && <motion.button
                     type="button"
                     whileHover={{ scale: 1.18 }}
                     whileTap={{ scale: 0.92 }}
@@ -406,7 +418,7 @@ export function EditAudiobookScreen() {
                     ) : (
                       <Play size={12} className={isSelected ? "text-winblue" : "text-inherit"} />
                     )}
-                  </motion.button>
+                  </motion.button>}
                 </div>
               );
             })}
@@ -860,7 +872,7 @@ export function EditAudiobookScreen() {
                 >
                   <div className="flex items-center justify-between pb-0.5">
                     <div className="min-w-0 pr-2">
-                      <h4 className="text-sm font-bold text-[var(--text-main)] truncate">{previewChapter.title}</h4>
+                      <h4 className="text-xl font-bold text-[var(--text-main)] truncate">{previewChapter.title}</h4>
                     </div>
                   </div>
 

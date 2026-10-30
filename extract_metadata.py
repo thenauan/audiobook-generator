@@ -1,11 +1,17 @@
-import sys
+"""
+Metadados de um e-book para o app: título, autor, idioma, capa, capítulos (com o texto) e estimativas.
+Uso: python extract_metadata.py <arquivo>  ->  imprime um JSON
+"""
+import base64
 import json
 import os
-import base64
-from ebooklib import epub
-from pypdf import PdfReader
+import re
+import sys
+
 import mobi
 from bs4 import BeautifulSoup
+from pypdf import PdfReader
+
 
 def normalize_language_name(lang_str):
     if not lang_str:
@@ -13,270 +19,250 @@ def normalize_language_name(lang_str):
     cleaned = str(lang_str).strip().lower().replace("_", "-")
     if cleaned in ["unknown", "desconhecido", "und", "", "none"]:
         return "Português (Brasil)"
-    
-    # Português (Brasil e variações)
     if cleaned in ["pt", "pt-br", "br", "por", "portugues", "português", "pt-brasil", "portugues (brasil)", "português (brasil)"]:
         return "Português (Brasil)"
     if cleaned in ["pt-pt", "portugues (portugal)", "português (portugal)"]:
         return "Português (Portugal)"
-    
-    # Inglês
     if cleaned in ["en", "en-us", "eng", "english", "ingles", "inglês"]:
         return "Inglês"
     if cleaned in ["en-gb", "english (uk)", "inglês (reino unido)"]:
         return "Inglês (Reino Unido)"
-    
-    # Espanhol
-    if cleaned in ["es", "es-es", "es-la", "spa", "espanhol", "español", "spanish"]:
+    if cleaned in ["es", "es-es", "es-la", "es-mx", "es-ar", "spa", "espanhol", "español", "spanish"]:
         return "Espanhol"
-    
-    # Francês
     if cleaned in ["fr", "fra", "fre", "frances", "francês", "français", "french"]:
         return "Francês"
-    
-    # Alemão
     if cleaned in ["de", "deu", "ger", "alemao", "alemão", "deutsch", "german"]:
         return "Alemão"
-    
-    # Italiano
     if cleaned in ["it", "ita", "italiano", "italian"]:
         return "Italiano"
-        
-    # Russo
     if cleaned in ["ru", "rus", "russo", "russian"]:
         return "Russo"
-        
-    # Japonês
     if cleaned in ["ja", "jpn", "japones", "japonês", "japanese"]:
         return "Japonês"
-
-    # Chinês
     if cleaned in ["zh", "chi", "zho", "chines", "chinês", "chinese"]:
         return "Chinês"
-
+    if cleaned in ["ar", "ara", "arabe", "árabe", "arabic"]:
+        return "Árabe"
+    if cleaned.startswith("pt"):
+        return "Português (Brasil)"
+    if cleaned.startswith("en"):
+        return "Inglês"
+    if cleaned.startswith("es"):
+        return "Espanhol"
     return str(lang_str).strip().title()
+
 
 def detect_sample_language(text):
     if not text or len(text.strip()) < 20:
         return ""
     try:
-        from langdetect import detect
+        from langdetect import detect, DetectorFactory
+        DetectorFactory.seed = 0
         res = detect(text.strip())
         if res:
             return res
-    except:
+    except Exception:
         pass
-    
-    # Fast stop-words heuristic
     words = text.lower().split()
-    pt_markers = {'que', 'não', 'uma', 'para', 'com', 'como', 'mais', 'pela', 'pelo', 'está', 'este', 'essa', 'livro', 'capítulo', 'muito', 'quando'}
-    en_markers = {'the', 'and', 'that', 'have', 'with', 'this', 'from', 'they', 'will', 'would', 'there', 'their', 'book', 'chapter', 'about', 'which'}
-    es_markers = {'que', 'los', 'las', 'del', 'por', 'con', 'para', 'como', 'más', 'pero', 'libro', 'capítulo', 'cuando', 'este', 'esta'}
-    
-    pt_score = sum(1 for w in words if w in pt_markers)
-    en_score = sum(1 for w in words if w in en_markers)
-    es_score = sum(1 for w in words if w in es_markers)
-    
-    if pt_score > en_score and pt_score > es_score and pt_score >= 2:
+    pt_markers = {'que', 'não', 'uma', 'para', 'com', 'como', 'mais', 'pela', 'pelo', 'está', 'este', 'essa', 'muito', 'quando'}
+    en_markers = {'the', 'and', 'that', 'have', 'with', 'this', 'from', 'they', 'will', 'would', 'there', 'their', 'about', 'which'}
+    es_markers = {'los', 'las', 'del', 'por', 'con', 'como', 'más', 'pero', 'cuando', 'esta', 'muy', 'también'}
+    pt, en, es = (sum(1 for w in words if w in m) for m in (pt_markers, en_markers, es_markers))
+    if pt > en and pt > es and pt >= 2:
         return "pt-BR"
-    elif en_score > pt_score and en_score > es_score and en_score >= 2:
+    if en > pt and en > es and en >= 2:
         return "en"
-    elif es_score > pt_score and es_score > en_score and es_score >= 2:
+    if es > pt and es > en and es >= 2:
         return "es"
     return ""
 
-def extract_metadata(file_path):
+
+def _lang_code(lang):
+    l = (lang or "").lower()
+    if l.startswith("en") or "ingl" in l:
+        return "en"
+    if l.startswith("es") or "espanh" in l or "españ" in l:
+        return "es"
+    if l.startswith("ar") or "árab" in l or "arab" in l:
+        return "ar"
+    if l.startswith("ru") or "russ" in l or "русск" in l:
+        return "ru"
+    return "pt"
+
+
+def _duracao_legivel(minutos):
+    if minutos >= 60:
+        h, m = int(minutos // 60), int(minutos % 60)
+        return f"{h}h {m}m" if m else f"{h}h"
+    return f"{max(1, int(round(minutos)))}m"
+
+
+def _capa_data_url(dados, mime):
+    if not dados:
+        return None
+    if not (mime or "").startswith("image/"):
+        mime = "image/jpeg"
+    return f"data:{mime};base64,{base64.b64encode(dados).decode('ascii')}"
+
+
+def _titulo_autor(title, author, file_path, original_name):
+    if not title or str(title).strip().lower() in ("unknown", "untitled", "sem título"):
+        title = os.path.splitext(os.path.basename(original_name or file_path))[0]
+        title = re.sub(r"^_?oceanofpdf\.com_?", "", title, flags=re.IGNORECASE).replace("_", " ").strip()
+    author = str(author).strip()
+    if not author or author.lower() == "unknown":
+        author = "Desconhecido"
+    return str(title).strip() or "Desconhecido", author
+
+
+def extract_metadata(file_path, original_name=None, ao_parcial=None):
+    """Nunca levanta exceção: no pior caso devolve o nome do arquivo como título e nenhum capítulo
+    (o conversor tenta ler o livro de novo na hora de converter). `ao_parcial` recebe logo no começo o que
+    sai rápido (capa, título, autor, idioma), para o app mostrar o livro antes de montar os capítulos."""
+    from book_structure import estruturar_livro, ler_epub, ler_texto_arquivo, LivroIlegivel
+
     ext = os.path.splitext(file_path)[1].lower()
-    title = ""
-    author = ""
-    genre = ""
-    subgenre = ""
-    narrator = ""
-    language = ""
-    cover_base64 = None
-    char_count = 0
-    text_sample = ""
-    
+    title = author = genre = subgenre = narrator = language = ""
+    cover_data = None
+    avisos = []
+    ilegivel = ""
+
     try:
-        if ext == '.txt':
-            with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
-                content = f.read()
-                char_count = len(content)
-                text_sample = content[:2000]
-                title = os.path.basename(file_path).rsplit('.', 1)[0]
-
-        elif ext == '.epub':
-            book = epub.read_epub(file_path)
-            title_meta = book.get_metadata('DC', 'title')
-            if title_meta: title = title_meta[0][0]
-            creator_meta = book.get_metadata('DC', 'creator')
-            if creator_meta: author = creator_meta[0][0]
-            lang_meta = book.get_metadata('DC', 'language')
-            if lang_meta: language = lang_meta[0][0]
-            subj_meta = book.get_metadata('DC', 'subject')
-            if subj_meta and len(subj_meta) > 0:
-                genre = str(subj_meta[0][0])
-                if len(subj_meta) > 1:
-                    subgenre = str(subj_meta[1][0])
-            
-            for item in book.get_items():
-                if item.get_type() == 9: # IMAGE
-                    if 'cover' in item.get_id().lower() or 'cover' in item.get_name().lower():
-                        cover_base64 = base64.b64encode(item.get_content()).decode('utf-8')
-                        break
-                elif item.get_type() == 1: # DOCUMENT
-                    content = BeautifulSoup(item.get_content(), 'html.parser').get_text(separator=' ', strip=True)
-                    char_count += len(content)
-                    if len(text_sample) < 2000: text_sample += content + " "
-
+        if ext == '.epub':
+            livro = ler_epub(file_path)
+            meta = livro["meta"]
+            title = (meta.get("title") or [""])[0]
+            author = ", ".join(meta.get("creator") or [])
+            language = (meta.get("language") or [""])[0]
+            subjects = meta.get("subject") or []
+            genre = subjects[0] if subjects else ""
+            subgenre = subjects[1] if len(subjects) > 1 else ""
+            if livro["cover"]:
+                cover_data = _capa_data_url(*livro["cover"])
         elif ext == '.pdf':
             reader = PdfReader(file_path)
+            if reader.is_encrypted:
+                try:
+                    reader.decrypt("")
+                except Exception:
+                    avisos.append("PDF protegido por senha")
             meta = reader.metadata
             if meta:
-                if meta.title:
-                    title = meta.title
-                if meta.author:
-                    author = meta.author
-                if hasattr(meta, 'subject') and meta.subject:
-                    genre = meta.subject
-                
-                # Try to get language from metadata
-                try:
-                    if '/Lang' in reader.trailer['/Root']:
-                        language = reader.trailer['/Root']['/Lang']
-                except:
-                    pass
-            
-            for page in reader.pages:
-                content = page.extract_text() or ""
-                char_count += len(content)
-                if len(text_sample) < 2000: text_sample += content + " "
-
-        elif ext in ['.mobi', '.azw']:
-            temp_dir, html_content = mobi.extract(file_path)
-            with open(html_content, 'r', encoding='utf-8', errors='ignore') as f:
-                content = BeautifulSoup(f.read(), 'html.parser').get_text(separator=' ', strip=True)
-                char_count = len(content)
-                text_sample = content[:2000]
-            import shutil
-            shutil.rmtree(temp_dir, ignore_errors=True)
-            
+                title = meta.title or ""
+                author = meta.author or ""
+                genre = getattr(meta, "subject", "") or ""
+            try:
+                language = str(reader.trailer['/Root'].get('/Lang', '') or '')
+            except Exception:
+                pass
+        elif ext in ('.mobi', '.azw', '.azw3', '.prc'):
+            temp_dir, arquivo = mobi.extract(file_path)
+            try:
+                if arquivo.lower().endswith('.epub'):
+                    livro = ler_epub(arquivo)
+                    title = (livro["meta"].get("title") or [""])[0]
+                    author = ", ".join(livro["meta"].get("creator") or [])
+                    language = (livro["meta"].get("language") or [""])[0]
+                    if livro["cover"]:
+                        cover_data = _capa_data_url(*livro["cover"])
+                else:
+                    cab = open(arquivo, 'rb').read(200000).decode('utf-8', 'replace')
+                    m = re.search(r'<title>(.*?)</title>', cab, re.IGNORECASE | re.DOTALL)
+                    if m:
+                        title = BeautifulSoup(m.group(1), 'html.parser').get_text().strip()
+            finally:
+                import shutil
+                shutil.rmtree(temp_dir, ignore_errors=True)
+    except LivroIlegivel as e:
+        ilegivel = str(e)
     except Exception as e:
-        pass
+        avisos.append(f"metadados: {e}")
 
-    # Language detection fallback based on text sample
-    if (not language or str(language).lower() in ["unknown", "und", "desconhecido", ""]) and text_sample.strip():
-        detected = detect_sample_language(text_sample)
-        if detected:
-            language = detected
+    if ao_parcial:
+        t, a = _titulo_autor(title, author, file_path, original_name)
+        try:
+            ao_parcial({"partial": True, "title": t, "author": a, "genre": str(genre).strip(), "subgenre": str(subgenre).strip(),
+                        "language": normalize_language_name(language) if language else "", "cover": cover_data})
+        except Exception:
+            pass
 
-    if char_count == 0:
-        size_bytes = os.path.getsize(file_path)
-        char_count = (size_bytes / 2)
-
-    duration_mins = char_count / 900
-    # Calibração realista da velocidade de síntese neural (Edge TTS + WebSocket chunking + FFmpeg loudnorm/m4b):
-    # A síntese com processamento e áudio final ocorre a aproximadamente 7.5x a 8x do tempo real de reprodução.
-    proc_time_mins = max(0.25, duration_mins / 7.5)
-    duration_hours = duration_mins / 60
-    
-    if duration_hours >= 1:
-        duration_str = f"{int(duration_hours)}h {int((duration_hours % 1) * 60)}m"
-    else:
-        duration_str = f"{int(duration_mins)}m"
-        
-    if proc_time_mins >= 60:
-        p_hrs = int(proc_time_mins // 60)
-        p_mins = int(proc_time_mins % 60)
-        proc_time_str = f"{p_hrs}h {p_mins}m" if p_mins > 0 else f"{p_hrs}h"
-    elif proc_time_mins >= 1:
-        p_mins = int(proc_time_mins)
-        p_secs = int((proc_time_mins % 1) * 60)
-        proc_time_str = f"{p_mins} min e {p_secs} seg" if p_secs > 5 else f"{p_mins} min"
-    else:
-        proc_time_str = f"{max(10, int(proc_time_mins * 60))} seg"
-
-    audio_size_mb = duration_mins * 0.9
-    if audio_size_mb > 1024:
-        audio_size_str = f"{audio_size_mb / 1024:.2f} GB"
-    else:
-        audio_size_str = f"{audio_size_mb:.2f} MB"
-
-    # Obligatory fields fallback to "Desconhecido"
-    clean_title = str(title).strip() if title else ""
-    if not clean_title or clean_title.lower() == "unknown":
-        clean_title = "Desconhecido"
-
-    clean_author = str(author).strip() if author else ""
-    if not clean_author or clean_author.lower() == "unknown":
-        clean_author = "Desconhecido"
-
-    # Optional fields default to empty string
-    clean_genre = str(genre).strip() if genre else ""
-    clean_subgenre = str(subgenre).strip() if subgenre else ""
-    clean_narrator = str(narrator).strip() if narrator else ""
-    clean_language = normalize_language_name(language)
-
-    cover_data = None
-    if cover_base64:
-        cover_data = f"data:image/jpeg;base64,{cover_base64}"
-
+    # Capítulos e texto
     chapters_data = []
+    char_count = 0
     try:
-        from converter import extrair_texto, estruturar_obra_nlp
-        full_text = extrair_texto(file_path)
-        if full_text and full_text.strip():
-            raw_caps = estruturar_obra_nlp(full_text, False)
-            for idx, c in enumerate(raw_caps):
-                clean_tit = c["titulo"]
-                content_str = c["conteudo"].strip()
-                snippet = content_str[:500] if len(content_str) > 500 else content_str
-                if len(content_str) > 500:
-                    snippet += "..."
-                chapters_data.append({
-                    "id": f"cap-{idx + 1}",
-                    "title": clean_tit,
-                    "snippet": snippet,
-                    "content": content_str
-                })
-    except Exception as ex_ch:
-        pass
+        caps = estruturar_livro(file_path, _lang_code(language))
+        textos = [c["conteudo"] for c in caps]
+        # Amostra do meio do livro (o começo costuma ter créditos e dedicatória) para detectar o idioma
+        junto = "\n\n".join(textos)
+        meio = len(junto) // 2
+        amostra = junto[max(0, meio - 2500):meio + 2500] or junto[:5000]
+        if not language:
+            detectado = detect_sample_language(amostra)
+            if detectado and _lang_code(detectado) != "pt":
+                caps = estruturar_livro(file_path, _lang_code(detectado))  # títulos genéricos no idioma do livro
+            language = detectado
+        for idx, c in enumerate(caps):
+            conteudo = c["conteudo"].strip()
+            char_count += len(conteudo) + len(c["titulo"])
+            chapters_data.append({
+                "id": f"cap-{idx + 1}",
+                "title": c["titulo"],
+                "snippet": conteudo[:500] + ("..." if len(conteudo) > 500 else ""),
+                "content": conteudo,
+            })
+    except LivroIlegivel as e:
+        ilegivel = ilegivel or str(e)
+    except Exception as e:
+        avisos.append(f"capítulos: {e}")
+        if ext == '.txt':
+            try:
+                texto = ler_texto_arquivo(file_path)
+                char_count = len(texto)
+                chapters_data.append({"id": "cap-1", "title": "Capítulo 1", "snippet": texto[:500], "content": texto})
+            except Exception:
+                pass
 
-    if not chapters_data and text_sample.strip():
-        chapters_data.append({
-            "id": "cap-1",
-            "title": clean_title or "Capítulo 1",
-            "snippet": text_sample[:500] + ("..." if len(text_sample) > 500 else ""),
-            "content": text_sample
-        })
+    title, author = _titulo_autor(title, author, file_path, original_name)
+
+    # Estimativas (o app recalcula conforme o formato e a qualidade escolhidos)
+    minutos = char_count / 900 if char_count else 0
+    proc_seg = char_count / 1000 + minutos * 0.5 + 15 if char_count else 0
+    tamanho_mb = minutos * 60 * 192 / 8 / 1000
 
     return {
-        "title": clean_title,
-        "author": clean_author,
-        "genre": clean_genre,
-        "subgenre": clean_subgenre,
-        "narrator": clean_narrator,
-        "language": clean_language,
-        "durationEst": duration_str,
-        "processingTimeEst": proc_time_str,
-        "audioSizeEst": audio_size_str,
+        "title": str(title).strip() or "Desconhecido",
+        "author": author,
+        "genre": str(genre).strip(),
+        "subgenre": str(subgenre).strip(),
+        "narrator": str(narrator).strip(),
+        "language": normalize_language_name(language),
+        "charCount": int(char_count),
+        "durationEst": _duracao_legivel(minutos) if char_count else "",
+        "processingTimeEst": (f"{int(proc_seg // 60)}m {int(proc_seg % 60)}s" if proc_seg >= 60 else f"{int(proc_seg)}s") if char_count else "",
+        "audioSizeEst": (f"{tamanho_mb:.1f} MB" if tamanho_mb < 1024 else f"{tamanho_mb / 1024:.2f} GB") if char_count else "",
         "cover": cover_data,
-        "chapters": chapters_data
+        "chapters": chapters_data,
+        "warnings": avisos,
+        "unreadable": ilegivel,
     }
 
+
 if __name__ == "__main__":
-    if len(sys.argv) > 1:
-        file_path = sys.argv[1]
-        try:
-            if not os.path.exists(file_path):
-                print(json.dumps({"error": "File not found"}))
-                sys.exit(1)
-            metadata = extract_metadata(file_path)
-            # Ensure we only print the JSON
-            print(json.dumps(metadata))
-        except Exception as e:
-            print(json.dumps({"error": str(e)}))
-            sys.exit(1)
-    else:
+    try:
+        sys.stdout.reconfigure(encoding="utf-8")
+    except Exception:
+        pass
+    if len(sys.argv) < 2:
         print(json.dumps({"error": "No file path provided"}))
+        sys.exit(1)
+    caminho = sys.argv[1]
+    if not os.path.exists(caminho):
+        print(json.dumps({"error": "File not found"}))
+        sys.exit(1)
+    try:
+        def parcial(dados):
+            print(json.dumps(dados, ensure_ascii=False), flush=True)
+        print(json.dumps(extract_metadata(caminho, sys.argv[2] if len(sys.argv) > 2 else None, parcial), ensure_ascii=False), flush=True)
+    except Exception as e:
+        print(json.dumps({"error": str(e)}, ensure_ascii=False))
         sys.exit(1)

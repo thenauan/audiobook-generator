@@ -1,4 +1,5 @@
 // ===== Camadas globais: pop-ups, folhas, confirmações, aviso e entradas de arquivo =====
+import React from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { AUDIO_FORMATS } from './audioFormats';
 import { ConfirmPanel } from '../components/ConfirmPanel';
@@ -16,9 +17,11 @@ import { PopupMorphContainer, MenuOptionItem, getButtonCoverPopupStyle, clearBut
 import { SortOption } from './types';
 import { getGenericBookCover, getGenericTextCover } from '../lib/covers';
 import { useApp } from './AppContext';
+import { voiceLang } from '../data/voices';
+import { targetLanguageName } from '../data/languages';
 
 export function Overlays() {
-  const { mainScrollRef, activeScreenKeyRef, navigateTo, t, toastMessage, showToast, playingSnippet, toggleSnippet, playingVoiceCode, toggleVoiceSample, setFiles, fileInputRef, defaultVoice, showTranslationModal, setShowTranslationModal, foreignLangFile, selectedVoice, setSelectedVoice, viewingTextModal, setViewingTextModal, coverFileInputRef, handleCoverUpload, activeSettingSelector, setActiveSettingSelector, selectorMode, setSelectorMode, selectorDirection, setSelectorDirection, selectorInputValue, setSelectorInputValue, sortBy, handleSelectSort, activeBookMenu, setActiveBookMenu, sortMenuAnchor, setSortMenuAnchor, handleStartEditBook, handleDeleteHistoryItem, handleFileUpload, proceedWithConversion, availableVoices, syncTextDestination, syncingBookIds, syncTextInputRef, handleGenerateBookText, handlePickBookTextFile, handleSyncTextFileChosen, activeTextMenu, setActiveTextMenu, handleStartEditText, handleDeleteGeneratedText, viewingTextAnchor, setViewingTextAnchor } = useApp();
+  const { files, showCancelModal, setShowCancelModal, cancelModalAnchor, setCancelModalAnchor, handleCancelProcessing, mainScrollRef, activeScreenKeyRef, navigateTo, t, toastMessage, showToast, playingSnippet, toggleSnippet, playingVoiceCode, toggleVoiceSample, setFiles, fileInputRef, defaultVoice, showTranslationModal, setShowTranslationModal, foreignLangFile, selectedVoice, setSelectedVoice, viewingTextModal, setViewingTextModal, coverFileInputRef, handleCoverUpload, activeSettingSelector, setActiveSettingSelector, selectorMode, setSelectorMode, selectorDirection, setSelectorDirection, selectorInputValue, setSelectorInputValue, sortBy, handleSelectSort, activeBookMenu, setActiveBookMenu, sortMenuAnchor, setSortMenuAnchor, handleStartEditBook, handleDeleteHistoryItem, handleFileUpload, proceedWithConversion, availableVoices, syncTextDestination, syncingBookIds, syncTextInputRef, handleGenerateBookText, handlePickBookTextFile, handleSyncTextFileChosen, activeTextMenu, setActiveTextMenu, handleStartEditText, handleDeleteGeneratedText, viewingTextAnchor, setViewingTextAnchor } = useApp();
   return (
     <>
       {/* POP-UP: SELETOR DE AJUSTES EMERGINDO DO BOTÃO (Seção 31 do DESIGN_SYSTEM.md) */}
@@ -36,40 +39,63 @@ export function Overlays() {
               }} 
             />
             {(() => {
+              const sel = activeSettingSelector;
+              const close = () => {
+                if (sel.triggerEl) clearButtonCoverAnchorCache(sel.triggerEl);
+                setActiveSettingSelector(null);
+              };
+              // Páginas do pop-up: 'select' (lista), 'input' (digitar), 'sub:N' (segunda página da opção N)
+              // e 'subinput:N' (digitar dentro da segunda página)
+              const subMatch = /^sub(input)?:(\d+)$/.exec(selectorMode);
+              const subpage = subMatch ? sel.options?.[Number(subMatch[2])]?.subpage : undefined;
+              const subIndex = subMatch ? Number(subMatch[2]) : -1;
+              const isInput = selectorMode === 'input' || Boolean(subMatch?.[1]);
+              const page = subpage
+                ? { title: subpage.title, options: subpage.options, currentValue: subpage.currentValue, onSelect: subpage.onSelect, placeholder: subpage.inputPlaceholder }
+                : { title: sel.title, options: sel.options || [], currentValue: sel.currentValue, onSelect: sel.onSelect, placeholder: sel.inputPlaceholder };
+
               const longestLabelLength = Math.max(
-                activeSettingSelector.hideTitle ? 0 : (activeSettingSelector.title?.length || 0),
-                ...(activeSettingSelector.options?.map(o => o.label?.length || 0) || [0])
+                sel.hideTitle || subpage ? 0 : (page.title?.length || 0),
+                ...(page.options.map(o => (o.label?.length || 0) + (o.hint ? o.hint.length + 3 : 0)) || [0])
               );
-              const hasIcons = activeSettingSelector.options?.some(o => o.icon || o.colorPreview);
+              const hasIcons = page.options.some(o => o.icon || o.colorPreview);
               const iconOffset = hasIcons ? 64 : 44;
               // Largura pelo texto mais longo (~6,4 px por letra em text-xs) + ícone, folgas e o ✓.
               // No computador o pop-up ainda fica 20% maior (getButtonCoverPopupStyle).
-              const dynamicWidth = selectorMode === 'input'
+              const dynamicWidth = isInput
                 ? Math.max(240, Math.min(300, longestLabelLength * 6.4 + 110))
-                : Math.min(260, Math.max(180, longestLabelLength * 5.6 + iconOffset));
-              
-              const optionsCount = activeSettingSelector.options ? activeSettingSelector.options.length : 0;
-              const estimatedHeight = selectorMode === 'input' ? 165 : Math.min(420, optionsCount * 42 + (activeSettingSelector.hideTitle ? 16 : 56));
+                : subpage
+                  // Segunda página: voltar (≈90 px de cada lado) + título grande no centro
+                  ? Math.min(400, Math.max(250, longestLabelLength * 5.6 + iconOffset, (subpage.title.length * 11) + 190))
+                  : sel.captions && page.options.some(o => o.description)
+                    // Com legendas: largura confortável para a descrição quebrar em no máximo duas linhas
+                    ? Math.min(290, Math.max(230, longestLabelLength * 5.6 + iconOffset))
+                    : Math.min(300, Math.max(180, longestLabelLength * 5.6 + iconOffset, sel.hideTitle ? 0 : (sel.title?.length || 0) * 11 + 40));
+
+              const sectionsCount = new Set(page.options.map(o => o.section).filter(Boolean)).size;
+              const estimatedHeight = isInput ? 165 : Math.min(420, page.options.length * (sel.captions ? 54 : 42) + sectionsCount * 26 + (subpage ? 56 : sel.hideTitle ? 16 : 56));
+
+              const goBack = () => {
+                setSelectorDirection(-1);
+                setSelectorMode(subMatch?.[1] ? `sub:${subIndex}` : 'select');
+              };
 
               return (
                 <PopupMorphContainer
-                  key={`setting-popup-${activeSettingSelector.id}`}
+                  key={`setting-popup-${sel.id}`}
                   activeKey={selectorMode}
                   direction={selectorDirection}
                   targetWidth={dynamicWidth}
                   targetRadius={24}
-                  style={getButtonCoverPopupStyle(activeSettingSelector.triggerEl, dynamicWidth, estimatedHeight, 'auto')}
+                  style={getButtonCoverPopupStyle(sel.triggerEl, dynamicWidth, estimatedHeight, 'auto')}
                   className="text-[var(--text-main)]"
                 >
-                  {selectorMode === 'input' ? (
+                  {isInput ? (
                     <div className="p-3 space-y-3">
                       {/* Voltar para as opções e título centralizado */}
                       <PopupBackHeader
-                        title={activeSettingSelector.title}
-                        onBack={activeSettingSelector.options && activeSettingSelector.options.length > 0 ? () => {
-                          setSelectorDirection(-1);
-                          setSelectorMode('select');
-                        } : undefined}
+                        title={page.title}
+                        onBack={subpage || page.options.length > 0 ? goBack : undefined}
                       />
 
                       {/* Barra de Digitação */}
@@ -77,11 +103,8 @@ export function Overlays() {
                         onSubmit={(e) => {
                           e.preventDefault();
                           if (selectorInputValue.trim()) {
-                            activeSettingSelector.onSelect(selectorInputValue.trim());
-                            if (activeSettingSelector.triggerEl) {
-                              clearButtonCoverAnchorCache(activeSettingSelector.triggerEl);
-                            }
-                            setActiveSettingSelector(null);
+                            page.onSelect(selectorInputValue.trim());
+                            close();
                           }
                         }}
                         className="space-y-3"
@@ -92,7 +115,7 @@ export function Overlays() {
                             autoFocus
                             value={selectorInputValue}
                             onChange={(e) => setSelectorInputValue(e.target.value)}
-                            placeholder={activeSettingSelector.inputPlaceholder || "Digite aqui..."}
+                            placeholder={page.placeholder || "Digite aqui..."}
                             className="w-full bg-transparent outline-none text-xs font-semibold text-[var(--text-main)] placeholder:text-[var(--text-muted)]/50"
                           />
                           {selectorInputValue && (
@@ -114,12 +137,7 @@ export function Overlays() {
                             type="button"
                             whileHover={{ scale: 1.08 }}
                             whileTap={{ scale: 0.94 }}
-                            onClick={() => {
-                              if (activeSettingSelector.triggerEl) {
-                                clearButtonCoverAnchorCache(activeSettingSelector.triggerEl);
-                              }
-                              setActiveSettingSelector(null);
-                            }}
+                            onClick={close}
                             className="h-7 px-3 rounded-full bg-card/75 border border-[var(--text-main)]/10 text-xs font-semibold text-[var(--text-main)] hover:bg-white/15 hover:border-white/25 hover:text-white hover:shadow-[0_0_12px_rgba(255,255,255,0.25)] transition-all cursor-pointer flex items-center justify-center gap-1.5"
                             title="Cancelar"
                           >
@@ -142,71 +160,113 @@ export function Overlays() {
                     </div>
                   ) : (
                     <div className="flex flex-col p-2">
-                      {/* Título: mesmo estilo de Ordenar por (sem linhas divisórias, sem botão de X) */}
-                      {!activeSettingSelector.hideTitle && (
+                      {subpage ? (
+                        // Segunda página: voltar (com o nome da primeira) e título centralizado
+                        <div className="px-1 pt-1 pb-1.5">
+                          <PopupBackHeader title={subpage.title} backLabel={sel.title} onBack={goBack} />
+                        </div>
+                      ) : !sel.hideTitle && (
+                        // Título: mesmo estilo de Ordenar por (sem linhas divisórias, sem botão de X)
                         <div className="px-3 pt-2 pb-1.5">
-                          <h3 className="text-sm font-bold text-[var(--text-main)] truncate">{activeSettingSelector.title}</h3>
+                          <h3 className="text-xl font-bold text-[var(--text-main)] truncate">{sel.title}</h3>
                         </div>
                       )}
                       <div className="overflow-y-auto custom-scrollbar space-y-0.5 max-h-[320px]">
-                        {activeSettingSelector.options?.map((option, idx) => {
-                          const isSelected = activeSettingSelector.currentValue === option.value;
+                        {page.options.map((option, idx) => {
+                          const isSelected = option.selected ?? page.currentValue === option.value;
                           const isCustomAction = option.value === '__custom__' || option.isCustomInput;
+                          const opensPage = Boolean(option.subpage);
+                          const showSection = option.section && option.section !== page.options[idx - 1]?.section;
 
                           return (
-                            <button
-                              key={idx}
-                              onClick={() => {
-                                if (isCustomAction) {
-                                  setSelectorDirection(1);
-                                  setSelectorMode('input');
-                                } else {
-                                  activeSettingSelector.onSelect(option.value);
-                                  if (activeSettingSelector.triggerEl) {
-                                    clearButtonCoverAnchorCache(activeSettingSelector.triggerEl);
+                            <React.Fragment key={idx}>
+                              {showSection && (
+                                <div className={`px-3 pb-1 text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)] ${idx === 0 ? 'pt-0.5' : 'pt-2.5'}`}>
+                                  {option.section}
+                                </div>
+                              )}
+                              <button
+                                onClick={() => {
+                                  if (opensPage) {
+                                    setSelectorDirection(1);
+                                    setSelectorMode(`sub:${idx}`);
+                                  } else if (isCustomAction) {
+                                    if (subpage) setSelectorInputValue('');
+                                    setSelectorDirection(1);
+                                    setSelectorMode(subpage ? `subinput:${subIndex}` : 'input');
+                                  } else {
+                                    page.onSelect(option.value);
+                                    close();
                                   }
-                                  setActiveSettingSelector(null);
-                                }
-                              }}
-                              className={`relative w-full flex items-center justify-between px-3 py-2 text-xs font-semibold rounded-2xl select-none transition-all duration-150 border border-transparent cursor-pointer group ${
-                                isSelected
-                                  ? 'hover:bg-winblue/25 hover:shadow-[0_0_12px_rgba(var(--winblue-rgb),0.3)]'
-                                  : 'hover:bg-white/15 hover:border-white/20 hover:shadow-[0_0_12px_rgba(255,255,255,0.15)]'
-                              }`}
-                            >
-                              {isSelected && (
-                                <motion.div
-                                  layoutId="setting-active-pill"
-                                  className="absolute inset-0 bg-winblue/15 border border-winblue rounded-2xl shadow-[0_0_10px_rgba(var(--winblue-rgb),0.2)] pointer-events-none z-0"
-                                  transition={{ type: "spring", stiffness: 520, damping: 36, mass: 0.55 }}
-                                />
-                              )}
-                              <div className={`relative z-10 flex items-center gap-2.5 transition-colors ${isSelected ? 'text-winblue font-bold' : 'text-[var(--text-main)]'}`}>
-                                {option.colorPreview ? (
-                                  <div 
-                                    className="w-4 h-4 rounded-full border border-black/10 dark:border-white/20 shrink-0 shadow-sm"
-                                    style={{ backgroundColor: option.colorPreview }}
+                                }}
+                                className={`relative w-full flex items-center justify-between px-3 py-2 text-xs font-semibold rounded-2xl select-none transition-all duration-150 cursor-pointer group ${
+                                  isSelected
+                                    ? 'hover:bg-winblue/25 hover:shadow-[0_0_12px_rgba(var(--winblue-rgb),0.3)]'
+                                    : 'hover:bg-white/15 hover:shadow-[0_0_12px_rgba(255,255,255,0.15)]'
+                                }`}
+                              >
+                                {isSelected && (
+                                  <motion.div
+                                    layoutId="setting-active-pill"
+                                    className="absolute inset-0 bg-winblue/15 rounded-2xl shadow-[0_0_10px_rgba(var(--winblue-rgb),0.2)] pointer-events-none z-0"
+                                    transition={{ type: "spring", stiffness: 520, damping: 36, mass: 0.55 }}
                                   />
-                                ) : option.icon ? (
-                                  <div className={`shrink-0 flex items-center justify-center [&_svg]:shrink-0 transition-colors ${isSelected ? 'text-winblue [&_svg]:!text-winblue' : 'text-[var(--text-main)] [&_svg]:!text-[var(--text-main)]'}`}>
-                                    {option.icon}
-                                  </div>
-                                ) : null}
-                                <span className="whitespace-nowrap">{option.label}</span>
-                              </div>
-                              {isSelected && (
-                                <motion.div
-                                  layoutId="setting-active-check"
-                                  className="relative z-10 text-winblue shrink-0 ml-2"
-                                  transition={{ type: "spring", stiffness: 520, damping: 36, mass: 0.55 }}
-                                >
-                                  <BsCheck2 size={16} />
-                                </motion.div>
-                              )}
-                              {isCustomAction && (
-                                <ChevronRight size={13} className="relative z-10 text-current shrink-0 ml-2" />
-                              )}
-                            </button>
+                                )}
+                                <div className={`relative z-10 flex items-center gap-2.5 min-w-0 transition-colors ${isSelected ? 'text-winblue font-bold' : 'text-[var(--text-main)]'}`}>
+                                  {option.colorPreview ? (
+                                    <div
+                                      className="w-4 h-4 rounded-full border border-black/10 dark:border-white/20 shrink-0 shadow-sm"
+                                      style={{ backgroundColor: option.colorPreview }}
+                                    />
+                                  ) : option.icon ? (
+                                    <div className={`shrink-0 flex items-center justify-center [&_svg]:shrink-0 transition-colors ${isSelected ? 'text-winblue [&_svg]:!text-winblue' : 'text-[var(--text-main)] [&_svg]:!text-[var(--text-main)]'}`}>
+                                      {option.icon}
+                                    </div>
+                                  ) : null}
+                                  {sel.captions && option.description ? (
+                                    <span className="flex flex-col min-w-0 text-left">
+                                      <span className="whitespace-nowrap">{option.label}</span>
+                                      <span className={`text-[10.5px] font-medium leading-snug mt-0.5 whitespace-normal ${isSelected ? 'text-winblue/75' : 'text-[var(--text-muted)]'}`}>{option.description}</span>
+                                    </span>
+                                  ) : (
+                                    <span className="whitespace-nowrap truncate" title={option.label}>{option.label}</span>
+                                  )}
+                                </div>
+                                <div className="relative z-10 flex items-center gap-1.5 shrink-0 ml-2">
+                                  {option.sampleCode && (
+                                    <span
+                                      role="button"
+                                      tabIndex={-1}
+                                      title={playingVoiceCode === option.sampleCode ? 'Parar amostra' : 'Ouvir amostra'}
+                                      aria-label={playingVoiceCode === option.sampleCode ? 'Parar amostra' : 'Ouvir amostra'}
+                                      onClick={(e) => toggleVoiceSample(e, option.sampleCode!)}
+                                      className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 transition-all cursor-pointer border ${
+                                        playingVoiceCode === option.sampleCode
+                                          ? 'opacity-100 bg-winblue/20 border-winblue/45 text-winblue'
+                                          : 'opacity-0 group-hover:opacity-100 bg-card/80 border-[var(--text-main)]/15 text-[var(--text-main)] hover:bg-white/20 hover:border-white/35 hover:shadow-[0_0_10px_rgba(255,255,255,0.3)]'
+                                      }`}
+                                    >
+                                      {playingVoiceCode === option.sampleCode ? <Pause size={11} fill="currentColor" /> : <Play size={11} fill="currentColor" className="ml-px" />}
+                                    </span>
+                                  )}
+                                  {option.hint && (
+                                    <span className={`text-[11px] font-semibold whitespace-nowrap ${isSelected ? 'text-winblue' : 'text-[var(--text-muted)]'}`}>{option.hint}</span>
+                                  )}
+                                  {isSelected && !opensPage && (
+                                    <motion.div
+                                      layoutId="setting-active-check"
+                                      className="text-winblue shrink-0"
+                                      transition={{ type: "spring", stiffness: 520, damping: 36, mass: 0.55 }}
+                                    >
+                                      <BsCheck2 size={16} />
+                                    </motion.div>
+                                  )}
+                                  {(isCustomAction || opensPage) && (
+                                    <ChevronRight size={13} className={`shrink-0 rtl:rotate-180 ${isSelected ? 'text-winblue' : 'text-current'}`} />
+                                  )}
+                                </div>
+                              </button>
+                            </React.Fragment>
                           );
                         })}
                       </div>
@@ -249,7 +309,7 @@ export function Overlays() {
             >
               {/* Título: Ordenar por (maiúsculas e minúsculas, sem linhas divisórias) */}
               <div className="px-3 pt-2 pb-1.5">
-                <h3 className="text-sm font-bold text-[var(--text-main)]">{t.sortBy || 'Ordenar por'}</h3>
+                <h3 className="text-xl font-bold text-[var(--text-main)]">{t.sortBy || 'Ordenar por'}</h3>
               </div>
 
               <div className="space-y-0.5">
@@ -266,16 +326,16 @@ export function Overlays() {
                     <button
                       key={opt.id}
                       onClick={() => handleSelectSort(opt.id as SortOption)}
-                      className={`relative w-full flex items-center justify-between px-3 py-2 text-xs font-semibold rounded-2xl select-none transition-all duration-150 border border-transparent group cursor-pointer ${
+                      className={`relative w-full flex items-center justify-between px-3 py-2 text-xs font-semibold rounded-2xl select-none transition-all duration-150 group cursor-pointer ${
                         isSelected
                           ? 'hover:bg-winblue/25 hover:shadow-[0_0_12px_rgba(var(--winblue-rgb),0.3)]'
-                          : 'hover:bg-white/15 hover:border-white/20 hover:shadow-[0_0_12px_rgba(255,255,255,0.15)]'
+                          : 'hover:bg-white/15 hover:shadow-[0_0_12px_rgba(255,255,255,0.15)]'
                       }`}
                     >
                       {isSelected && (
                         <motion.div
                           layoutId="sort-active-pill"
-                          className="absolute inset-0 bg-winblue/15 border border-winblue rounded-2xl shadow-[0_0_10px_rgba(var(--winblue-rgb),0.2)] pointer-events-none z-0"
+                          className="absolute inset-0 bg-winblue/15 rounded-2xl shadow-[0_0_10px_rgba(var(--winblue-rgb),0.2)] pointer-events-none z-0"
                           transition={{ type: "spring", stiffness: 520, damping: 36, mass: 0.55 }}
                         />
                       )}
@@ -329,7 +389,7 @@ export function Overlays() {
               {activeBookMenu.mode === 'confirm-delete' ? (
                 <ConfirmPanel
                   title={`Excluir "${activeBookMenu.item.title}"?`}
-                  description="O audiobook sai de Convertidos. O arquivo de áudio continua na pasta."
+                  description="O audiobook sai de Convertidos e o arquivo de áudio vai para a Lixeira do computador."
                   confirmLabel="Excluir"
                   onConfirm={() => {
                     handleDeleteHistoryItem(activeBookMenu.item.id);
@@ -543,7 +603,7 @@ export function Overlays() {
               {activeTextMenu.mode === 'confirm-delete' ? (
                 <ConfirmPanel
                   title={`Excluir "${activeTextMenu.item.title}"?`}
-                  description="O texto sai de Convertidos. Os arquivos de texto continuam na pasta."
+                  description="O texto sai de Convertidos e os arquivos (.lrc, .srt, .sync.json) vão para a Lixeira do computador."
                   confirmLabel="Excluir"
                   onConfirm={() => {
                     handleDeleteGeneratedText(activeTextMenu.item.id);
@@ -629,54 +689,34 @@ export function Overlays() {
         )}
       </AnimatePresence>
 
-      {/* IDIOMA ESTRANGEIRO DETECTADO: nasce da etiqueta de idioma do e-book */}
+
+      {/* CANCELAR CONVERSÃO: nasce do "Cancelar todos" ou do ✕ do card; encerra todas as conversões em andamento */}
       <AnimatePresence>
-        {showTranslationModal && foreignLangFile && (
-          <AnchoredPopup
-            key="translation-popup"
-            anchor={document.querySelector<HTMLElement>(`[data-lang-tag="${foreignLangFile.id}"]`)}
-            width={300}
-            estimatedHeight={190}
-            onClose={() => setShowTranslationModal(false)}
-            className="p-4"
-          >
-            <h4 className="text-sm font-bold text-[var(--text-main)] mb-1.5 flex items-center gap-2">
-              <RiTranslateAi2 size={16} className="text-winblue shrink-0" />
-              <span>Idioma estrangeiro detectado</span>
-            </h4>
-            <p className="text-xs text-[var(--text-muted)] mb-4 leading-relaxed">
-              <strong className="text-[var(--text-main)]">"{foreignLangFile.title}"</strong> está em{' '}
-              <strong className="text-winblue">{foreignLangFile.language}</strong>. Traduzir para português antes de narrar?
-            </p>
-            <div className="flex items-center justify-end gap-2">
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={() => {
-                  setFiles(prev => prev.map(f => f.id === foreignLangFile.id ? { ...f, requiresTranslation: false } : f));
-                  setShowTranslationModal(false);
-                }}
-                className="h-8 px-3.5 rounded-full bg-card/75 border border-[var(--text-main)]/10 text-[var(--text-main)] hover:bg-white/15 hover:border-white/25 hover:shadow-[0_0_12px_rgba(255,255,255,0.25)] text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer"
+        {showCancelModal && cancelModalAnchor && (() => {
+          const converting = files.filter(f => f.status !== 'idle' && f.status !== 'success' && f.status !== 'error');
+          const close = () => { setShowCancelModal(false); setCancelModalAnchor(null); };
+          return (
+            <AnchoredPopup
+              key="cancel-conversion"
+              anchor={cancelModalAnchor}
+              width={300}
+              estimatedHeight={150 + Math.min(converting.length, 4) * 56}
+              onClose={close}
+            >
+              <ConfirmPanel
+                title={converting.length > 1 ? `Cancelar ${converting.length} conversões?` : 'Cancelar a conversão?'}
+                description="A conversão para agora e os e-books voltam para a lista, prontos para converter de novo."
+                confirmLabel="Cancelar conversão"
+                cancelLabel="Continuar"
+                icon={<X size={13} />}
+                onConfirm={async () => { close(); await handleCancelProcessing(); }}
+                onCancel={close}
               >
-                <X size={13} />
-                <span>Manter</span>
-              </motion.button>
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={() => {
-                  setFiles(prev => prev.map(f => f.id === foreignLangFile.id ? { ...f, requiresTranslation: true } : f));
-                  setShowTranslationModal(false);
-                  showToast("Tradução automática ativada para este livro!");
-                }}
-                className="h-8 px-3.5 rounded-full bg-winblue/20 border border-winblue/45 text-winblue hover:bg-winblue/30 text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer hover:shadow-[0_0_14px_rgba(var(--winblue-rgb),0.4)]"
-              >
-                <RiTranslateAi2 size={13} />
-                <span>Traduzir</span>
-              </motion.button>
-            </div>
-          </AnchoredPopup>
-        )}
+                <ConfirmItemList items={converting.map(f => ({ id: f.id, title: f.title || f.filename || 'E-book', subtitle: f.author, cover: f.customCover || f.cover || getGenericBookCover(f.title || 'Desconhecido', f.author || 'Desconhecido', f.coverColor) }))} />
+              </ConfirmPanel>
+            </AnchoredPopup>
+          );
+        })()}
       </AnimatePresence>
 
       {/* VISUALIZAR TEXTO GERADO: nasce do card ou da opção que o abriu */}
@@ -691,7 +731,7 @@ export function Overlays() {
             className="p-3 max-h-[min(560px,calc(100vh-48px))]"
           >
             <div className="relative flex items-center justify-center min-h-8 px-10">
-              <h4 className="text-sm font-bold text-[var(--text-main)] truncate text-center">{viewingTextModal.title}</h4>
+              <h4 className="text-xl font-bold text-[var(--text-main)] truncate text-center">{viewingTextModal.title}</h4>
               <motion.button
                 type="button"
                 whileHover={{ scale: 1.12 }}

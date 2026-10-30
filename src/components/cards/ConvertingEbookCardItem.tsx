@@ -1,6 +1,6 @@
 import React from 'react';
-import { motion } from 'motion/react';
-import { X, Clock, Download, AlertCircle, RotateCcw, Layers } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
+import { X, Clock, Download, AlertCircle, RotateCcw, Layers, ChevronDown, Copy, Check } from 'lucide-react';
 import { AppFile } from '../../app/types';
 import { getCoverAmbientStyle, getCoverProgressStyle, getGenericBookCover } from '../../lib/covers';
 import { CoverAmbientBackground } from './CoverAmbientBackground';
@@ -32,7 +32,7 @@ export const ConvertingEbookCardItem: React.FC<ConvertingEbookCardItemProps> = (
     if (file.status === 'syncing') return file.syncMessage || 'Sincronizando áudio e texto...';
     if (file.status === 'idle') return 'Aguardando na fila...';
     if (file.status === 'success' || file.progress >= 100) return 'Audiobook gerado com sucesso!';
-    return 'Gerando audiobook...';
+    return file.stageMessage || 'Gerando audiobook...';
   };
 
   const getTimeRemainingStr = () => {
@@ -83,11 +83,11 @@ export const ConvertingEbookCardItem: React.FC<ConvertingEbookCardItemProps> = (
     ? file.partsDone 
     : Math.min(partsTotal, Math.max(file.progress > 0 ? 1 : 0, Math.round(((file.progress || 0) / 100) * partsTotal)));
 
+  // Velocidade real de download do áudio, medida pelo conversor (fora da narração fica em 0)
   const getSpeedStr = () => {
-    if (file.status === 'success' || file.status === 'idle') return '0MB/s';
-    const hash = (file.id || '').split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-    const speed = 9.5 + (hash % 3);
-    return `${Math.round(speed)}MB/s`;
+    const bps = file.status === 'processing' ? (file.speedBps || 0) : 0;
+    if (bps >= 1024 * 1024) return `${(bps / 1024 / 1024).toFixed(1)} MB/s`;
+    return `${Math.round(bps / 1024)} KB/s`;
   };
 
   const currentProg = Math.round(file.progress || 0);
@@ -167,12 +167,7 @@ export const ConvertingEbookCardItem: React.FC<ConvertingEbookCardItemProps> = (
 
           {/* Área Inferior: Se der erro, a barra com suas informações some e surge a mensagem de erro */}
           {isError ? (
-            <div className="w-full min-w-0 mt-3 flex items-center gap-2.5 px-3.5 py-2.5 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs sm:text-sm font-semibold shadow-sm">
-              <AlertCircle size={16} className="shrink-0 text-red-500" />
-              <span className="truncate">
-                {file.errorMessage || 'Falha na conversão deste audiobook. Verifique o arquivo e tente novamente.'}
-              </span>
-            </div>
+            <ErrorPanel message={file.errorMessage || 'Falha na conversão deste audiobook. Verifique o arquivo e tente novamente.'} details={file.errorDetails} />
           ) : (
             <div className="w-full min-w-0 mt-3">
               {/* Linha de Textos e Estatísticas */}
@@ -229,3 +224,52 @@ export const ConvertingEbookCardItem: React.FC<ConvertingEbookCardItemProps> = (
     </motion.div>
   );
 };
+
+
+// Erro da conversão: mensagem inteira (sem cortar) e detalhes técnicos; tudo pode ser selecionado e copiado
+function ErrorPanel({ message, details }: { message: string; details?: string }) {
+  const [open, setOpen] = React.useState(false);
+  const [copied, setCopied] = React.useState(false);
+  const copy = () => {
+    navigator.clipboard?.writeText(details ? `${message}
+
+${details}` : message).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1600);
+    }).catch(() => {});
+  };
+  const btn = "h-7 px-3 rounded-full bg-red-500/10 border border-red-500/25 text-red-400 hover:bg-red-500/20 hover:border-red-400/45 hover:shadow-[0_0_12px_rgba(239,68,68,0.25)] text-[11px] font-semibold flex items-center gap-1.5 transition-all cursor-pointer shrink-0 [&_svg]:text-inherit";
+  return (
+    <div className="w-full min-w-0 mt-3 px-3.5 py-3 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-400 shadow-sm">
+      <div className="flex items-start gap-2.5">
+        <AlertCircle size={16} className="shrink-0 text-red-500 mt-0.5" />
+        <p className="flex-1 min-w-0 text-xs sm:text-sm font-semibold leading-relaxed break-words select-text cursor-text">{message}</p>
+      </div>
+      <div className="flex items-center gap-2 mt-2.5 pl-[26px]">
+        {details && (
+          <motion.button type="button" whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} onClick={() => setOpen(o => !o)} className={btn} aria-expanded={open}>
+            <ChevronDown size={13} className={`transition-transform ${open ? 'rotate-180' : ''}`} />
+            <span>{open ? 'Ocultar detalhes' : 'Ver detalhes'}</span>
+          </motion.button>
+        )}
+        <motion.button type="button" whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} onClick={copy} className={btn}>
+          {copied ? <Check size={13} /> : <Copy size={13} />}
+          <span>{copied ? 'Copiado' : 'Copiar erro'}</span>
+        </motion.button>
+      </div>
+      <AnimatePresence initial={false}>
+        {open && details && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ type: 'spring', stiffness: 420, damping: 38 }}
+            className="overflow-hidden"
+          >
+            <pre className="mt-2.5 ml-[26px] max-h-64 overflow-auto custom-scrollbar rounded-xl bg-black/20 dark:bg-black/30 p-3 text-[11px] leading-relaxed font-mono text-[var(--text-main)]/85 whitespace-pre-wrap break-words select-text cursor-text">{details}</pre>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}

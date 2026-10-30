@@ -1,7 +1,9 @@
 // ===== Telas e menus principais =====
 import { ScreenId } from './types';
 
-export const APP_VERSION = "1.0.0";
+import pkg from '../../package.json';
+
+export const APP_VERSION: string = pkg.version;
 
 // Menus Principais Raiz (os 7 menus principais da aplicação)
 export const MAIN_MENUS: ScreenId[] = [

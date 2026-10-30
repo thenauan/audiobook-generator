@@ -1,7 +1,8 @@
 // ===== Cores e capas genéricas (SVG) de audiobooks e textos =====
 import React from 'react';
+import { languageNamePt } from '../data/voices';
 
-// 24 Paletas de cores para capas genéricas (idênticas ao Audiobook Player)
+// Paleta das capas genéricas e dos destaques de fundo (as 24 primeiras são as mesmas do Audiobook Player)
 export interface GenericCoverColor {
   id: string;
   name: string;
@@ -32,8 +33,48 @@ export const GENERIC_COVER_COLORS: GenericCoverColor[] = [
   { id: 'cream', name: 'Creme', hex: '#FDE68A' },
   { id: 'mint', name: 'Menta', hex: '#A7F3D0' },
   { id: 'lavender', name: 'Lavanda', hex: '#DDD6FE' },
-  { id: 'peach', name: 'Pêssego', hex: '#FED7AA' }
+  { id: 'peach', name: 'Pêssego', hex: '#FED7AA' },
+  // Cores a mais (só aparecem quando escolhidas; a cor automática continua entre as 24 primeiras)
+  { id: 'terracotta', name: 'Terracota', hex: '#C2410C' },
+  { id: 'brown', name: 'Marrom', hex: '#78350F' },
+  { id: 'mustard', name: 'Mostarda', hex: '#CA8A04' },
+  { id: 'sand', name: 'Areia', hex: '#D6C7A1' },
+  { id: 'olive', name: 'Oliva', hex: '#4D7C0F' },
+  { id: 'pistachio', name: 'Pistache', hex: '#D9F99D' },
+  { id: 'sage', name: 'Sálvia', hex: '#84A98C' },
+  { id: 'aqua', name: 'Água-marinha', hex: '#2DD4BF' },
+  { id: 'ocean', name: 'Oceano', hex: '#0E7490' },
+  { id: 'ice', name: 'Gelo', hex: '#BAE6FD' },
+  { id: 'periwinkle', name: 'Pervinca', hex: '#818CF8' },
+  { id: 'plum', name: 'Ameixa', hex: '#701A75' },
+  { id: 'magenta', name: 'Magenta', hex: '#C026D3' },
+  { id: 'blush', name: 'Rosa-claro', hex: '#FBCFE8' },
+  { id: 'raspberry', name: 'Framboesa', hex: '#BE123C' },
+  { id: 'wine', name: 'Vinho', hex: '#4C0519' },
+  { id: 'silver', name: 'Prata', hex: '#CBD5E1' },
+  { id: 'graphite', name: 'Grafite', hex: '#27272A' },
 ];
+
+// Cor automática de quem não escolheu nenhuma: sempre entre as 24 originais, para os livros que já existem
+// não mudarem de cor quando a paleta cresce
+const AUTO_COVER_COLORS = GENERIC_COVER_COLORS.slice(0, 24);
+
+// Ordem do seletor: cores vivas pelo tom (do vermelho ao rosa), da mais clara à mais escura; neutras no fim
+export const COVER_COLOR_PICKER: GenericCoverColor[] = (() => {
+  const hsl = (hex: string) => {
+    const r = parseInt(hex.slice(1, 3), 16) / 255, g = parseInt(hex.slice(3, 5), 16) / 255, b = parseInt(hex.slice(5, 7), 16) / 255;
+    const max = Math.max(r, g, b), min = Math.min(r, g, b), l = (max + min) / 2, d = max - min;
+    const s = d === 0 ? 0 : d / (1 - Math.abs(2 * l - 1));
+    let h = 0;
+    if (d) h = max === r ? ((g - b) / d) % 6 : max === g ? (b - r) / d + 2 : (r - g) / d + 4;
+    return { h: (h * 60 + 360) % 360, s, l };
+  };
+  const neutral = (c: GenericCoverColor) => { const { s, l } = hsl(c.hex); return s < 0.2 || l < 0.12; };
+  const vivid = GENERIC_COVER_COLORS.filter(c => !neutral(c))
+    .sort((a, b) => Math.round(hsl(a.hex).h / 20) - Math.round(hsl(b.hex).h / 20) || hsl(b.hex).l - hsl(a.hex).l);
+  const neutrals = GENERIC_COVER_COLORS.filter(neutral).sort((a, b) => hsl(b.hex).l - hsl(a.hex).l);
+  return [...vivid, ...neutrals];
+})();
 
 export function hexToHsl(hex: string): { h: number; s: number; l: number } {
   const c = hex.replace('#', '');
@@ -95,16 +136,31 @@ export function normalizeLanguageName(lang?: string): string {
     return 'Italiano';
   }
   // Russo
-  if (['ru', 'rus', 'russo', 'russian'].includes(cleaned)) {
+  if (['ru', 'ru-ru', 'rus', 'russo', 'russian', 'русский'].includes(cleaned)) {
     return 'Russo';
+  }
+  // Árabe
+  if (['ar', 'ar-sa', 'ara', 'arabe', 'árabe', 'arabic', 'العربية'].includes(cleaned)) {
+    return 'Árabe';
   }
   // Japonês
   if (['ja', 'jpn', 'japones', 'japonês', 'japanese'].includes(cleaned)) {
     return 'Japonês';
   }
   // Chinês
-  if (['zh', 'chi', 'zho', 'chines', 'chinês', 'chinese'].includes(cleaned)) {
+  if (['zh', 'zh-cn', 'chi', 'zho', 'chines', 'chinês', 'chinese', '中文'].includes(cleaned)) {
     return 'Chinês';
+  }
+  if (['nl', 'nl-nl', 'nld', 'dut', 'holandes', 'holandês', 'dutch', 'nederlands'].includes(cleaned)) return 'Holandês';
+  if (['pl', 'pl-pl', 'pol', 'polones', 'polonês', 'polish', 'polski'].includes(cleaned)) return 'Polonês';
+  if (['tr', 'tr-tr', 'tur', 'turco', 'turkish', 'türkçe'].includes(cleaned)) return 'Turco';
+  if (['ko', 'ko-kr', 'kor', 'coreano', 'korean', '한국어'].includes(cleaned)) return 'Coreano';
+  if (['hi', 'hi-in', 'hin', 'hindi', 'हिन्दी'].includes(cleaned)) return 'Hindi';
+  // Outros idiomas com voz da Microsoft: código ("el", "sv-SE") vira o nome em português ("Grego", "Sueco")
+  const codigo = cleaned.match(/^([a-z]{2,3})(?:-[a-z0-9]{2,4})?$/);
+  if (codigo) {
+    const nome = languageNamePt(codigo[1]);
+    if (nome && nome.toLowerCase() !== codigo[1]) return nome;
   }
 
   return lang.trim();
@@ -258,8 +314,8 @@ export function getGenericCoverColor(coverUrl?: string, title?: string, author?:
     for (let i = 0; i < str.length; i++) {
       hash = str.charCodeAt(i) + ((hash << 5) - hash);
     }
-    const index = Math.abs(hash) % GENERIC_COVER_COLORS.length;
-    return GENERIC_COVER_COLORS[index].hex;
+    const index = Math.abs(hash) % AUTO_COVER_COLORS.length;
+    return AUTO_COVER_COLORS[index].hex;
   }
   return GENERIC_COVER_COLORS[0].hex;
 }
@@ -299,15 +355,15 @@ export function getGenericBookCover(title?: string, author?: string, colorOrInde
   if (typeof colorOrIndex === 'string' && /^#[0-9a-fA-F]{6}$/i.test(colorOrIndex)) {
     bgHex = colorOrIndex;
   } else if (typeof colorOrIndex === 'number' && !isNaN(colorOrIndex)) {
-    bgHex = GENERIC_COVER_COLORS[Math.abs(colorOrIndex) % GENERIC_COVER_COLORS.length].hex;
+    bgHex = AUTO_COVER_COLORS[Math.abs(colorOrIndex) % AUTO_COVER_COLORS.length].hex;
   } else {
     let hash = 0;
     const str = (title || '') + (author || '');
     for (let i = 0; i < str.length; i++) {
       hash = str.charCodeAt(i) + ((hash << 5) - hash);
     }
-    const index = Math.abs(hash) % GENERIC_COVER_COLORS.length;
-    bgHex = GENERIC_COVER_COLORS[index].hex;
+    const index = Math.abs(hash) % AUTO_COVER_COLORS.length;
+    bgHex = AUTO_COVER_COLORS[index].hex;
   }
 
   const { isLight, textColor, gradStart, gradMid, gradEnd, iconHex } = getCoverTones(bgHex);
@@ -387,15 +443,15 @@ export function getGenericTextCover(
   } else if (typeof colorOrAudiobookCover === 'string' && colorOrAudiobookCover.startsWith('data:image/svg')) {
     bgHex = getGenericCoverColor(colorOrAudiobookCover, title, author);
   } else if (typeof colorOrAudiobookCover === 'number' && !isNaN(colorOrAudiobookCover)) {
-    bgHex = GENERIC_COVER_COLORS[Math.abs(colorOrAudiobookCover) % GENERIC_COVER_COLORS.length].hex;
+    bgHex = AUTO_COVER_COLORS[Math.abs(colorOrAudiobookCover) % AUTO_COVER_COLORS.length].hex;
   } else {
     let hash = 0;
     const str = (title || '') + (author || '');
     for (let i = 0; i < str.length; i++) {
       hash = str.charCodeAt(i) + ((hash << 5) - hash);
     }
-    const index = Math.abs(hash) % GENERIC_COVER_COLORS.length;
-    bgHex = GENERIC_COVER_COLORS[index].hex;
+    const index = Math.abs(hash) % AUTO_COVER_COLORS.length;
+    bgHex = AUTO_COVER_COLORS[index].hex;
   }
 
   const { isLight, textColor, gradStart, gradMid, gradEnd, iconHex } = getCoverTones(bgHex);

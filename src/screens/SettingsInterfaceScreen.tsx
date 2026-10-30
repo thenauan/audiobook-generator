@@ -41,21 +41,22 @@ export function SettingsInterfaceScreen() {
               setActiveSettingSelector({
                 hideTitle: true,
                 id: 'theme',
+                captions: true,
                 triggerEl: e.currentTarget,
                 title: 'Tema',
                 subtitle: 'Aparência clara, escura ou automática',
                 currentValue: themeMode,
                 options: [
-                  { value: 'system', label: 'Modo do Sistema', description: 'Acompanha as cores do Windows', icon: <Monitor size={14} className="shrink-0" /> },
-                  { value: 'light', label: 'Claro', description: 'Superfícies claras com alto contraste', icon: <Sun size={14} className="shrink-0" /> },
-                  { value: 'dark', label: 'Escuro', description: 'Tons escuros ideais para leitura noturna', icon: <Moon size={14} className="shrink-0" /> },
+                  { value: 'system', label: 'Modo do sistema', description: 'Muda junto com o tema do Windows', icon: <Monitor size={14} className="shrink-0" /> },
+                  { value: 'light', label: 'Claro', description: 'Fundo claro, bom para ambientes iluminados', icon: <Sun size={14} className="shrink-0" /> },
+                  { value: 'dark', label: 'Escuro', description: 'Fundo escuro, descansa a vista à noite', icon: <Moon size={14} className="shrink-0" /> },
                 ],
                 onSelect: (val) => setThemeMode(val)
               });
             }}
             className="h-8 pl-3.5 pr-2.5 rounded-full bg-card/75 backdrop-blur-3xl border border-[var(--text-main)]/10 shadow-sm text-[var(--text-main)] hover:bg-white/15 hover:border-white/25 hover:shadow-[0_0_12px_rgba(255,255,255,0.2)] flex items-center gap-1.5 text-xs font-semibold transition-all shrink-0 cursor-pointer [&_svg]:text-inherit"
           >
-            <span>{themeMode === 'system' ? 'Modo do Sistema' : themeMode === 'light' ? 'Claro' : 'Escuro'}</span>
+            <span>{themeMode === 'system' ? 'Modo do sistema' : themeMode === 'light' ? 'Claro' : 'Escuro'}</span>
             <ChevronDown size={14} className="-mr-0.5 text-inherit" />
           </motion.button>
         </div>
@@ -122,14 +123,15 @@ export function SettingsInterfaceScreen() {
               setActiveSettingSelector({
                 hideTitle: true,
                 id: 'font-size',
+                captions: true,
                 triggerEl: e.currentTarget,
                 title: 'Tamanho da fonte',
                 subtitle: 'Ajuste o tamanho do texto',
                 currentValue: uiFontSize,
                 options: [
-                  { value: 'small', label: 'Pequena', description: 'Textos compactos a 85%', icon: <AArrowDown size={14} className="shrink-0" /> },
-                  { value: 'standard', label: 'Padrão', description: 'Escala 100% nativa Inter', icon: <Type size={14} className="shrink-0" /> },
-                  { value: 'large', label: 'Grande', description: 'Textos ampliados a 118%', icon: <AArrowUp size={14} className="shrink-0" /> },
+                  { value: 'small', label: 'Pequena', description: 'Cabe mais conteúdo na tela (85%)', icon: <AArrowDown size={14} className="shrink-0" /> },
+                  { value: 'standard', label: 'Padrão', description: 'Tamanho original do app (100%)', icon: <Type size={14} className="shrink-0" /> },
+                  { value: 'large', label: 'Grande', description: 'Textos maiores, mais fáceis de ler (118%)', icon: <AArrowUp size={14} className="shrink-0" /> },
                 ],
                 onSelect: (val) => setUiFontSize(val)
               });
@@ -171,6 +173,7 @@ export function SettingsInterfaceScreen() {
                   { value: 'en-US', label: 'English (US)', description: 'United States', icon: <span className="text-sm leading-none">🇺🇸</span> },
                   { value: 'es-ES', label: 'Español (ES)', description: 'España', icon: <span className="text-sm leading-none">🇪🇸</span> },
                   { value: 'ar-SA', label: 'العربية (SA)', description: 'المملكة العربية السعودية', icon: <span className="text-sm leading-none">🇸🇦</span> },
+                  { value: 'ru-RU', label: 'Русский', description: 'Россия', icon: <span className="text-sm leading-none">🇷🇺</span> },
                 ],
                 onSelect: (val) => setInterfaceLang(val)
               });
@@ -178,7 +181,7 @@ export function SettingsInterfaceScreen() {
             className="h-8 pl-3.5 pr-2.5 rounded-full bg-card/75 backdrop-blur-3xl border border-[var(--text-main)]/10 shadow-sm text-[var(--text-main)] hover:bg-white/15 hover:border-white/25 hover:shadow-[0_0_12px_rgba(255,255,255,0.2)] flex items-center gap-1.5 text-xs font-semibold transition-all shrink-0 cursor-pointer [&_svg]:text-inherit"
           >
             <span>
-              {interfaceLang === 'pt-BR' ? 'Idioma do sistema (Português)' : interfaceLang === 'en-US' ? 'English (US)' : interfaceLang === 'es-ES' ? 'Español (ES)' : 'العربية (SA)'}
+              {interfaceLang === 'pt-BR' ? 'Idioma do sistema (Português)' : interfaceLang === 'en-US' ? 'English (US)' : interfaceLang === 'es-ES' ? 'Español (ES)' : interfaceLang === 'ru-RU' ? 'Русский' : 'العربية (SA)'}
             </span>
             <ChevronDown size={14} className="-mr-0.5 text-inherit" />
           </motion.button>

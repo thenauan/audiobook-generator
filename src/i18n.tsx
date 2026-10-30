@@ -8,6 +8,7 @@ const DICTIONARY: Record<string, Record<string, string>> = {
   'en-US': { back: 'Back', cancel: 'Cancel', confirm: 'Confirm', delete: 'Delete', more_options: 'More options', see_all: 'See all' },
   'es-ES': { back: 'Volver', cancel: 'Cancelar', confirm: 'Confirmar', delete: 'Eliminar', more_options: 'Más opciones', see_all: 'Ver todo' },
   'ar-SA': { back: 'رجوع', cancel: 'إلغاء', confirm: 'تأكيد', delete: 'حذف', more_options: 'خيارات أخرى', see_all: 'عرض الكل' },
+  'ru-RU': { back: 'Назад', cancel: 'Отмена', confirm: 'Подтвердить', delete: 'Удалить', more_options: 'Ещё', see_all: 'Показать все' },
 };
 
 let language = (() => {

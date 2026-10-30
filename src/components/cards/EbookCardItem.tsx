@@ -9,6 +9,12 @@ import { getButtonCoverPopupStyle, clearButtonCoverAnchorCache } from '../Popove
 import { ActiveSettingSelector, AppFile } from '../../app/types';
 import { getCoverAmbientStyle, getGenericBookCover, normalizeLanguageName } from '../../lib/covers';
 import { CoverAmbientBackground } from './CoverAmbientBackground';
+import { useApp } from '../../app/AppContext';
+import { estimateConversion } from '../../app/estimates';
+import { voicesFor, narrationLang, effectiveVoice, languageCode } from '../../data/voices';
+import { LANGUAGES, languageByName, translationTargets, targetLanguageName, appLangCode } from '../../data/languages';
+import { RiTranslateAi2 } from 'react-icons/ri';
+import { voiceOptions as buildVoiceOptions } from '../../data/voiceOptions';
 import { CARD_ANIMATE, CARD_EXIT, CARD_INITIAL, cardTransition, ebookLayoutId } from './cardMotion';
 
 export interface EbookCardItemProps {
@@ -104,8 +110,11 @@ export const EbookCardItem: React.FC<EbookCardItemProps> = ({
     tagsScrollRef.current.scrollLeft = scrollLeftPos.current - walk;
   };
 
-  const effectiveFileType: AudioFormat = file.fileType || (fileTypeOption === 'ask' ? 'single' : fileTypeOption);
-  const currentVoiceObj = availableVoices.find(v => v.code === (file.voice || selectedVoice));
+  const effectiveFileType: AudioFormat = file.fileType || (fileTypeOption === 'ask' ? 'm4b' : fileTypeOption);
+  // Vozes do idioma narrado (o do livro, ou o da voz padrão se o livro for traduzido); idioma desconhecido: todas
+  const voiceOptions = voicesFor(narrationLang(file, selectedVoice));
+  const currentVoiceCode = effectiveVoice(file, selectedVoice);
+  const currentVoiceObj = availableVoices.find(v => v.code === currentVoiceCode);
 
   // Estados de seleção das tags (por padrão ou pelo usuário)
   const isVoiceSelected = true;
@@ -122,7 +131,7 @@ export const EbookCardItem: React.FC<EbookCardItemProps> = ({
     if (!isSelected) {
       return 'text-neutral-400 dark:text-neutral-500';
     }
-    return 'text-white';
+    return 'text-[var(--text-main)]';
   };
 
   // Texto das tags: normal se selecionado; cinza se não selecionado
@@ -133,61 +142,14 @@ export const EbookCardItem: React.FC<EbookCardItemProps> = ({
     return 'text-[var(--text-main)] transition-colors';
   };
 
-  // Formatações para o pop-up de informações de conversão
-  const formatAudioDurationReadable = (val?: string) => {
-    if (!val || val === '...') return '2 horas e 15 minutos';
-    const clean = val.trim();
-    if (clean.toLowerCase().includes('hora') || clean.toLowerCase().includes('minuto')) {
-      return clean;
-    }
-    const hMatch = clean.match(/(\d+)\s*h(?:oras?)?/i);
-    const mMatch = clean.match(/(\d+)\s*m(?:in(?:utos?)?)?/i);
-    const sMatch = clean.match(/(\d+)\s*s(?:eg(?:undos?)?)?/i);
-    const hours = hMatch ? parseInt(hMatch[1], 10) : 0;
-    const minutes = mMatch ? parseInt(mMatch[1], 10) : 0;
-    const seconds = sMatch ? parseInt(sMatch[1], 10) : 0;
-
-    if (hours > 0 && minutes > 0) {
-      return `${hours} ${hours === 1 ? 'hora' : 'horas'} e ${minutes} min`;
-    }
-    if (hours > 0) {
-      return `${hours} ${hours === 1 ? 'hora' : 'horas'}`;
-    }
-    if (minutes > 0) {
-      return `${minutes} minutos`;
-    }
-    if (seconds > 0) {
-      return `${seconds} segundos`;
-    }
-    return clean;
-  };
-
-  const formatProcTimeReadable = (val?: string) => {
-    if (!val || val === '...') return '1 min e 40 seg';
-    const clean = val.trim();
-    if (clean.toLowerCase().includes('minuto') || clean.toLowerCase().includes('segundo')) {
-      return clean;
-    }
-    const mMatch = clean.match(/(\d+)\s*m(?:in)?/i);
-    const sMatch = clean.match(/(\d+)\s*s(?:eg)?/i);
-    const m = mMatch ? parseInt(mMatch[1], 10) : 0;
-    const s = sMatch ? parseInt(sMatch[1], 10) : 0;
-    if (m > 0 && s > 0) return `${m} min e ${s} seg`;
-    if (m > 0) return `${m} ${m === 1 ? 'minuto' : 'minutos'}`;
-    if (s > 0) return `${s} segundos`;
-    return clean;
-  };
-
-  const formatAudioSizeMB = (val?: string) => {
-    if (val && val !== '...' && val.toUpperCase().includes('MB')) return val;
-    if (val && val !== '...' && val.toUpperCase().includes('GB')) return val;
-    if (val && val !== '...' && !isNaN(parseFloat(val))) return `${parseFloat(val).toFixed(0)} MB`;
-    return '85 MB';
-  };
-
-  const estimatedProcTime = formatProcTimeReadable(file.processingTimeEst);
-  const estimatedAudioDuration = formatAudioDurationReadable(file.durationEst);
-  const estimatedFileSize = formatAudioSizeMB(file.audioSizeEst || file.sizeStr);
+  // Estimativas do pop-up de informações: calculadas pelo tamanho do texto, formato e qualidade escolhidos
+  const { audioQuality, interfaceLang } = useApp();
+  const estimate = estimateConversion(file.charCount || 0, effectiveFileType, audioQuality, Boolean(file.requiresTranslation));
+  const carregando = file.metadataStatus === 'loading';
+  const semDados = !file.charCount;
+  const estimatedProcTime = carregando ? 'Calculando…' : semDados ? '—' : estimate.timeLabel;
+  const estimatedAudioDuration = carregando ? 'Calculando…' : semDados ? '—' : estimate.durationLabel;
+  const estimatedFileSize = carregando ? 'Calculando…' : semDados ? '—' : estimate.sizeLabel;
 
   return (
     <motion.div 
@@ -230,7 +192,7 @@ export const EbookCardItem: React.FC<EbookCardItemProps> = ({
               >
                 {/* Título: mesmo estilo de Ordenar por (maiúsculas e minúsculas, sem linhas divisórias, sem botão de X) */}
                 <div className="px-3 pt-2 pb-1.5">
-                  <h3 className="text-sm font-bold text-[var(--text-main)]">Informações de conversão</h3>
+                  <h3 className="text-xl font-bold text-[var(--text-main)]">Informações de conversão</h3>
                 </div>
 
                 <div className="space-y-0.5">
@@ -428,21 +390,15 @@ export const EbookCardItem: React.FC<EbookCardItemProps> = ({
                   transition={{ type: "spring", stiffness: 500, damping: 30 }}
                   onClick={(e) => {
                     e.stopPropagation();
-                    const currentVoiceCode = file.voice || selectedVoice;
                     setActiveSettingSelector({
                       id: `voice-${file.id}`,
                       triggerEl: e.currentTarget,
                       title: 'Voz da Narração',
                       currentValue: currentVoiceCode,
-                      options: availableVoices.map((v) => ({
-                        value: v.code,
-                        label: v.label,
-                        icon: <span className="text-base mr-1">{v.flag}</span>
-                      })),
+                      options: buildVoiceOptions(voiceOptions, appLangCode(interfaceLang)),
                       onSelect: (val) => {
                         onUpdateFile({ voice: val });
-                        setSelectedVoice(val);
-                        showToast("Voz definida com sucesso!");
+                        showToast("Voz definida para este livro.");
                       }
                     });
                   }}
@@ -567,30 +523,72 @@ export const EbookCardItem: React.FC<EbookCardItemProps> = ({
                   onClick={(e) => {
                     e.stopPropagation();
                     const currentLang = normalizeLanguageName(file.language);
+                    const bookCode = languageCode(currentLang);
+                    const detected = languageByName(currentLang);
+                    const flag = (f?: string) => <span className="text-sm leading-none w-4 text-center">{f || '🌐'}</span>;
+                    const targets = translationTargets(bookCode, interfaceLang);
+                    const translating = Boolean(file.requiresTranslation && file.translateTo && file.translateTo !== bookCode);
                     setActiveSettingSelector({
                       id: `lang-${file.id}`,
                       triggerEl: e.currentTarget,
-                      title: 'Idioma da Obra',
-                      currentValue: currentLang,
-                      inputPlaceholder: 'Digite o idioma (ex: Francês, Italiano)...',
+                      title: 'Idioma',
+                      hideTitle: true,
+                      currentValue: translating ? '__translate__' : currentLang,
                       options: [
-                        { value: 'Português (Brasil)', label: 'Português (Brasil)', icon: <span className="text-base mr-1">🇧🇷</span> },
-                        { value: 'Português (Portugal)', label: 'Português (Portugal)', icon: <span className="text-base mr-1">🇵🇹</span> },
-                        { value: 'Inglês', label: 'Inglês (English)', icon: <span className="text-base mr-1">🇺🇸</span> },
-                        { value: 'Espanhol', label: 'Espanhol (Español)', icon: <span className="text-base mr-1">🇪🇸</span> },
-                        { value: 'Francês', label: 'Francês (Français)', icon: <span className="text-base mr-1">🇫🇷</span> },
-                        { value: 'Alemão', label: 'Alemão (Deutsch)', icon: <span className="text-base mr-1">🇩🇪</span> },
-                        { value: 'Italiano', label: 'Italiano', icon: <span className="text-base mr-1">🇮🇹</span> },
-                        { value: '__custom__', label: 'Digitar outro idioma...', icon: <Edit3 size={13} />, isCustomInput: true },
+                        // O idioma reconhecido: escolher volta a narrar no idioma original (sem traduzir)
+                        { value: currentLang, label: currentLang, icon: flag(detected?.flag), hint: 'Original' },
+                        {
+                          value: '__fix__', label: 'Corrigir idioma', icon: <Edit3 size={13} />, selected: false,
+                          subpage: {
+                            title: 'Corrigir idioma',
+                            currentValue: null,
+                            inputPlaceholder: 'Digite o idioma (ex: Grego, Sueco)...',
+                            options: [
+                              ...LANGUAGES.filter(l => l.name !== currentLang).map(l => ({ value: l.name, label: l.name, icon: flag(l.flag), hint: l.native !== l.name ? l.native : undefined })),
+                              { value: '__custom__', label: 'Digitar outro idioma...', icon: <Edit3 size={13} />, isCustomInput: true },
+                            ],
+                            onSelect: (val) => {
+                              const name = normalizeLanguageName(val);
+                              const code = languageCode(name);
+                              // A tradução para o mesmo idioma do livro deixa de fazer sentido
+                              const keepTranslation = file.requiresTranslation && file.translateTo && file.translateTo !== code;
+                              onUpdateFile({ language: name, isLanguageSelected: true, ...(keepTranslation ? {} : { requiresTranslation: false, translateTo: undefined }) });
+                            },
+                          },
+                        },
+                        {
+                          value: '__translate__', label: 'Traduzir para', icon: <RiTranslateAi2 size={14} />,
+                          hint: translating ? targetLanguageName(file.translateTo) : undefined,
+                          subpage: {
+                            title: 'Traduzir para',
+                            currentValue: translating ? file.translateTo : null,
+                            options: targets.map(l => ({
+                              value: l.code,
+                              label: targetLanguageName(l.code),
+                              icon: flag(l.flag),
+                              hint: l.code === appLangCode(interfaceLang) ? 'Em uso' : l.native,
+                            })),
+                            onSelect: (code) => onUpdateFile({ requiresTranslation: true, translateTo: code }),
+                          },
+                        },
                       ],
-                      onSelect: (val) => onUpdateFile({ language: normalizeLanguageName(val), isLanguageSelected: true })
+                      onSelect: () => onUpdateFile({ requiresTranslation: false, translateTo: undefined, isLanguageSelected: true }),
                     });
                   }}
                   className="group/tag h-8 px-3.5 rounded-full bg-black/5 dark:bg-white/5 border border-[var(--text-main)]/10 hover:border-neutral-400 dark:hover:border-white/40 hover:bg-neutral-200/80 dark:hover:bg-white/15 hover:shadow-[0_0_12px_rgba(0,0,0,0.12)] dark:hover:shadow-[0_0_12px_rgba(255,255,255,0.25)] text-[11px] font-semibold flex items-center gap-1.5 transition-all shrink-0 cursor-pointer"
-                  title="Definir idioma"
+                  title="Idioma do livro e tradução"
                 >
-                  <Globe size={12} className={`${getTagIconClass(isLanguageSelected)} shrink-0 transition-colors`} />
-                  <span className={getTagTextClass(isLanguageSelected)}>Idioma: {normalizeLanguageName(file.language)}</span>
+                  {file.requiresTranslation && file.translateTo && file.translateTo !== languageCode(normalizeLanguageName(file.language)) ? (
+                    <>
+                      <RiTranslateAi2 size={13} className={`${getTagIconClass(true)} shrink-0 transition-colors`} />
+                      <span className={getTagTextClass(true)}>{normalizeLanguageName(file.language)} → {targetLanguageName(file.translateTo)}</span>
+                    </>
+                  ) : (
+                    <>
+                      <Globe size={12} className={`${getTagIconClass(isLanguageSelected)} shrink-0 transition-colors`} />
+                      <span className={getTagTextClass(isLanguageSelected)}>Idioma: {normalizeLanguageName(file.language)}</span>
+                    </>
+                  )}
                 </motion.button>
 
                 {/* Tag Narrador */}

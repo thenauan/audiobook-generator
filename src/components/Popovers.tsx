@@ -52,11 +52,11 @@ export function MenuOptionItem({
 
   const variantClasses = isDanger
     ? (clicked
-        ? "bg-red-500/20 text-red-500 ring-1 ring-red-500/40 border-red-500/30 shadow-[0_0_12px_rgba(239,68,68,0.25)]"
-        : "text-red-500 hover:bg-red-500/15 hover:text-red-400 hover:border-red-500/30 hover:shadow-[0_0_12px_rgba(239,68,68,0.2)]")
+        ? "bg-red-500/20 text-red-500 shadow-[0_0_12px_rgba(239,68,68,0.25)]"
+        : "text-red-500 hover:bg-red-500/15 hover:text-red-400 hover:shadow-[0_0_12px_rgba(239,68,68,0.2)]")
     : (clicked
-        ? "bg-slate-400/25 text-slate-900 ring-1 ring-slate-400/40 border-slate-400/30 shadow-[0_0_12px_rgba(100,116,139,0.3)] dark:bg-white/20 dark:text-white dark:ring-white/30 dark:border-white/30 dark:shadow-[0_0_12px_rgba(255,255,255,0.2)]"
-        : "text-[var(--text-main)] hover:bg-white/15 hover:text-white hover:border-white/20 hover:shadow-[0_0_12px_rgba(255,255,255,0.15)]");
+        ? "bg-slate-400/25 text-slate-900 shadow-[0_0_12px_rgba(100,116,139,0.3)] dark:bg-white/20 dark:text-white dark:shadow-[0_0_12px_rgba(255,255,255,0.2)]"
+        : "text-[var(--text-main)] hover:bg-white/15 hover:text-white hover:shadow-[0_0_12px_rgba(255,255,255,0.15)]");
 
   return (
     <motion.button
@@ -65,7 +65,7 @@ export function MenuOptionItem({
       transition={{ type: "spring", stiffness: 650, damping: 32, mass: 0.45 }}
       onClick={handleClick}
       className={cn(
-        "group w-full flex items-center gap-3 px-4 py-2.5 text-xs font-medium rounded-2xl transition-all duration-150 select-none text-left border border-transparent [&_svg]:transition-colors [&_svg]:shrink-0",
+        "group w-full flex items-center gap-3 px-4 py-2.5 text-xs font-medium rounded-2xl transition-all duration-150 select-none text-left [&_svg]:transition-colors [&_svg]:shrink-0",
         variantClasses,
         className
       )}

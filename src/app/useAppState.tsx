@@ -20,11 +20,19 @@ import { HELP_TOPICS } from '../data/helpTopics';
 import { isAudioFormat, audioFormatFromPath, type AudioFormat, type AudioQuality } from './audioFormats';
 import { clearButtonCoverAnchorCache } from '../components/Popovers';
 import { ROOT_SCREENS } from './screens';
-import { ActiveSettingSelector, AppFile, SyncTextDestination, ChapterItem, GeneratedTextItem, HistoryItem, NavGroupItem, Phase, ScreenId, SortOption } from './types';
+import { ActiveSettingSelector, AppFile, SyncTextDestination, SyncTextGranularity, ChapterItem, GeneratedTextItem, HistoryItem, NavGroupItem, Phase, ScreenId, SortOption } from './types';
 import { getGenericBookCover, getGenericCoverColor, getGenericTextCover, normalizeLanguageName } from '../lib/covers';
 import { DEFAULT_AUDIOBOOKS, DEFAULT_RECENT_SEARCHES } from '../data/defaults';
 import { compareGroupKeys, compareTitles, getAlphabetGroupKey } from '../lib/grouping';
 import { translations } from '../translations';
+import { loadJSON, saveJSON, removeKey, isArray } from '../lib/storage';
+import { estimateConversion } from './estimates';
+import { VOICES, languageCode, voiceLang, effectiveVoice } from '../data/voices';
+
+// Leitura/gravação de preferências sem risco: armazenamento cheio ou bloqueado não derruba o app
+const safeGet = (key: string): string | null => { try { return localStorage.getItem(key); } catch { return null; } };
+const safeSet = (key: string, value: string) => { try { localStorage.setItem(key, value); } catch { /* cheio ou bloqueado */ } };
+
 
 export function useAppState() {
   // Navegação (pilha de telas do esqueleto: voltar do sistema, gesto da borda e transições do iOS)
@@ -72,11 +80,11 @@ export function useAppState() {
 
   const [accentColor, setAccentColor] = useState<string>(() => {
     if (typeof window === 'undefined') return 'blue';
-    return localStorage.getItem('app_accent_color') || 'blue';
+    return safeGet('app_accent_color') || 'blue';
   });
 
   useEffect(() => {
-    localStorage.setItem('app_accent_color', accentColor);
+    safeSet('app_accent_color', accentColor);
     const active = accentPalette[accentColor] || accentPalette.blue;
     document.documentElement.style.setProperty('--winblue', active.hex);
     document.documentElement.style.setProperty('--winblue-rgb', active.rgb);
@@ -86,13 +94,13 @@ export function useAppState() {
   // Tema Claro / Escuro / Sistema
   const [themeMode, setThemeMode] = useState<'light' | 'dark' | 'system'>(() => {
     if (typeof window === 'undefined') return 'system';
-    return (localStorage.getItem('app_theme_mode') as any) || 'system';
+    return (safeGet('app_theme_mode') as any) || 'system';
   });
 
   const [resolvedTheme, setResolvedTheme] = useState<'light' | 'dark'>('dark');
 
   useEffect(() => {
-    localStorage.setItem('app_theme_mode', themeMode);
+    safeSet('app_theme_mode', themeMode);
     if (themeMode === 'system') {
       const match = window.matchMedia('(prefers-color-scheme: dark)');
       setResolvedTheme(match.matches ? 'dark' : 'light');
@@ -116,28 +124,28 @@ export function useAppState() {
 
   const [uiFontSize, setUiFontSize] = useState<'standard' | 'small' | 'large'>(() => {
     if (typeof window === 'undefined') return 'standard';
-    return (localStorage.getItem('app_font_size') as any) || 'standard';
+    return (safeGet('app_font_size') as any) || 'standard';
   });
 
   // A densidade da interface saiu dos Ajustes: limpa o que tiver ficado salvo
   useEffect(() => {
     document.documentElement.removeAttribute('data-density');
-    try { localStorage.removeItem('app_ui_density'); } catch {}
+    try { removeKey('app_ui_density'); } catch {}
   }, []);
 
   useEffect(() => {
     document.documentElement.setAttribute('data-font-size', uiFontSize);
-    localStorage.setItem('app_font_size', uiFontSize);
+    safeSet('app_font_size', uiFontSize);
   }, [uiFontSize]);
 
   // Idioma da Aplicação
   const [interfaceLang, setInterfaceLang] = useState<string>(() => {
     if (typeof window === 'undefined') return 'pt-BR';
-    return localStorage.getItem('app_interface_lang') || 'pt-BR';
+    return safeGet('app_interface_lang') || 'pt-BR';
   });
 
   useEffect(() => {
-    localStorage.setItem('app_interface_lang', interfaceLang);
+    safeSet('app_interface_lang', interfaceLang);
     const langConfig = (translations as any)[interfaceLang] || translations['pt-BR'];
     document.documentElement.setAttribute('dir', langConfig.dir || 'ltr');
     document.documentElement.setAttribute('lang', interfaceLang);
@@ -267,6 +275,13 @@ export function useAppState() {
   // Estados de Conversão e Arquivos
   const [phase, setPhase] = useState<Phase>(0);
   const [files, setFiles] = useState<AppFile[]>([]);
+
+  // Lista vazia (último livro removido, com ou sem erro, convertendo ou não): volta a área de arrastar
+  useEffect(() => {
+    if (files.length > 0 || (phase !== 1 && phase !== 2)) return;
+    const timer = setTimeout(() => setPhase(0), 220);
+    return () => clearTimeout(timer);
+  }, [files.length, phase]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [coverColorsMap, setCoverColorsMap] = useState<Record<string, string>>({});
 
@@ -279,129 +294,124 @@ export function useAppState() {
   // Pasta de Salvamento e Preferências
   const [outputFolder, setOutputFolder] = useState(() => {
     if (typeof window === 'undefined') return '';
-    return localStorage.getItem('output_folder') || '';
+    return safeGet('output_folder') || '';
   });
 
-  useEffect(() => {
-    localStorage.setItem('output_folder', outputFolder);
-  }, [outputFolder]);
-
-  const destinationFolderInputRef = useRef<HTMLInputElement>(null);
-
-  const handleSelectOutputFolder = async () => {
-    // 1. Electron
-    if ((window as any).electron?.selectFolder) {
-      try {
-        const folder = await (window as any).electron.selectFolder();
-        if (folder) {
-          setOutputFolder(folder);
-          localStorage.setItem('output_folder', folder);
-          showToast(`Pasta selecionada: ${folder}`);
-          return;
-        }
-      } catch (err) {}
-    }
-
-    // 2. Servidor Local / API
+  // Pasta de salvamento garantida: se o usuário não escolheu uma, o app cria Documentos/Audiobook Generator
+  const ensureOutputFolder = async (): Promise<string> => {
+    const atual = safeGet('output_folder') || outputFolder;
+    if (atual) return atual;
     try {
-      const res = await fetch('/api/select-folder', { method: 'POST' });
-      if (res.ok) {
-        const data = await res.json();
-        if (data.path) {
-          setOutputFolder(data.path);
-          localStorage.setItem('output_folder', data.path);
-          showToast(`Pasta selecionada: ${data.path}`);
-          return;
-        }
-        if (data.cancelled) {
-          return;
-        }
+      const res = await fetch('/api/default-folder', { method: 'POST' });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.path) {
+        setOutputFolder(data.path);
+        safeSet('output_folder', data.path);
+        return data.path;
       }
-    } catch (e) {
-      console.warn("Backend select-folder não respondeu, tentando navegadores...", e);
-    }
-
-    // 3. File System Access API
-    if ('showDirectoryPicker' in window) {
-      try {
-        const dirHandle = await (window as any).showDirectoryPicker();
-        if (dirHandle && dirHandle.name) {
-          const selectedPath = dirHandle.name;
-          setOutputFolder(selectedPath);
-          localStorage.setItem('output_folder', selectedPath);
-          showToast(`Pasta selecionada: ${selectedPath}`);
-          return;
-        }
-      } catch (err: any) {
-        if (err.name === 'AbortError') return;
-      }
-    }
-
-    // 4. Fallback input webkitdirectory
-    destinationFolderInputRef.current?.click();
+    } catch { /* servidor indisponível */ }
+    return '';
   };
 
-  const handleDestinationFolderInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (files && files.length > 0) {
-      const relativePath = (files[0] as any).webkitRelativePath;
-      const folderName = relativePath ? relativePath.split('/')[0] : 'Pasta selecionada';
-      setOutputFolder(folderName);
-      localStorage.setItem('output_folder', folderName);
-      showToast(`Pasta selecionada: ${folderName}`);
+  // Abre a pasta de salvamento no explorador de arquivos do sistema
+  const openOutputFolder = async () => {
+    const folder = await ensureOutputFolder();
+    if (!folder) { showToast('Não foi possível encontrar a pasta de salvamento.'); return; }
+    try {
+      const res = await fetch('/api/open-folder', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ path: folder }) });
+      if (!res.ok) throw new Error();
+    } catch {
+      showToast('Não foi possível abrir a pasta. Ela pode ter sido movida ou apagada.');
     }
+  };
+
+  useEffect(() => {
+    safeSet('output_folder', outputFolder);
+  }, [outputFolder]);
+
+
+  const applyOutputFolder = (folder: string) => {
+    setOutputFolder(folder);
+    safeSet('output_folder', folder);
+    showToast(`Pasta selecionada: ${folder}`);
+  };
+
+  const handleSelectOutputFolder = async () => {
+    // 1) App instalado: seletor nativo do sistema (preload.cjs)
+    const bridge = (window as any).electron;
+    if (bridge?.selectFolder) {
+      try {
+        const folder = await bridge.selectFolder();
+        if (folder) applyOutputFolder(folder);
+        return;
+      } catch { /* tenta pelo servidor */ }
+    }
+    // 2) No navegador: o servidor local abre o seletor do sistema
+    try {
+      const res = await fetch('/api/select-folder', { method: 'POST' });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.path) { applyOutputFolder(data.path); return; }
+      if (res.ok && data.cancelled) return;
+    } catch { /* servidor indisponível */ }
+    showToast('Não foi possível abrir o seletor de pastas. Verifique se o app está aberto pelo atalho do Audiobook Generator.');
   };
 
   const handleClearCache = async () => {
     try {
-      await fetch('/api/clean-cache', {
+      const res = await fetch('/api/clean-cache', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ outputFolder })
       });
-      showToast((t as any).settings_cache_cleared || "Cache limpo com sucesso!");
-    } catch (e) {
-      showToast((t as any).settings_cache_cleared || "Cache limpo com sucesso!");
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data.success === false) throw new Error(data.error || 'falha');
+      showToast(data.deleted > 0 ? `Cache limpo: ${data.deleted} ${data.deleted === 1 ? 'item removido' : 'itens removidos'}.` : 'O cache já estava vazio.');
+    } catch {
+      showToast('Não foi possível limpar o cache agora. Tente de novo com nenhuma conversão em andamento.');
     }
   };
 
   const [defaultVoice, setDefaultVoice] = useState(() => {
     // A voz é escolhida em cada e-book; "perguntar" (versões antigas) vira a voz padrão
-    const saved = localStorage.getItem('app_default_voice');
+    const saved = safeGet('app_default_voice');
     return saved && saved !== 'ask' ? saved : 'pt-BR-AntonioNeural';
   });
 
   useEffect(() => {
-    localStorage.setItem('app_default_voice', defaultVoice);
+    safeSet('app_default_voice', defaultVoice);
   }, [defaultVoice]);
 
   const [fileTypeOption, setFileTypeOption] = useState<'ask' | AudioFormat>(() => {
-    // O formato é escolhido em cada e-book; "perguntar" (versões antigas) vira MP3
-    const saved = localStorage.getItem('file_type_option');
-    return isAudioFormat(saved) ? saved : 'single';
+    // O formato é escolhido em cada e-book; o padrão é M4B ("perguntar", de versões antigas, também vira M4B).
+    // O MP3 era o padrão antes: quem nunca trocou passa para M4B uma vez.
+    let saved = safeGet('file_type_option');
+    if (!safeGet('default_format_m4b_v1')) {
+      if (saved === 'single') saved = 'm4b';
+      safeSet('default_format_m4b_v1', 'true');
+    }
+    return isAudioFormat(saved) ? saved : 'm4b';
   });
 
   // Qualidade do áudio gerado (taxa de bits dos formatos com compressão)
   const [audioQuality, setAudioQuality] = useState<AudioQuality>(() => {
-    const saved = localStorage.getItem('audio_quality');
+    const saved = safeGet('audio_quality');
     return saved === 'standard' || saved === 'high' || saved === 'max' ? saved : 'high';
   });
 
   useEffect(() => {
-    localStorage.setItem('audio_quality', audioQuality);
+    safeSet('audio_quality', audioQuality);
   }, [audioQuality]);
 
   useEffect(() => {
-    localStorage.setItem('file_type_option', fileTypeOption);
+    safeSet('file_type_option', fileTypeOption);
   }, [fileTypeOption]);
 
   // Histórico de Audiobooks e Textos Gerados
   const [history, setHistory] = useState<HistoryItem[]>(() => {
     if (typeof window === 'undefined') return DEFAULT_AUDIOBOOKS;
-    const saved = localStorage.getItem('audiobook_history');
-    const items: HistoryItem[] = saved ? JSON.parse(saved) : DEFAULT_AUDIOBOOKS;
-    // O histórico mostra só audiobooks convertidos com sucesso
-    return items.filter(h => h.status !== 'error');
+    const items = loadJSON<HistoryItem[]>('audiobook_history', DEFAULT_AUDIOBOOKS, isArray);
+    // O histórico mostra só audiobooks convertidos com sucesso (e ignora entradas corrompidas)
+    return items.filter(h => h && typeof h === 'object' && h.id && h.status !== 'error');
   });
 
   useEffect(() => {
@@ -409,13 +419,12 @@ export function useAppState() {
       setHistory(prev => prev.filter(h => h.status !== 'error'));
       return;
     }
-    localStorage.setItem('audiobook_history', JSON.stringify(history));
+    saveJSON('audiobook_history', history, () => showToast('O armazenamento do app está cheio: capas antigas de Convertidos foram trocadas pela capa genérica.'));
   }, [history]);
 
   const [generatedTexts, setGeneratedTexts] = useState<GeneratedTextItem[]>(() => {
     if (typeof window === 'undefined') return [];
-    const saved = localStorage.getItem('audiobook_generated_texts');
-    return saved ? JSON.parse(saved) : [
+    return loadJSON<GeneratedTextItem[]>('audiobook_generated_texts', [
       {
         id: 'mock-text-1',
         title: 'O Mistério da Estrela Cadente',
@@ -425,18 +434,17 @@ export function useAppState() {
         date: '17/10/2026',
         content: 'Nas montanhas esquecidas de Aldora, uma centelha de luz cortou os céus noturnos com um estrondo silencioso. Gael observava da torre mais alta, com seu manto ondulando contra a ventania gélida...'
       }
-    ];
+    ], isArray).filter(tx => tx && typeof tx === 'object' && tx.id);
   });
 
   useEffect(() => {
-    localStorage.setItem('audiobook_generated_texts', JSON.stringify(generatedTexts));
+    saveJSON('audiobook_generated_texts', generatedTexts);
   }, [generatedTexts]);
 
   // Pesquisas Recentes
   const [recentSearches, setRecentSearches] = useState<string[]>(() => {
     if (typeof window === 'undefined') return DEFAULT_RECENT_SEARCHES;
-    const saved = localStorage.getItem('recent_searches');
-    return saved ? JSON.parse(saved) : DEFAULT_RECENT_SEARCHES;
+    return loadJSON<string[]>('recent_searches', DEFAULT_RECENT_SEARCHES, isArray).filter(x => typeof x === 'string');
   });
 
   const [showDeleteSearchHistoryConfirm, setShowDeleteSearchHistoryConfirm] = useState<boolean>(false);
@@ -448,33 +456,39 @@ export function useAppState() {
       const filtered = prev.filter(t => t.toLowerCase() !== trimmed.toLowerCase());
       const updated = [trimmed, ...filtered].slice(0, 10);
       try {
-        localStorage.setItem('recent_searches', JSON.stringify(updated));
+        safeSet('recent_searches', JSON.stringify(updated));
       } catch {}
       return updated;
     });
   }, []);
 
   useEffect(() => {
-    localStorage.setItem('recent_searches', JSON.stringify(recentSearches));
+    safeSet('recent_searches', JSON.stringify(recentSearches));
   }, [recentSearches]);
 
   // Modais de Diálogo e Confirmação
   const [showWelcomeModal, setShowWelcomeModal] = useState(() => {
     if (typeof window === 'undefined') return false;
-    return localStorage.getItem('has_seen_welcome_v3') !== 'true';
+    return safeGet('has_seen_welcome_v3') !== 'true';
   });
 
   const [showInitialConfigModal, setShowInitialConfigModal] = useState(() => {
     if (typeof window === 'undefined') return false;
-    return localStorage.getItem('has_seen_welcome_v3') === 'true' && localStorage.getItem('has_seen_initial_config_v3') !== 'true';
+    return safeGet('has_seen_welcome_v3') === 'true' && safeGet('has_seen_initial_config_v3') !== 'true';
   });
+
+  useEffect(() => {
+    if (!showWelcomeModal && !showInitialConfigModal && !outputFolder) ensureOutputFolder();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showWelcomeModal, showInitialConfigModal]);
 
   const [showDuplicateModal, setShowDuplicateModal] = useState(false);
   const [duplicateFileTitle, setDuplicateFileTitle] = useState('');
   const [showTranslationModal, setShowTranslationModal] = useState(false);
   const [foreignLangFile, setForeignLangFile] = useState<AppFile | null>(null);
   const [translationAnchor, setTranslationAnchor] = useState<HTMLElement | null>(null);
-  const [selectedVoice, setSelectedVoice] = useState('pt-BR-AntonioNeural');
+  const [selectedVoice, setSelectedVoice] = useState(() => defaultVoice);
+  useEffect(() => { setSelectedVoice(defaultVoice); }, [defaultVoice]);
   const [conversionAnchor, setConversionAnchor] = useState<HTMLElement | null>(null);
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [cancelModalAnchor, setCancelModalAnchor] = useState<HTMLElement | null>(null);
@@ -538,27 +552,36 @@ export function useAppState() {
   // Estado para Gerar Texto Sincronizado por Padrão na Conversão (Padrão: marcado que sim)
   const [generateSyncTextDefault, setGenerateSyncTextDefault] = useState<boolean>(() => {
     if (typeof window === 'undefined') return true;
-    const saved = localStorage.getItem('generate_sync_text_default');
+    const saved = safeGet('generate_sync_text_default');
     return saved !== null ? saved === 'true' : true;
   });
 
   useEffect(() => {
-    localStorage.setItem('generate_sync_text_default', String(generateSyncTextDefault));
+    safeSet('generate_sync_text_default', String(generateSyncTextDefault));
   }, [generateSyncTextDefault]);
 
   // Onde guardar o texto sincronizado: metadados do audiobook, pasta da biblioteca ou ambos
   const [syncTextDestination, setSyncTextDestination] = useState<SyncTextDestination>(() => {
     if (typeof window === 'undefined') return 'both';
-    const saved = localStorage.getItem('sync_text_destination');
+    const saved = safeGet('sync_text_destination');
     return saved === 'metadata' || saved === 'library' || saved === 'both' ? saved : 'both';
   });
 
   useEffect(() => {
-    localStorage.setItem('sync_text_destination', syncTextDestination);
+    safeSet('sync_text_destination', syncTextDestination);
   }, [syncTextDestination]);
 
+  // Separação do texto sincronizado (frases, palavras ou as duas)
+  const [syncTextGranularity, setSyncTextGranularity] = useState<SyncTextGranularity>(() => {
+    const saved = safeGet('sync_text_granularity');
+    return saved === 'sentences' || saved === 'words' || saved === 'both' ? saved : 'sentences';
+  });
+  useEffect(() => {
+    safeSet('sync_text_granularity', syncTextGranularity);
+  }, [syncTextGranularity]);
+
   // Texto gerado e salvo na biblioteca: entra no histórico como os demais textos
-  const addSyncTextToLibrary = (title: string, author: string, coverColor: string | undefined, content: string, wordCount?: number) => {
+  const addSyncTextToLibrary = (title: string, author: string, coverColor: string | undefined, content: string, wordCount?: number, files?: string[]) => {
     const color = coverColor || getGenericCoverColor(undefined, title, author);
     const newTextItem: GeneratedTextItem = {
       id: Math.random().toString(),
@@ -570,7 +593,8 @@ export function useAppState() {
       date: new Date().toLocaleDateString(interfaceLang),
       wordCount: wordCount ?? content.split(/\s+/).length,
       coverColor: color,
-      cover: getGenericTextCover(title, author, color)
+      cover: getGenericTextCover(title, author, color),
+      files: files && files.length > 0 ? files : undefined,
     };
     setGeneratedTexts(prev => [newTextItem, ...prev]);
   };
@@ -603,7 +627,7 @@ export function useAppState() {
       const res = await fetch('/api/sync-text', { method: 'POST', body: formData });
       const data = await res.json();
       if (data.success) {
-        if (data.savedToLibrary) addSyncTextToLibrary(book.title, book.author, book.coverColor, data.content, data.wordCount);
+        if (data.savedToLibrary) addSyncTextToLibrary(book.title, book.author, book.coverColor, data.content, data.wordCount, data.files);
         showToast(data.fallbackToLibrary
           ? `Texto de "${book.title}" salvo na biblioteca (este formato não guarda texto nos metadados).`
           : data.savedToLibrary && data.embedded?.length
@@ -639,7 +663,7 @@ export function useAppState() {
 
   // Pop-up Seletor de Ajustes Ativo
   const [activeSettingSelector, setActiveSettingSelector] = useState<ActiveSettingSelector | null>(null);
-  const [selectorMode, setSelectorMode] = useState<'select' | 'input'>('select');
+  const [selectorMode, setSelectorMode] = useState<string>('select');
   const [selectorDirection, setSelectorDirection] = useState<1 | -1>(1);
   const [selectorInputValue, setSelectorInputValue] = useState<string>('');
 
@@ -1074,7 +1098,7 @@ export function useAppState() {
   const [editBookLanguage, setEditBookLanguage] = useState('');
   const [editBookYear, setEditBookYear] = useState('');
   const [editBookVoice, setEditBookVoice] = useState('');
-  const [editBookFileType, setEditBookFileType] = useState<AudioFormat>('single');
+  const [editBookFileType, setEditBookFileType] = useState<AudioFormat>('m4b');
   const [editBookGenerateSyncText, setEditBookGenerateSyncText] = useState(true);
   const [editBookRequiresTranslation, setEditBookRequiresTranslation] = useState(false);
   const [editBookCover, setEditBookCover] = useState<string | undefined>(undefined);
@@ -1135,8 +1159,8 @@ export function useAppState() {
     setEditBookNarrator(file.narrator || '');
     setEditBookLanguage(normalizeLanguageName(file.language));
     setEditBookYear(file.year || '');
-    setEditBookVoice(file.voice || selectedVoice);
-    setEditBookFileType(file.fileType || (fileTypeOption === 'ask' ? 'single' : fileTypeOption));
+    setEditBookVoice(effectiveVoice(file, defaultVoice));
+    setEditBookFileType(file.fileType || (fileTypeOption === 'ask' ? 'm4b' : fileTypeOption));
     setEditBookGenerateSyncText(file.generateSyncText !== undefined ? file.generateSyncText : true);
     setEditBookRequiresTranslation(Boolean(file.requiresTranslation));
     setEditBookCover(file.customCover || file.cover);
@@ -1288,7 +1312,7 @@ export function useAppState() {
     setHistory(prev => {
       const next = prev.map(item => item.id === editingBook.id ? updatedBook : item);
       try {
-        localStorage.setItem('audiobook_history', JSON.stringify(next));
+        safeSet('audiobook_history', JSON.stringify(next));
       } catch (e) {
         console.warn("Erro ao salvar histórico local:", e);
       }
@@ -1311,10 +1335,10 @@ export function useAppState() {
       const target = prev[index];
       const content = (target.content || target.snippet || '').trim();
       const paragraphs = content.split('\n\n').filter(p => p.trim());
-      
+
       let part1Content = '';
       let part2Content = '';
-      
+
       if (paragraphs.length >= 2) {
         const mid = Math.ceil(paragraphs.length / 2);
         part1Content = paragraphs.slice(0, mid).join('\n\n');
@@ -1325,7 +1349,7 @@ export function useAppState() {
         part1Content = sentences.slice(0, mid).join(' ');
         part2Content = sentences.slice(mid).join(' ');
       }
-      
+
       const baseTitle = target.title.replace(/\s*-\s*Parte\s*\d+$/i, '').trim() || 'Capítulo';
       const part1: ChapterItem = {
         ...target,
@@ -1340,7 +1364,7 @@ export function useAppState() {
         content: part2Content,
         snippet: part2Content.slice(0, 500)
       };
-      
+
       const next = [...prev];
       next.splice(index, 1, part1, part2);
       return next;
@@ -1395,7 +1419,7 @@ export function useAppState() {
         return t;
       });
       try {
-        localStorage.setItem('audiobook_gen_texts', JSON.stringify(updated));
+
       } catch (e) {
         console.warn("Erro ao salvar textos locais:", e);
       }
@@ -1467,15 +1491,42 @@ export function useAppState() {
     return () => window.removeEventListener('close-all-popups', closeAllPopups);
   }, [closeAllPopups]);
 
+  // Arquivos de um item no computador. Audiobooks antigos (sem a lista) usam o caminho do áudio; no formato
+  // "um arquivo por capítulo", a pasta "(Audiobook)" onde os capítulos estão.
+  const filesOfBook = (b: HistoryItem): string[] => {
+    if (b.files && b.files.length > 0) {
+      const pastas = new Set<string>();
+      for (const f of b.files) {
+        const pasta = f.replace(/[\\/][^\\/]+$/, '');
+        if (/\(Audiobook\)( \(\d+\))?$/.test(pasta)) pastas.add(pasta);
+      }
+      return pastas.size > 0 ? [...pastas] : b.files;
+    }
+    if (!b.path) return [];
+    const pasta = b.path.replace(/[\\/][^\\/]+$/, '');
+    return /\(Audiobook\)( \(\d+\))?$/.test(pasta) ? [pasta] : [b.path];
+  };
+  const filesOfText = (tx: GeneratedTextItem): string[] => tx.files || [];
+
+  // Exclui do computador (para a Lixeira) e avisa o resultado
+  const deleteFromDisk = async (paths: string[], what: string) => {
+    if (paths.length === 0) { showToast(`${what} excluído de Convertidos.`); return; }
+    try {
+      const res = await fetch('/api/delete-files', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ paths }) });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || `código ${res.status}`);
+      showToast(data.skipped?.length
+        ? `${what} excluído. Alguns arquivos foram mantidos por não serem do audiobook.`
+        : `${what} excluído e enviado para a Lixeira.`);
+    } catch (e) {
+      showToast(`${what} saiu de Convertidos, mas os arquivos não foram excluídos: ${e instanceof Error ? e.message : e}`);
+    }
+  };
+
   const handleDeleteHistoryItem = (id: string) => {
-    setHistory(prev => {
-      const updated = prev.filter(h => h.id !== id);
-      try {
-        localStorage.setItem('audiobook_gen_history', JSON.stringify(updated));
-      } catch {}
-      return updated;
-    });
-    showToast("Audiobook excluído de Convertidos.");
+    const item = history.find(h => h.id === id);
+    setHistory(prev => prev.filter(h => h.id !== id));
+    deleteFromDisk(item ? filesOfBook(item) : [], 'Audiobook');
   };
 
   // Convertidos: modo de seleção para excluir vários itens de uma vez ('book:<id>' ou 'text:<id>')
@@ -1492,22 +1543,27 @@ export function useAppState() {
     const bookIds = new Set(selectedConverted.filter(k => k.startsWith('book:')).map(k => k.slice(5)));
     const textIds = new Set(selectedConverted.filter(k => k.startsWith('text:')).map(k => k.slice(5)));
     const count = bookIds.size + textIds.size;
+    const paths = [
+      ...history.filter(h => bookIds.has(h.id)).flatMap(filesOfBook),
+      ...generatedTexts.filter(tx => textIds.has(tx.id)).flatMap(filesOfText),
+    ];
+    if (paths.length > 0) deleteFromDisk(paths, count === 1 ? '1 item' : `${count} itens`);
     if (bookIds.size > 0) {
       setHistory(prev => {
         const updated = prev.filter(h => !bookIds.has(h.id));
-        try { localStorage.setItem('audiobook_gen_history', JSON.stringify(updated)); } catch {}
+
         return updated;
       });
     }
     if (textIds.size > 0) {
       setGeneratedTexts(prev => {
         const updated = prev.filter(tx => !textIds.has(tx.id));
-        try { localStorage.setItem('audiobook_gen_texts', JSON.stringify(updated)); } catch {}
+
         return updated;
       });
     }
     exitConvertedSelection();
-    showToast(count === 1 ? '1 item excluído de Convertidos.' : `${count} itens excluídos de Convertidos.`);
+    if (paths.length === 0) showToast(count === 1 ? '1 item excluído de Convertidos.' : `${count} itens excluídos de Convertidos.`);
   };
   // Sair de Convertidos encerra a seleção
   useEffect(() => {
@@ -1518,14 +1574,9 @@ export function useAppState() {
   }, [currentScreen]);
 
   const handleDeleteGeneratedText = (id: string) => {
-    setGeneratedTexts(prev => {
-      const updated = prev.filter(t => t.id !== id);
-      try {
-        localStorage.setItem('audiobook_gen_texts', JSON.stringify(updated));
-      } catch {}
-      return updated;
-    });
-    showToast("Texto excluído de Convertidos.");
+    const item = generatedTexts.find(tx => tx.id === id);
+    setGeneratedTexts(prev => prev.filter(t => t.id !== id));
+    deleteFromDisk(item ? filesOfText(item) : [], 'Texto');
   };
 
   // SSE (Server-Sent Events) para Progresso
@@ -1534,7 +1585,9 @@ export function useAppState() {
     if (phase === 2) {
       eventSource = new EventSource('/api/progress');
       eventSource.onmessage = (event) => {
-        const data = JSON.parse(event.data);
+        let data: any;
+        try { data = JSON.parse(event.data); } catch { return; }
+        if (!data || typeof data !== 'object') return;
         setFiles(prevFiles => {
           const newFiles = prevFiles.map((f): AppFile => {
             if (f.id === data.fileId) {
@@ -1547,7 +1600,7 @@ export function useAppState() {
                 } else if (data.status === 'syncing') {
                   return { ...f, progress: currentProg, status: 'syncing', syncMessage: data.message || 'Sincronizando áudio e texto...', editingProgress: 100, translationProgress: 100, isEditing: false, isTranslating: false };
                 } else {
-                  return { ...f, progress: currentProg, status: 'processing', syncMessage: undefined, editingProgress: 100, translationProgress: 100, isEditing: false, isTranslating: false, partsDone: data.partsDone !== undefined ? data.partsDone : f.partsDone, partsTotal: data.partsTotal || f.partsTotal };
+                  return { ...f, progress: currentProg, status: 'processing', syncMessage: undefined, stageMessage: data.message || (data.partsDone !== undefined ? undefined : f.stageMessage), editingProgress: 100, translationProgress: 100, isEditing: false, isTranslating: false, partsDone: data.partsDone !== undefined ? data.partsDone : f.partsDone, partsTotal: data.partsTotal || f.partsTotal };
                 }
               } else if (data.type === 'done') {
                 const bookCover = f.customCover || f.cover || getGenericBookCover(f.title, f.author, f.coverColor);
@@ -1567,12 +1620,14 @@ export function useAppState() {
                   cover: bookCover,
                   coverColor: f.coverColor,
                   path: (data.paths && data.paths.length > 0) ? data.paths[0] : (f.generatedPaths?.[0] || outputFolder),
+                  // Arquivos do audiobook (o texto salvo na biblioteca vira um item próprio em Textos)
+                  files: (data.paths || []).filter((p: string) => !/\.(lrc|srt|vtt)$|\.sync\.json$/i.test(p)),
                   duration: data.finalDuration || f.durationEst,
                   size: data.finalSize || f.audioSizeEst
                 };
                 setHistory(prev => [completedHistoryItem, ...prev]);
                 if (data.syncText?.savedToLibrary && data.syncText.content) {
-                  addSyncTextToLibrary(f.title, f.author, f.coverColor, data.syncText.content, data.syncText.wordCount);
+                  addSyncTextToLibrary(f.title, f.author, f.coverColor, data.syncText.content, data.syncText.wordCount, data.syncText.files);
                 }
                 showToast(`"${f.title}" concluído com sucesso e adicionado a Convertidos!`);
 
@@ -1595,8 +1650,10 @@ export function useAppState() {
                   audioSizeEst: data.finalSize || f.audioSizeEst,
                   durationEst: data.finalDuration || f.durationEst
                 };
+              } else if (data.type === 'speed') {
+                return { ...f, speedBps: typeof data.bytesPerSec === 'number' ? data.bytesPerSec : f.speedBps };
               } else if (data.type === 'error') {
-                return { ...f, status: 'error', errorMessage: data.error };
+                return { ...f, status: 'error', errorMessage: data.error, errorDetails: data.details };
               }
             }
             return f;
@@ -1620,14 +1677,21 @@ export function useAppState() {
 
   // Upload e Extração de Metadados
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const selectedFiles = event.target.files;
-    if (!selectedFiles || selectedFiles.length === 0) return;
+    const allFiles = event.target.files ? Array.from(event.target.files) : [];
+    const accepted = /\.(epub|pdf|mobi|azw|azw3|prc|txt)$/i;
+    const selectedFiles = allFiles.filter(f => accepted.test(f.name) && f.size > 0);
+    const rejected = allFiles.length - selectedFiles.length;
+    if (rejected > 0) {
+      showToast(rejected === 1 ? 'Um arquivo foi ignorado: use Epub, Pdf, Mobi/Azw ou Txt.' : `${rejected} arquivos foram ignorados: use Epub, Pdf, Mobi/Azw ou Txt.`);
+    }
+    if (fileInputRef.current) fileInputRef.current.value = '';
+    if (selectedFiles.length === 0) return;
 
     const newFiles: AppFile[] = [];
     for (let i = 0; i < selectedFiles.length; i++) {
       const file = selectedFiles[i];
       const fileId = Math.random().toString();
-      
+
       const initialCoverColor = getGenericCoverColor(undefined, file.name.replace(/\.[^/.]+$/, ""));
       const newFile: AppFile = {
         id: fileId,
@@ -1639,8 +1703,8 @@ export function useAppState() {
         narrator: '',
         language: 'Português (Brasil)',
         sizeStr: (file.size / (1024 * 1024)).toFixed(2) + ' MB',
-        durationEst: '...',
-        processingTimeEst: '...',
+        durationEst: '',
+        processingTimeEst: '',
         status: 'idle',
         progress: 0,
         translationProgress: 0,
@@ -1661,10 +1725,64 @@ export function useAppState() {
       formData.append('file', file);
       formData.append('filename', file.name);
 
-      fetch('/api/metadata', {
-        method: 'POST',
-        body: formData
-      }).then(res => res.json()).then(data => {
+      // Resposta em partes (uma linha JSON por parte): capa, título e autor chegam antes dos capítulos
+      const applyPartial = (data: any) => {
+        setFiles(prev => prev.map(f => {
+          if (f.id !== fileId || f.metadataStatus !== 'loading') return f;
+          const t = data.title && data.title.trim() && data.title !== 'Unknown' ? data.title.trim() : f.title;
+          const a = data.author && data.author.trim() && data.author !== 'Unknown' ? data.author.trim() : f.author;
+          return {
+            ...f,
+            title: t || f.title,
+            author: a || f.author,
+            genre: data.genre || f.genre,
+            subgenre: data.subgenre || f.subgenre,
+            language: data.language ? normalizeLanguageName(data.language) : f.language,
+            cover: data.cover || f.cover,
+          };
+        }));
+      };
+      // Lê o livro; se a conexão falhar (servidor ocupado, rede local instável), tenta mais 2 vezes
+      const readMetadata = async (tentativa = 0): Promise<Response> => {
+        try {
+          const res = await fetch('/api/metadata', { method: 'POST', body: formData });
+          if (res.status >= 500 && tentativa < 2) throw new Error(`HTTP ${res.status}`);
+          return res;
+        } catch (e) {
+          if (tentativa >= 2) throw e;
+          await new Promise(r => setTimeout(r, 1200 * (tentativa + 1)));
+          return readMetadata(tentativa + 1);
+        }
+      };
+      readMetadata().then(async res => {
+        if (!res.ok || !res.body) {
+          const data = await res.json().catch(() => ({}));
+          throw new Error(data.error || 'falha ao ler o arquivo');
+        }
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+        let final: any = null;
+        const handleLine = (line: string) => {
+          if (!line.trim()) return;
+          let obj: any;
+          try { obj = JSON.parse(line); } catch { return; }
+          if (obj.error) throw new Error(obj.error);
+          if (obj.partial) applyPartial(obj);
+          else final = obj;
+        };
+        for (;;) {
+          const { value, done } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || '';
+          lines.forEach(handleLine);
+        }
+        handleLine(buffer + decoder.decode());
+        if (!final) throw new Error('falha ao ler o arquivo');
+        return final;
+      }).then(data => {
         const detectedLang = normalizeLanguageName(data.language);
         setFiles(prev => prev.map(f => {
           if (f.id === fileId) {
@@ -1678,9 +1796,10 @@ export function useAppState() {
               subgenre: data.subgenre || '',
               narrator: data.narrator || '',
               language: detectedLang,
-              durationEst: data.durationEst || '3h 15m',
-              audioSizeEst: data.audioSizeEst || '85 MB',
-              processingTimeEst: data.processingTimeEst || '1m 40s',
+              charCount: typeof data.charCount === 'number' ? data.charCount : undefined,
+              durationEst: data.durationEst || '',
+              audioSizeEst: data.audioSizeEst || '',
+              processingTimeEst: data.processingTimeEst || '',
               partsTotal: data.partsTotal || 1,
               metadataStatus: 'loaded',
               cover: data.cover || undefined,
@@ -1691,12 +1810,17 @@ export function useAppState() {
           return f;
         }));
 
-        if (detectedLang && !detectedLang.toLowerCase().includes('português') && !detectedLang.toLowerCase().includes('portugues')) {
-          setForeignLangFile({ ...newFile, title: data.title || newFile.title, language: detectedLang });
-          setShowTranslationModal(true);
+        // Livro sem texto narrável (DRM, PDF escaneado, arquivo corrompido): avisa já ao carregar
+        if (data.unreadable) {
+          showToast(`"${file.name}": ${data.unreadable}`);
+          setFiles(prev => prev.map(f => f.id === fileId ? { ...f, errorMessage: data.unreadable } : f));
+          return;
         }
-      }).catch(() => {
-        setFiles(prev => prev.map(f => f.id === fileId ? { ...f, metadataStatus: 'error' } : f));
+      }).catch((e) => {
+        const motivo = e instanceof Error && e.message ? e.message : String(e);
+        console.error(`Metadados de "${file.name}":`, e);
+        setFiles(prev => prev.map(f => f.id === fileId ? { ...f, metadataStatus: 'error', durationEst: '', audioSizeEst: '', processingTimeEst: '' } : f));
+        showToast(`Não foi possível ler os dados de "${file.name}" (${motivo}). Preencha título e autor no card; o livro ainda pode ser convertido.`);
       });
     }
 
@@ -1721,20 +1845,21 @@ export function useAppState() {
       handleOpenMetadataModal(invalidFile);
       return;
     }
-    if (!outputFolder) {
-      showToast("Selecione a pasta de destino nos Ajustes ou Configurações!");
-      navigateTo('settings');
-      return;
-    }
-
-    // Sem perguntas: cada e-book já tem voz e formato no próprio card (ou herda os padrões dos Ajustes)
-    const effectiveVoice = selectedVoice || (defaultVoice !== 'ask' ? defaultVoice : 'pt-BR-AntonioNeural');
-    const effectiveFileType: AudioFormat = fileTypeOption === 'ask' ? 'single' : fileTypeOption;
-
-    proceedWithConversion(effectiveVoice, effectiveFileType, targetFiles);
+    // Sem pasta escolhida: usa (e cria, se preciso) a pasta padrão
+    ensureOutputFolder().then(folder => {
+      if (!folder) {
+        showToast('Escolha uma pasta de salvamento em Ajustes › Armazenamento e pastas.');
+        navigateTo('settings-storage');
+        return;
+      }
+      // Sem perguntas: cada e-book já tem voz e formato no próprio card (ou herda os padrões dos Ajustes)
+      const effectiveVoice = selectedVoice || (defaultVoice !== 'ask' ? defaultVoice : 'pt-BR-AntonioNeural');
+      const effectiveFileType: AudioFormat = fileTypeOption === 'ask' ? 'm4b' : fileTypeOption;
+      proceedWithConversion(effectiveVoice, effectiveFileType, targetFiles, folder);
+    });
   };
 
-  const proceedWithConversion = async (voiceCode: string, fileType: AudioFormat, targetFiles?: AppFile[]) => {
+  const proceedWithConversion = async (voiceCode: string, fileType: AudioFormat, targetFiles?: AppFile[], folderOverride?: string) => {
     setPhase(2);
     const filesToConvert = targetFiles || files;
 
@@ -1760,7 +1885,7 @@ export function useAppState() {
       subgenre: f.subgenre || '',
       narrator: f.narrator || '',
       language: normalizeLanguageName(f.language),
-      voice: f.voice || voiceCode,
+      voice: effectiveVoice(f, voiceCode),
       translate: f.requiresTranslation,
       cover: f.customCover || f.cover || null,
       generate_sync_text: f.generateSyncText !== undefined ? f.generateSyncText : true,
@@ -1771,20 +1896,43 @@ export function useAppState() {
     }))));
     formData.append('config', JSON.stringify({
       voice: voiceCode,
-      outputFolder: outputFolder,
+      outputFolder: folderOverride || outputFolder,
       fileType: fileType,
       file_format: fileType,
       mode_folder: fileType === 'multiple',
       target_lang: 'pt',
       generate_sync_text: generateSyncTextDefault,
       sync_text_destination: syncTextDestination,
+      sync_text_granularity: syncTextGranularity,
       audio_quality: audioQuality
     }));
 
+    const ids = new Set(filesToConvert.map(f => f.id));
+    const failAll = (message: string, details: string) => {
+      const when = new Date().toLocaleString(interfaceLang);
+      const fullDetails = `${details}\n\nEndereço do app: ${window.location.origin}\nQuando: ${when}`;
+      setFiles(prev => prev.map(f => ids.has(f.id) ? { ...f, status: 'error', errorMessage: message, errorDetails: fullDetails } : f));
+      showToast(message);
+    };
     try {
-      await fetch('/api/process', { method: 'POST', body: formData });
+      const res = await fetch('/api/process', { method: 'POST', body: formData });
+      if (!res.ok) {
+        const body = await res.text().catch(() => '');
+        let data: any = {};
+        try { data = JSON.parse(body); } catch { /* resposta sem JSON */ }
+        failAll(
+          data.error || `O serviço de conversão recusou o pedido (código ${res.status}). Tente de novo.`,
+          `POST /api/process respondeu ${res.status} ${res.statusText}.\nResposta: ${body.slice(0, 1500) || '(vazia)'}`
+        );
+      }
     } catch (e) {
-      showToast("Erro ao conectar com o serviço de síntese!");
+      // Sem resposta nenhuma: o servidor local do app não está rodando (a página continua aberta sem ele)
+      const vivo = await fetch('/api/health', { cache: 'no-store' }).then(r => r.ok).catch(() => false);
+      const motivo = `POST /api/process falhou sem resposta: ${e instanceof Error ? `${e.name}: ${e.message}` : String(e)}.\nTeste do servidor (/api/health): ${vivo ? 'respondeu' : 'sem resposta'}.`;
+      failAll(vivo
+        ? 'A conexão com o serviço de conversão caiu durante o envio do livro. Tente de novo; se repetir, veja os detalhes.'
+        : 'O serviço local do app não está respondendo, então nada pode ser convertido. Feche esta janela e abra o Audiobook Generator de novo pelo atalho (ou pelo abrir_no_navegador.bat).',
+        motivo);
     }
   };
 
@@ -1792,26 +1940,41 @@ export function useAppState() {
     try {
       await fetch('/api/cancel', { method: 'POST' });
       setPhase(1);
-      setFiles(prev => prev.map(f => ({ ...f, status: 'idle', progress: 0 })));
+      // Só os que estavam convertendo voltam para a fila; os já concluídos ficam como estão
+      setFiles(prev => prev.map(f => (f.status === 'success' ? f : { ...f, status: 'idle', progress: 0, errorMessage: undefined, errorDetails: undefined })));
       setShowCancelModal(false);
-      showToast("Processamento cancelado.");
+      setCancelModalAnchor(null);
+      showToast("Conversão cancelada.");
     } catch (e) {
       setShowCancelModal(false);
+      setCancelModalAnchor(null);
+      showToast("Não foi possível cancelar: o serviço de conversão não respondeu.");
     }
   };
 
   const handleRetryFile = (file: AppFile) => {
-    setFiles(prev => prev.map(f => f.id === file.id ? { ...f, status: 'processing', progress: 0, errorMessage: undefined } : f));
-    const effectiveVoice = file.voice || selectedVoice || (defaultVoice !== 'ask' ? defaultVoice : 'pt-BR-AntonioNeural');
-    const effectiveFileType: AudioFormat = (file.fileType || (fileTypeOption === 'ask' ? 'single' : fileTypeOption)) as any;
-    proceedWithConversion(effectiveVoice, effectiveFileType, [file]);
+    setFiles(prev => prev.map(f => f.id === file.id ? { ...f, status: 'processing', progress: 0, errorMessage: undefined, errorDetails: undefined } : f));
+    const retryVoice = effectiveVoice(file, defaultVoice);
+    const effectiveFileType: AudioFormat = (file.fileType || (fileTypeOption === 'ask' ? 'm4b' : fileTypeOption)) as any;
+    proceedWithConversion(retryVoice, effectiveFileType, [file]);
     showToast(`Reiniciando conversão de "${file.title}"...`);
+  };
+
+  // Tenta de novo, num pedido só, todos os livros que falharam (cada um com a própria voz e formato)
+  const handleRetryAllFailed = () => {
+    const failed = files.filter(f => f.status === 'error');
+    if (failed.length === 0) return;
+    const ids = new Set(failed.map(f => f.id));
+    setFiles(prev => prev.map(f => ids.has(f.id) ? { ...f, status: 'processing', progress: 0, errorMessage: undefined, errorDetails: undefined } : f));
+    const effectiveFileType: AudioFormat = fileTypeOption === 'ask' ? 'm4b' : fileTypeOption;
+    proceedWithConversion(defaultVoice, effectiveFileType, failed);
+    showToast(failed.length === 1 ? `Reiniciando conversão de "${failed[0].title}"...` : `Reiniciando ${failed.length} conversões...`);
   };
 
   const sendGeneratedTextToConverter = (text: string, title: string) => {
     const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
     const file = new File([blob], `${title}.txt`, { type: 'text/plain' });
-    
+
     const fileId = Math.random().toString();
     const newFile: AppFile = {
       id: fileId,
@@ -1874,7 +2037,7 @@ export function useAppState() {
   }, [searchQuery, history, generatedTexts]);
   const [isDevModeActive, setIsDevModeActive] = useState(() => {
     if (typeof window === 'undefined') return false;
-    return localStorage.getItem('app_dev_mode') === 'true';
+    return safeGet('app_dev_mode') === 'true';
   });
   const [devBackup, setDevBackup] = useState<any | null>(null);
   const [devCrashScreen, setDevCrashScreen] = useState(false);
@@ -1883,7 +2046,7 @@ export function useAppState() {
   const handleExitDevMode = useCallback(() => {
     setIsDevModeActive(false);
     try {
-      localStorage.removeItem('app_dev_mode');
+      removeKey('app_dev_mode');
     } catch {}
     if (devBackup) {
       if (devBackup.files !== undefined) setFiles(devBackup.files);
@@ -1930,7 +2093,7 @@ export function useAppState() {
     ];
     setGeneratedTexts(mockTexts);
     try {
-      localStorage.setItem('app_dev_mode', 'true');
+      safeSet('app_dev_mode', 'true');
     } catch {}
     setSearchQuery('');
     showToast('Modo Dev: Audiobooks e textos de teste adicionados ao histórico!');
@@ -1939,7 +2102,7 @@ export function useAppState() {
   const handleToggleDevZeroState = useCallback(() => {
     setIsDevModeActive(true);
     try {
-      localStorage.setItem('app_dev_mode', 'true');
+      safeSet('app_dev_mode', 'true');
     } catch {}
     if (history.length > 0 || generatedTexts.length > 0) {
       setDevBackup({ files, history, generatedTexts });
@@ -1962,7 +2125,7 @@ export function useAppState() {
   const handleSimulateConversionQueue = useCallback(() => {
     setIsDevModeActive(true);
     try {
-      localStorage.setItem('app_dev_mode', 'true');
+      safeSet('app_dev_mode', 'true');
     } catch {}
     if (!devBackup) {
       setDevBackup({ files, history, generatedTexts });
@@ -2024,7 +2187,7 @@ export function useAppState() {
   const handleSimulateConversionCompleted = useCallback(() => {
     setIsDevModeActive(true);
     try {
-      localStorage.setItem('app_dev_mode', 'true');
+      safeSet('app_dev_mode', 'true');
     } catch {}
     if (!devBackup) {
       setDevBackup({ files, history, generatedTexts });
@@ -2073,7 +2236,7 @@ export function useAppState() {
   const handleSimulateConversionError = useCallback(() => {
     setIsDevModeActive(true);
     try {
-      localStorage.setItem('app_dev_mode', 'true');
+      safeSet('app_dev_mode', 'true');
     } catch {}
     if (!devBackup) {
       setDevBackup({ files, history, generatedTexts });
@@ -2118,7 +2281,7 @@ export function useAppState() {
   const handleShowWelcomeModal = useCallback(() => {
     setIsDevModeActive(true);
     try {
-      localStorage.setItem('app_dev_mode', 'true');
+      safeSet('app_dev_mode', 'true');
     } catch {}
     closeAllPopups();
     setShowWelcomeModal(true);
@@ -2129,7 +2292,7 @@ export function useAppState() {
   const handleShowInitialConfigModal = useCallback(() => {
     setIsDevModeActive(true);
     try {
-      localStorage.setItem('app_dev_mode', 'true');
+      safeSet('app_dev_mode', 'true');
     } catch {}
     closeAllPopups();
     setShowInitialConfigModal(true);
@@ -2140,7 +2303,7 @@ export function useAppState() {
   const handleSimulateFirstLaunch = useCallback(() => {
     setIsDevModeActive(true);
     try {
-      localStorage.setItem('app_dev_mode', 'true');
+      safeSet('app_dev_mode', 'true');
     } catch {}
     if (!devBackup) {
       setDevBackup({ files, history, generatedTexts });
@@ -2151,12 +2314,12 @@ export function useAppState() {
     setRecentSearches([]);
     setPhase(0);
     try {
-      localStorage.removeItem('app_files');
-      localStorage.removeItem('audiobook_history');
-      localStorage.removeItem('audiobook_generated_texts');
-      localStorage.removeItem('recent_searches');
-      localStorage.removeItem('has_seen_welcome_v3');
-      localStorage.removeItem('has_seen_initial_config_v3');
+      removeKey('app_files');
+      removeKey('audiobook_history');
+      removeKey('audiobook_generated_texts');
+      removeKey('recent_searches');
+      removeKey('has_seen_welcome_v3');
+      removeKey('has_seen_initial_config_v3');
     } catch {}
     setSearchQuery('');
     navigateTo('converter');
@@ -2168,7 +2331,7 @@ export function useAppState() {
   const handleTestDevNotifications = useCallback(() => {
     setIsDevModeActive(true);
     try {
-      localStorage.setItem('app_dev_mode', 'true');
+      safeSet('app_dev_mode', 'true');
     } catch {}
     setSearchQuery('');
     showToast('🔔 [Dev] Notificação 1: Áudio "A Arte da Guerra" salvo em MP3');
@@ -2183,7 +2346,7 @@ export function useAppState() {
   const handleSimulateFullScreenError = useCallback(() => {
     setIsDevModeActive(true);
     try {
-      localStorage.setItem('app_dev_mode', 'true');
+      safeSet('app_dev_mode', 'true');
     } catch {}
     setSearchQuery('');
     setDevCrashScreen(true);
@@ -2275,9 +2438,9 @@ export function useAppState() {
       case 'help-topic': return HELP_TOPICS.find(tp => tp.id === helpTopicId)?.title || t.help;
       case 'settings': return t.settings;
       case 'settings-interface': return 'Interface';
-      case 'settings-conversion': return 'Conversão de Áudio';
-      case 'settings-storage': return 'Armazenamento & Pastas';
-      case 'settings-about': return 'Sistema e Sobre';
+      case 'settings-conversion': return 'Conversão de áudio';
+      case 'settings-storage': return t.storageAndFolders;
+      case 'settings-about': return 'Sistema e sobre';
       case 'edit-audiobook': return editingFileId ? 'Editar opções da obra' : 'Editar audiobook';
       case 'edit-text': return 'Editar texto';
       default: return t.appName;
@@ -2297,9 +2460,9 @@ export function useAppState() {
         case 'help': return t.help;
         case 'settings': return t.settings;
         case 'settings-interface': return 'Interface';
-        case 'settings-conversion': return 'Conversão de Áudio';
-        case 'settings-storage': return 'Armazenamento & Pastas';
-        case 'settings-about': return 'Sistema e Sobre';
+        case 'settings-conversion': return 'Conversão de áudio';
+        case 'settings-storage': return t.storageAndFolders;
+        case 'settings-about': return 'Sistema e sobre';
         case 'edit-audiobook': return 'Editar audiobook';
         case 'edit-text': return 'Editar texto';
         default: return t.back;
@@ -2312,16 +2475,8 @@ export function useAppState() {
     return t.back;
   }, [historyStack, currentScreen, t]);
 
-  const availableVoices = [
-    { code: 'pt-BR-AntonioNeural', label: 'Português (BR) - Antônio (Masculino)', flag: '🇧🇷' },
-    { code: 'pt-BR-FranciscaNeural', label: 'Português (BR) - Francisca (Feminino)', flag: '🇧🇷' },
-    { code: 'pt-PT-DuarteNeural', label: 'Português (PT) - Duarte (Masculino)', flag: '🇵🇹' },
-    { code: 'pt-PT-RaquelNeural', label: 'Português (PT) - Raquel (Feminino)', flag: '🇵🇹' },
-    { code: 'en-US-GuyNeural', label: 'English (US) - Guy (Male)', flag: '🇺🇸' },
-    { code: 'en-US-JennyNeural', label: 'English (US) - Jenny (Female)', flag: '🇺🇸' },
-    { code: 'es-ES-AlvaroNeural', label: 'Español (ES) - Álvaro (Masculino)', flag: '🇪🇸' },
-    { code: 'ar-SA-ZariyahNeural', label: 'العربية - Zariyah (Female)', flag: '🇸🇦' }
-  ];
+  // Todas as vozes (o card e a edição mostram só as do idioma do livro)
+  const availableVoices = VOICES;
 
 
   // ----- Ações do cabeçalho: um botão redondo por ação (a ação principal fica à direita) -----
@@ -2348,14 +2503,15 @@ export function useAppState() {
           icon: <RotateCcw size={13} />,
           onConfirm: () => {
             ['app_theme_mode', 'app_accent_color', 'app_font_size', 'app_interface_lang', 'app_default_voice', 'file_type_option', 'sync_text_destination', 'audio_quality']
-              .forEach(key => localStorage.removeItem(key));
+              .forEach(key => removeKey(key));
             setThemeMode('system');
             setAccentColor('blue');
             setUiFontSize('standard');
             setInterfaceLang('pt-BR');
             setDefaultVoice('pt-BR-AntonioNeural');
-            setFileTypeOption('single');
+            setFileTypeOption('m4b');
             setSyncTextDestination('both');
+            setSyncTextGranularity('sentences');
             setAudioQuality('high');
             showToast("Ajustes restaurados com sucesso!");
           },
@@ -2397,7 +2553,7 @@ export function useAppState() {
           tone: 'danger', disabled: n === 0,
           confirm: {
             title: n === 1 ? 'Excluir 1 item?' : `Excluir ${n} itens?`,
-            description: 'Os itens selecionados saem de Convertidos. Os arquivos de áudio e de texto continuam na pasta.',
+            description: 'Os itens saem de Convertidos e os arquivos de áudio e de texto vão para a Lixeira do computador.',
             content: <ConfirmItemList items={selectedItems} />,
             estimatedHeight: 150 + Math.min(selectedItems.length, 4) * 56,
             confirmLabel: 'Excluir',
@@ -2449,11 +2605,10 @@ export function useAppState() {
           exit={{ opacity: 0, scale: 0.25, x: 12, transition: { duration: 0.2, ease: "easeIn" } }}
           transition={{ type: "spring", stiffness: 550, damping: 25, mass: 0.45 }}
           className="relative flex items-center shrink-0 ml-auto"
-          title={`Adicionado ao histórico: ${historyNotificationBadge.title}`}
+          title={`Adicionado a Convertidos: ${historyNotificationBadge.title}`}
         >
-          <div className="relative w-6 h-8 rounded-[5px] overflow-hidden shadow-[0_4px_12px_rgba(0,0,0,0.35),0_0_12px_rgba(var(--winblue-rgb),0.5)] border border-winblue/70 bg-black/20 shrink-0">
+          <div className="relative w-6 h-8 rounded-[5px] overflow-hidden shadow-[0_4px_12px_rgba(0,0,0,0.3)] border border-white/15 bg-black/20 shrink-0">
             <img src={historyNotificationBadge.coverUrl} alt={historyNotificationBadge.title} className="w-full h-full object-cover" />
-            <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-winblue ring-2 ring-card shadow-sm animate-pulse" />
           </div>
         </motion.div>
       )}
@@ -2524,9 +2679,12 @@ export function useAppState() {
     setCoverColorsMap,
     outputFolder,
     setOutputFolder,
-    destinationFolderInputRef,
     handleSelectOutputFolder,
-    handleDestinationFolderInputChange,
+    handleRetryAllFailed,
+    syncTextGranularity,
+    setSyncTextGranularity,
+    ensureOutputFolder,
+    openOutputFolder,
     handleClearCache,
     defaultVoice,
     setDefaultVoice,
@@ -2731,7 +2889,9 @@ export function useAppState() {
     availableVoices,
     headerActions,
     selectRoot,
+    estimateConversion,
     historyBadge,
+    historyBadgeActive: Boolean(historyNotificationBadge),
     showBack,
   };
 }

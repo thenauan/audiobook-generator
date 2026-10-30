@@ -59,15 +59,15 @@ export default function App() {
       {/* Menu lateral (computador) */}
       <Sidebar
         brand={
-          <button type="button" onClick={() => selectRoot('converter')} className="flex items-center gap-1.5 text-[17px] cursor-pointer select-none">
+          <button type="button" onClick={() => selectRoot('converter')} className="flex items-center text-[17px] cursor-pointer select-none">
             <AppGlyph size={24} className="shrink-0" />
-            <span className="whitespace-nowrap"><span className="font-bold">Audiobook</span> <span className="font-normal">Generator</span></span>
+            <span className="whitespace-nowrap"><span className="font-bold">Audiobook</span><span className="font-normal">Generator</span></span>
           </button>
         }
         topItems={[
           { id: 'search', label: t.search, icon: <Search size={18} /> },
           { id: 'converter', label: t.converter, icon: <AiStarsIcon size={18} /> },
-          { id: 'history', label: t.history, icon: <BookHeadphones size={18} />, badge: historyBadge },
+          { id: 'history', label: t.history, icon: <BookHeadphones size={18} />, badge: historyBadge, highlight: app.historyBadgeActive },
         ]}
         bottomItems={[
           { id: 'other-apps', label: t.otherApps, icon: <RiApps2Line size={18} /> },
@@ -192,11 +192,6 @@ export default function App() {
                               if (currentScreen !== 'search') {
                                 navigateTo('search');
                               }
-                              if (val.trim().toLowerCase() === '//dev') {
-                                setIsDevModeActive(true);
-                                localStorage.setItem('app_dev_mode', 'true');
-                                showToast("Modo Desenvolvedor ativado!");
-                              }
                             }}
                             onKeyDown={(e) => {
                               if (e.key === 'Enter') {
@@ -228,24 +223,12 @@ export default function App() {
                                 exit={{ opacity: 0, y: 8, scale: 0.98 }}
                                 transition={{ type: "spring", stiffness: 520, damping: 36, mass: 0.55 }}
                                 onClick={(e) => e.stopPropagation()}
-                                className="absolute top-full max-md:left-0 md:left-1/2 md:-translate-x-1/2 mt-3 w-full md:min-w-[520px] max-h-[calc(100vh-220px)] bg-card/95 backdrop-blur-3xl border border-[var(--button-secondary-bg)] rounded-[28px] shadow-2xl z-[100] flex flex-col overflow-hidden"
+                                className="absolute top-full max-md:left-0 md:left-1/2 md:-translate-x-1/2 mt-3 w-full md:min-w-[520px] max-h-[calc(100vh-220px)] bg-card/95 backdrop-blur-3xl border border-[var(--button-secondary-bg)] rounded-[22px] shadow-2xl z-[100] flex flex-col overflow-hidden"
                               >
                                 {searchQuery.trim().toLowerCase() === '//dev' ? (
                                   <>
-                                    <div className="px-5 pt-4 pb-1 shrink-0 flex items-center justify-between">
-                                      <div className="text-amber-400">
-                                        <h3 className="text-sm font-bold truncate">Modo de desenvolvedor</h3>
-                                      </div>
-                                      <button
-                                        onClick={() => {
-                                          handleExitDevMode();
-                                          setSearchQuery('');
-                                        }}
-                                        className="text-xs text-amber-400/80 hover:text-amber-300 font-semibold cursor-pointer inline-flex items-center gap-1.5"
-                                      >
-                                        <Power size={13} className="shrink-0" />
-                                        <span>Desativar</span>
-                                      </button>
+                                    <div className="px-5 pt-4 pb-1 shrink-0">
+                                      <h3 className="text-xl font-bold truncate text-amber-400">Modo de desenvolvedor</h3>
                                     </div>
 
                                     <div className="space-y-1 flex-1 overflow-y-auto custom-scrollbar p-3 pb-6">
@@ -256,7 +239,7 @@ export default function App() {
                                             opt.onClick();
                                             setSearchQuery('');
                                           }}
-                                          className="group/searchitem relative flex items-center gap-3 py-2.5 px-4 rounded-full cursor-pointer transition-all border border-transparent hover:bg-[var(--button-secondary-bg)]/50 select-none"
+                                          className="group/searchitem relative flex items-center gap-3 py-2.5 px-4 rounded-2xl cursor-pointer transition-all hover:bg-[var(--button-secondary-bg)]/50 select-none"
                                         >
                                           <div className="shrink-0">
                                             {opt.icon}
@@ -272,7 +255,7 @@ export default function App() {
                                 ) : (
                                   <>
                                     <div className="px-5 pt-4 pb-1 shrink-0 flex items-center justify-between">
-                                      <h3 className="text-sm font-bold text-[var(--text-main)] truncate">
+                                      <h3 className="text-xl font-bold text-[var(--text-main)] truncate">
                                         {computedSearchResults.total > 0 
                                           ? `Resultados para "${searchQuery}"`
                                           : `Nenhum resultado para "${searchQuery}"`}
@@ -299,7 +282,7 @@ export default function App() {
                                                     toggleSnippet(book.path);
                                                   }
                                                 }}
-                                                className="group/searchitem relative flex items-center gap-3.5 py-2 pl-2.5 pr-4 rounded-3xl cursor-pointer transition-all border border-transparent hover:bg-[var(--button-secondary-bg)]/50 select-none"
+                                                className="group/searchitem relative flex items-center gap-3.5 py-2 pl-2.5 pr-4 rounded-2xl cursor-pointer transition-all hover:bg-[var(--button-secondary-bg)]/50 select-none"
                                               >
                                                 <div className="relative h-12 aspect-[1/1.6] shrink-0 rounded-[14px] overflow-hidden shadow-sm bg-black/20">
                                                   <img
@@ -368,7 +351,7 @@ export default function App() {
                                                   setViewingTextAnchor(e.currentTarget);
                                                   setViewingTextModal(text);
                                                 }}
-                                                className="group/searchitem relative flex items-center gap-3.5 py-2 pl-2.5 pr-4 rounded-3xl cursor-pointer transition-all border border-transparent hover:bg-[var(--button-secondary-bg)]/50 select-none"
+                                                className="group/searchitem relative flex items-center gap-3.5 py-2 pl-2.5 pr-4 rounded-2xl cursor-pointer transition-all hover:bg-[var(--button-secondary-bg)]/50 select-none"
                                               >
                                                 <img
                                                   src={coverUrl}

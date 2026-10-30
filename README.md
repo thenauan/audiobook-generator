@@ -1,55 +1,131 @@
-# Audiobook Generator with AI
+# Audiobook Generator — Free Ebook to Audiobook Converter (EPUB, PDF, MOBI, TXT → M4B, MP3)
 
-An AI-powered tool to automatically generate high-quality audiobooks from text or PDF files. Features translation, voice synthesis (TTS), and metadata extraction.
+**Audiobook Generator** is a free, open-source desktop app that converts ebooks into audiobooks with natural-sounding AI neural voices. Turn **EPUB, PDF, MOBI and TXT** files into **M4B or MP3 audiobooks** with chapters, cover art and text synchronized with the narration — on Windows, macOS and Linux.
+
+- 📚 **Ebook to audiobook**: EPUB, PDF, MOBI/AZW and TXT, one book or many at once
+- 🗣️ **300+ neural voices in 70+ languages** (Microsoft Edge text-to-speech)
+- 🎧 **M4B audiobooks** with chapters and cover, plus MP3, Opus, FLAC and WAV
+- 📝 **Synchronized text** (read along while you listen): .lrc, .srt and .sync.json, by sentence or word by word
+- 🌍 **Translation** before narrating, and automatic language detection
+- 🖥️ **Interface in 5 languages**: Português, English, Español, العربية, Русский
+
+**[⬇️ Download the latest version](https://github.com/thenauan/audiobook-generator/releases/latest)** · [Installation](#installation) · [How to use](#how-to-use) · [Supported languages](#supported-languages) · [FAQ](#faq)
+
+---
 
 ## Features
-- **PDF & E-book Support:** Convert Epub, Pdf, Mobi and Txt files into audiobooks, one book or many at once.
-- **Audio Formats:** M4B (AAC), MP3, Opus, FLAC and WAV, in a single file with chapters and cover or one MP3 per chapter, with Standard, High or Maximum quality.
-- **AI Text-To-Speech (TTS):** Uses Edge TTS neural voices, with a per-book pronunciation dictionary.
-- **Synced Text:** Generates text synced with the narration (from the book file or from the audio alone), embedded in the audio file, saved to the library folder (.lrc, .srt, .sync.json), or both.
-- **Language Detection & Translation:** Translates books in other languages before narrating.
-- **Automatic Metadata:** Extracts cover images, titles, authors and chapters, all editable before and after conversion.
-- **Converted library:** Listen to previews, edit metadata, generate text and delete one or many items with confirmation.
+
+| | |
+|---|---|
+| **Input formats** | EPUB, PDF (with selectable text), MOBI / AZW / AZW3, TXT |
+| **Output formats** | M4B (AAC, default), MP3 (single file or one per chapter), Opus, FLAC, WAV |
+| **Audio quality** | Standard, High or Maximum (up to MP3 320 kbps / AAC 256 kbps) |
+| **Chapters** | Detected from the book's table of contents and headings, editable before converting |
+| **Cover & metadata** | Title, author, genre, cover and chapters extracted automatically and editable |
+| **Voices** | 300+ Microsoft neural voices in 70+ languages, with audio samples to preview |
+| **Synced text** | Embedded in the audio file and/or saved as .lrc, .srt and .sync.json — by sentence, by word, or both |
+| **Translation** | Translate a book into Portuguese, English, Spanish, Arabic or Russian before narrating |
+| **Batch conversion** | Convert several books at once; interrupted conversions resume where they stopped |
+| **Library** | "Converted" screen to listen to previews, edit, generate text and delete books (to the Recycle Bin) |
+
+## Supported languages
+
+### Interface languages
+The app interface is available in:
+
+| Language | In the app |
+|---|---|
+| 🇧🇷 Portuguese (Brazil) | Português — *Conversor de e-books em audiobooks* |
+| 🇺🇸 English | English — *Ebook to audiobook converter* |
+| 🇪🇸 Spanish | Español — *Conversor de libros electrónicos a audiolibros* |
+| 🇸🇦 Arabic | العربية — *محوّل الكتب الإلكترونية إلى كتب صوتية* |
+| 🇷🇺 Russian | Русский — *Конвертер электронных книг в аудиокниги* |
+
+### Narration languages (70+)
+Books can be narrated in **any language that has a Microsoft neural voice** — 313 voices in 73 languages — even if the interface is not in that language: Afrikaans, Albanian, Amharic, Arabic, Azerbaijani, Bengali, Bosnian, Bulgarian, Burmese, Catalan, Chinese (Mandarin, Cantonese, Taiwanese), Croatian, Czech, Danish, Dutch, English (US, UK, Australia, India and more), Estonian, Filipino, Finnish, French, Galician, Georgian, German, Greek, Gujarati, Hebrew, Hindi, Hungarian, Icelandic, Indonesian, Irish, Italian, Japanese, Javanese, Kannada, Kazakh, Khmer, Korean, Lao, Latvian, Lithuanian, Macedonian, Malay, Malayalam, Marathi, Mongolian, Nepali, Norwegian, Pashto, Persian, Polish, Portuguese (Brazil and Portugal), Romanian, Russian, Serbian, Sinhala, Slovak, Slovenian, Somali, Spanish (Spain, Mexico and Latin America), Sundanese, Swahili, Swedish, Tamil, Telugu, Thai, Turkish, Ukrainian, Urdu, Uzbek, Vietnamese, Welsh and Zulu.
+
+All voices in Portuguese, English, Spanish, Arabic and Russian come with an audio sample you can play before choosing.
 
 ## Installation
 
-### Prerequisites (For developers)
-If you wish to run the app manually from source, ensure you have:
-- [Node.js](https://nodejs.org/) (v18+)
-- [Python 3](https://www.python.org/) (v3.10+)
-- [FFmpeg](https://ffmpeg.org/) (needed to export M4B, Opus, FLAC and WAV)
+> An internet connection is needed during installation (to download dependencies, about 300 MB) and while converting (the voices are generated by Microsoft's online text-to-speech service).
 
-### Standard Installation (For End Users)
-> **Note:** An active internet connection is required during the first installation to download dependencies (~300MB).
+### Windows
+1. Download `Audiobook-Generator-with-AI-Windows.zip` from the [Releases](https://github.com/thenauan/audiobook-generator/releases) page.
+2. Extract the folder wherever you like.
+3. Run `Installer.exe`. It installs everything the app needs (including FFmpeg, through winget, when missing).
+4. Open the app from the Desktop shortcut **Audiobook Generator with AI**.
 
-**Windows:**
-The installer also installs FFmpeg (via winget) when it is missing.
-1. Download the `Audiobook-Generator-with-AI-Windows.zip` from the [Releases](https://github.com/thenauan/audiobook-generator/releases) page.
-2. Extract the folder to your preferred location.
-3. Run `Installer.exe`.
-4. Follow the prompts to create a Desktop Shortcut.
-
-**Mac / Linux:**
-1. Download the `Audiobook-Generator-with-AI-Unix.zip` from the [Releases](https://github.com/thenauan/audiobook-generator/releases) page.
+### macOS / Linux
+1. Download `Audiobook-Generator-with-AI-Unix.zip` from the [Releases](https://github.com/thenauan/audiobook-generator/releases) page.
 2. Extract the folder.
 3. Open a terminal in the folder and run:
-   - Mac: `bash installer_mac.sh`
+   - macOS: `bash installer_mac.sh`
    - Linux: `bash installer_linux.sh`
-4. The application will be added to your Desktop or Applications menu.
+4. The app is added to your Desktop or Applications menu.
+
+### Requirements
+- [Node.js](https://nodejs.org/) 18 or newer
+- [Python](https://www.python.org/) 3.10 or newer
+- [FFmpeg](https://ffmpeg.org/) (for M4B, Opus, FLAC and WAV, and chapter volume normalization)
+
+The installers check and install these for you.
+
+## How to use
+
+1. **First launch:** choose the interface language and, if you want, set the defaults: theme, voice, format, quality, synced text and the folder where audiobooks are saved (if you skip it, the app creates `Documents/Audiobook Generator`).
+2. **Add ebooks:** drag EPUB, PDF, MOBI or TXT files into the **Converter**, or click to choose them. The cover, title, author, language and chapters are read automatically.
+3. **Adjust each book (optional):** on each card you can change the voice (hover a voice to hear its sample), the format, the language (or translate the book), genre, narrator and chapters.
+4. **Convert:** click **Converter**. Each card shows the progress, the parts narrated, the real download speed and the remaining time. If something fails, the card explains why and you can retry one book or all of them.
+5. **Listen:** finished audiobooks appear in **Converted** and in your save folder, ready for any audiobook player — including [Audiobook Player](https://github.com/thenauan/audiobook-player), which reads the synced text.
+
+The **Help** screen inside the app has step-by-step guides for every feature.
+
+## FAQ
+
+**Is it free?** Yes. The app is free and open source (MIT license).
+
+**Which format should I choose?** M4B is the standard audiobook format: one file with chapters and cover, supported by most audiobook apps. MP3 plays everywhere.
+
+**Can I convert a PDF?** Yes, if the PDF has selectable text. Scanned PDFs (images only) need OCR first.
+
+**Can I convert DRM-protected ebooks?** No. Protected files are detected and the app tells you it cannot read them.
+
+**Can I narrate a French (or Japanese, Greek…) book with the interface in English?** Yes. Interface and narration are independent; the book is narrated by a voice of its own language.
+
+**Does it work offline?** The app runs on your computer, but the voices (and translation) need an internet connection while converting.
+
+## Other languages · Outros idiomas · Otros idiomas · لغات أخرى · Другие языки
+
+### 🇧🇷 Português — Conversor de e-books em audiobooks
+O **Audiobook Generator** é um aplicativo gratuito para **converter e-books em audiobooks** com vozes neurais realistas. Transforme livros em **EPUB, PDF, MOBI e TXT** em **audiolivros M4B ou MP3**, com capítulos, capa e texto sincronizado com a narração. A interface está em português e a narração funciona em mais de 70 idiomas. Funciona no Windows, macOS e Linux. [Baixe a versão mais recente](https://github.com/thenauan/audiobook-generator/releases/latest), rode o instalador e arraste seus livros para o Conversor.
+
+### 🇪🇸 Español — Convertir libros electrónicos en audiolibros
+**Audiobook Generator** es una aplicación gratuita para **convertir libros electrónicos en audiolibros** con voces neuronales naturales. Convierte archivos **EPUB, PDF, MOBI y TXT** en **audiolibros M4B o MP3**, con capítulos, portada y texto sincronizado con la narración. La interfaz está disponible en español y la narración funciona en más de 70 idiomas. Funciona en Windows, macOS y Linux. [Descarga la última versión](https://github.com/thenauan/audiobook-generator/releases/latest), ejecuta el instalador y arrastra tus libros al Conversor.
+
+### 🇸🇦 العربية — تحويل الكتب الإلكترونية إلى كتب صوتية
+**Audiobook Generator** تطبيق مجاني **لتحويل الكتب الإلكترونية إلى كتب صوتية** بأصوات عصبية طبيعية. حوّل ملفات **EPUB وPDF وMOBI وTXT** إلى **كتب صوتية بصيغة M4B أو MP3** مع الفصول والغلاف ونص متزامن مع القراءة. الواجهة متوفرة باللغة العربية، والقراءة الصوتية تدعم أكثر من 70 لغة. يعمل على Windows وmacOS وLinux. [حمّل أحدث إصدار](https://github.com/thenauan/audiobook-generator/releases/latest) وشغّل برنامج التثبيت ثم اسحب كتبك إلى المحوّل.
+
+### 🇷🇺 Русский — Конвертер электронных книг в аудиокниги
+**Audiobook Generator** — бесплатное приложение, которое **превращает электронные книги в аудиокниги** с помощью естественных нейронных голосов. Конвертируйте файлы **EPUB, PDF, MOBI и TXT** в **аудиокниги M4B или MP3** с главами, обложкой и текстом, синхронизированным с озвучкой. Интерфейс доступен на русском языке, а озвучка работает более чем на 70 языках. Работает в Windows, macOS и Linux. [Скачайте последнюю версию](https://github.com/thenauan/audiobook-generator/releases/latest), запустите установщик и перетащите книги в Конвертер.
 
 ## Development
 
-To run the application in developer mode (opens in browser):
 ```bash
-# Install Node dependencies
+# Node dependencies
 npm install
 
-# Install Python dependencies
-python -m pip install ebooklib beautifulsoup4 pypdf pdfplumber mobi deep-translator langdetect mutagen edge-tts tqdm colorama faster-whisper
+# Python dependencies
+python -m pip install ebooklib beautifulsoup4 lxml pypdf pdfplumber mobi deep-translator langdetect mutagen edge-tts tqdm colorama faster-whisper
 
-# Run the dev server
+# Run (opens the app in the browser)
 npm run dev
 ```
 
 ## License
+
 MIT License
+
+---
+
+<sub>Keywords: ebook to audiobook converter, epub to audiobook, pdf to audiobook, epub to m4b, epub to mp3, mobi to audiobook, text to speech audiobook maker, AI audiobook generator, free audiobook creator, edge tts audiobook, conversor de ebook para audiobook, converter epub em audiolivro, conversor de pdf em audiobook, convertir epub a audiolibro, convertir pdf a audiolibro, конвертер epub в аудиокнигу, озвучка книг, تحويل الكتب إلى صوت, كتاب صوتي.</sub>

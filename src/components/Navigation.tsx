@@ -16,19 +16,23 @@ export interface NavTab {
   icon: React.ReactNode;
   // Selo à direita do item no menu lateral (ex.: capa do último item adicionado ao histórico)
   badge?: React.ReactNode;
+  // Destaque leve (o mesmo brilho do hover) enquanto o selo está visível
+  highlight?: boolean;
 }
 
-export function SidebarItem({ icon, label, active, onClick, badge }: { icon: React.ReactNode; label: string; active: boolean; onClick: () => void; badge?: React.ReactNode }) {
+export function SidebarItem({ icon, label, active, onClick, badge, highlight }: { icon: React.ReactNode; label: string; active: boolean; onClick: () => void; badge?: React.ReactNode; highlight?: boolean }) {
   // Mesmo padrão dos itens de pop-up: destaque branco/cinza com brilho no hover e cor de destaque quando selecionado
   return (
     <button
       onClick={onClick}
       aria-current={active ? 'page' : undefined}
       className={cn(
-        "w-full flex items-center gap-3 px-3.5 py-2.5 rounded-2xl text-sm font-semibold transition-all duration-150 select-none border",
+        "w-full flex items-center gap-3 px-[15px] py-[11px] rounded-2xl text-sm font-semibold transition-all duration-150 select-none",
         active
-          ? "bg-winblue/15 text-winblue border-winblue/25 shadow-[0_0_12px_rgba(var(--winblue-rgb),0.18)]"
-          : "border-transparent text-[var(--text-main)] hover:bg-white/15 hover:text-white hover:border-white/20 hover:shadow-[0_0_12px_rgba(255,255,255,0.15)]"
+          ? "bg-winblue/15 text-winblue shadow-[0_0_12px_rgba(var(--winblue-rgb),0.18)]"
+          : highlight
+            ? "bg-white/15 shadow-[0_0_12px_rgba(255,255,255,0.15)] text-[var(--text-main)]"
+            : "text-[var(--text-main)] hover:bg-white/15 hover:text-white hover:shadow-[0_0_12px_rgba(255,255,255,0.15)]"
       )}
     >
       <span className="shrink-0 flex items-center justify-center text-inherit">{icon}</span>
@@ -57,13 +61,13 @@ export function Sidebar({
         <div className="flex items-center gap-1.5 px-3 text-[var(--text-main)] text-xl tracking-tight mb-6">{brand}</div>
         <div className="flex flex-col gap-1.5 px-1">
           {topItems.map(item => (
-            <SidebarItem key={item.id} icon={item.icon} label={item.label} badge={item.badge} active={activeRoot === item.id} onClick={() => onSelect(item.id)} />
+            <SidebarItem key={item.id} icon={item.icon} label={item.label} badge={item.badge} highlight={item.highlight} active={activeRoot === item.id} onClick={() => onSelect(item.id)} />
           ))}
         </div>
       </div>
       <nav className="flex flex-col gap-1.5 px-1 mt-6">
         {bottomItems.map(item => (
-          <SidebarItem key={item.id} icon={item.icon} label={item.label} badge={item.badge} active={activeRoot === item.id} onClick={() => onSelect(item.id)} />
+          <SidebarItem key={item.id} icon={item.icon} label={item.label} badge={item.badge} highlight={item.highlight} active={activeRoot === item.id} onClick={() => onSelect(item.id)} />
         ))}
       </nav>
     </aside>

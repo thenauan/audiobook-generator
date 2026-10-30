@@ -1,22 +1,30 @@
 // ===== Tela: settings-conversion =====
 import { motion } from 'motion/react';
-import { FileText, Headphones, ChevronDown, Volume2, FolderTree, Mic, HelpCircle, FileAudio2, FolderOpen, CopyCheck } from 'lucide-react';
+import { FileText, Headphones, ChevronDown, Volume2, FolderTree, Mic, HelpCircle, FileAudio2, FolderOpen, CopyCheck, Rows3, AlignLeft, WholeWord } from 'lucide-react';
 import { AUDIO_FORMATS, AUDIO_QUALITIES, audioFormatInfo, audioQualityLabel, type AudioQuality } from '../app/audioFormats';
 import { audioFormatIcon, audioQualityIcon } from '../app/audioFormatIcons';
-import type { SyncTextDestination } from '../app/types';
+import type { SyncTextDestination, SyncTextGranularity } from '../app/types';
 
 const DESTINATION_LABELS: Record<SyncTextDestination, string> = {
   metadata: 'Metadados do audiobook',
   library: 'Pasta da biblioteca',
   both: 'Ambos',
 };
+
+const GRANULARITY_LABELS: Record<SyncTextGranularity, string> = {
+  sentences: 'Frases',
+  words: 'Palavras',
+  both: 'Frases e palavras',
+};
 import { LuBookAudio } from 'react-icons/lu';
 import { transicaoConteudo } from '../navigation/transitions';
 import { SettingToggle } from '../components/cards/SettingToggle';
 import { useApp } from '../app/AppContext';
+import { VOICES } from '../data/voices';
+import { voicePickerOptions } from '../data/voiceOptions';
 
 export function SettingsConversionScreen() {
-  const { showToast, defaultVoice, setDefaultVoice, fileTypeOption, setFileTypeOption, generateSyncTextDefault, setGenerateSyncTextDefault, syncTextDestination, setSyncTextDestination, activeSettingSelector, setActiveSettingSelector, audioQuality, setAudioQuality } = useApp();
+  const { showToast, interfaceLang, defaultVoice, setDefaultVoice, fileTypeOption, setFileTypeOption, generateSyncTextDefault, setGenerateSyncTextDefault, syncTextDestination, setSyncTextDestination, syncTextGranularity, setSyncTextGranularity, activeSettingSelector, setActiveSettingSelector, audioQuality, setAudioQuality } = useApp();
   return (
     <motion.div
       key="screen-settings-conversion"
@@ -27,7 +35,7 @@ export function SettingsConversionScreen() {
       className="w-full flex flex-col"
     >
       <div className="mb-12 max-md:mb-6">
-        <h1 className="text-4xl md:text-5xl font-semibold text-[var(--text-main)] tracking-tight">Conversão de Áudio</h1>
+        <h1 className="text-4xl md:text-5xl font-semibold text-[var(--text-main)] tracking-tight">Conversão de áudio</h1>
       </div>
 
       <div className="space-y-2.5">
@@ -52,8 +60,9 @@ export function SettingsConversionScreen() {
               setActiveSettingSelector({
                 hideTitle: true,
                 id: 'file-type',
+                captions: true,
                 triggerEl: e.currentTarget,
-                title: 'Formato dos Arquivos',
+                title: 'Formato dos arquivos',
                 subtitle: 'M4B, MP3, Opus, FLAC, WAV ou um arquivo por capítulo',
                 currentValue: fileTypeOption,
                 options: [
@@ -64,7 +73,7 @@ export function SettingsConversionScreen() {
             }}
             className="h-8 pl-3.5 pr-2.5 rounded-full bg-card/75 backdrop-blur-3xl border border-[var(--text-main)]/10 shadow-sm text-[var(--text-main)] hover:bg-white/15 hover:border-white/25 hover:shadow-[0_0_12px_rgba(255,255,255,0.2)] flex items-center gap-1.5 text-xs font-semibold transition-all shrink-0 cursor-pointer [&_svg]:text-inherit"
           >
-            <span>{audioFormatInfo(fileTypeOption === 'ask' ? 'single' : fileTypeOption).label}</span>
+            <span>{audioFormatInfo(fileTypeOption === 'ask' ? 'm4b' : fileTypeOption).label}</span>
             <ChevronDown size={14} className="-mr-0.5 text-inherit" />
           </motion.button>
         </div>
@@ -91,19 +100,16 @@ export function SettingsConversionScreen() {
                 hideTitle: true,
                 id: 'voice',
                 triggerEl: e.currentTarget,
-                title: 'Voz Neural Padrão',
-                subtitle: 'Voz utilizada para narrar conteúdos em português',
+                title: 'Voz neural padrão',
+                subtitle: 'Voz usada nos livros novos e idioma das traduções',
                 currentValue: defaultVoice,
-                options: [
-                  { value: 'pt-BR-AntonioNeural', label: 'Antônio (Masculino)', description: 'Voz equilibrada e formal', icon: <Mic size={14} className="shrink-0" /> },
-                  { value: 'pt-BR-FranciscaNeural', label: 'Francisca (Feminino)', description: 'Voz expressiva e natural', icon: <Mic size={14} className="shrink-0" /> },
-                ],
+                options: voicePickerOptions(interfaceLang, defaultVoice, setDefaultVoice),
                 onSelect: (val) => setDefaultVoice(val)
               });
             }}
             className="h-8 pl-3.5 pr-2.5 rounded-full bg-card/75 backdrop-blur-3xl border border-[var(--text-main)]/10 shadow-sm text-[var(--text-main)] hover:bg-white/15 hover:border-white/25 hover:shadow-[0_0_12px_rgba(255,255,255,0.2)] flex items-center gap-1.5 text-xs font-semibold transition-all shrink-0 cursor-pointer [&_svg]:text-inherit"
           >
-            <span>{defaultVoice === 'pt-BR-FranciscaNeural' ? 'Francisca (Feminino)' : 'Antônio (Masculino)'}</span>
+            <span>{(() => { const v = VOICES.find(x => x.code === defaultVoice); return v ? `${v.flag} ${v.label.split(' - ')[1] || v.label}` : defaultVoice; })()}</span>
             <ChevronDown size={14} className="-mr-0.5 text-inherit" />
           </motion.button>
         </div>
@@ -129,6 +135,7 @@ export function SettingsConversionScreen() {
               setActiveSettingSelector({
                 hideTitle: true,
                 id: 'audio-quality',
+                captions: true,
                 triggerEl: e.currentTarget,
                 title: 'Qualidade de áudio',
                 subtitle: 'Vale para MP3, M4B e Opus (FLAC e WAV são sempre sem perda)',
@@ -195,6 +202,7 @@ export function SettingsConversionScreen() {
               setActiveSettingSelector({
                 hideTitle: true,
                 id: 'sync-destination',
+                captions: true,
                 triggerEl: e.currentTarget,
                 title: 'Onde salvar o texto',
                 subtitle: 'Vale para a conversão e para "Gerar texto" em Convertidos',
@@ -213,6 +221,51 @@ export function SettingsConversionScreen() {
             className="h-8 pl-3.5 pr-2.5 rounded-full bg-card/75 backdrop-blur-3xl border border-[var(--text-main)]/10 shadow-sm text-[var(--text-main)] hover:bg-white/15 hover:border-white/25 hover:shadow-[0_0_12px_rgba(255,255,255,0.2)] flex items-center gap-1.5 text-xs font-semibold transition-all shrink-0 cursor-pointer [&_svg]:text-inherit"
           >
             <span>{DESTINATION_LABELS[syncTextDestination]}</span>
+            <ChevronDown size={14} className="-mr-0.5 text-inherit" />
+          </motion.button>
+        </div>
+
+        {/* Separação do texto sincronizado: frases, palavras ou as duas */}
+        <div className="settings-list-row py-3 sm:py-3.5 px-4 sm:px-5 rounded-[32px] bg-card/60 backdrop-blur-xl border border-[var(--text-main)]/10 transition-colors flex items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <div className="w-10 h-10 rounded-full bg-winblue/10 text-winblue flex items-center justify-center shrink-0">
+              <Rows3 size={20} />
+            </div>
+            <div className="flex flex-col">
+              <span className="font-semibold text-base text-[var(--text-main)]">Separação do texto sincronizado</span>
+              <span className="text-xs sm:text-sm text-[var(--text-muted)] mt-0.5">
+                Destacar o texto frase a frase, palavra por palavra ou nos dois níveis
+              </span>
+            </div>
+          </div>
+          <motion.button
+            whileHover={{ scale: 1.06 }}
+            whileTap={{ scale: 0.94 }}
+            animate={activeSettingSelector?.id === 'sync-granularity' ? { scale: 1.22, opacity: 0, pointerEvents: 'none' } : { scale: 1, opacity: 1, pointerEvents: 'auto' }}
+            transition={{ type: "spring", stiffness: 500, damping: 30 }}
+            onClick={(e) => {
+              e.stopPropagation();
+              setActiveSettingSelector({
+                hideTitle: true,
+                id: 'sync-granularity',
+                captions: true,
+                triggerEl: e.currentTarget,
+                title: 'Separação do texto',
+                currentValue: syncTextGranularity,
+                options: [
+                  { value: 'sentences', label: GRANULARITY_LABELS.sentences, description: 'Uma linha por frase, destacada enquanto é lida', icon: <AlignLeft size={14} className="shrink-0" /> },
+                  { value: 'words', label: GRANULARITY_LABELS.words, description: 'Cada palavra acende no momento em que é falada', icon: <WholeWord size={14} className="shrink-0" /> },
+                  { value: 'both', label: GRANULARITY_LABELS.both, description: 'Frases, com o tempo de cada palavra dentro delas', icon: <Rows3 size={14} className="shrink-0" /> },
+                ],
+                onSelect: (val) => {
+                  setSyncTextGranularity(val as SyncTextGranularity);
+                  showToast(`Texto sincronizado separado por ${GRANULARITY_LABELS[val as SyncTextGranularity].toLowerCase()}.`);
+                }
+              });
+            }}
+            className="h-8 pl-3.5 pr-2.5 rounded-full bg-card/75 backdrop-blur-3xl border border-[var(--text-main)]/10 shadow-sm text-[var(--text-main)] hover:bg-white/15 hover:border-white/25 hover:shadow-[0_0_12px_rgba(255,255,255,0.2)] flex items-center gap-1.5 text-xs font-semibold transition-all shrink-0 cursor-pointer [&_svg]:text-inherit"
+          >
+            <span>{GRANULARITY_LABELS[syncTextGranularity]}</span>
             <ChevronDown size={14} className="-mr-0.5 text-inherit" />
           </motion.button>
         </div>

@@ -127,8 +127,8 @@ export function AllAudiobooksScreen() {
                                 : 'w-full h-7 px-1 rounded-[12px] text-[10px] tracking-tight'
                             } ${
                               isSelected
-                                ? 'bg-winblue/20 text-winblue border border-winblue ring-1 ring-winblue/40 shadow-[0_0_14px_rgba(var(--winblue-rgb),0.45)] hover:bg-winblue/25 hover:shadow-[0_0_18px_rgba(var(--winblue-rgb),0.6)]'
-                                : 'text-[var(--text-muted)] border border-transparent hover:text-[var(--text-main)] hover:bg-white/20 hover:border-white/35 hover:shadow-[0_0_12px_rgba(255,255,255,0.25)]'
+                                ? 'bg-winblue/20 text-winblue shadow-[0_0_14px_rgba(var(--winblue-rgb),0.45)] hover:bg-winblue/25 hover:shadow-[0_0_18px_rgba(var(--winblue-rgb),0.6)]'
+                                : 'text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-white/20 hover:shadow-[0_0_12px_rgba(255,255,255,0.25)]'
                             }`}
                     title={group.title}
                   >

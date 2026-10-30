@@ -1,12 +1,51 @@
 // ===== Tela: settings-about =====
 import { motion } from 'motion/react';
-import { Trash2, Info, Code2, Cpu } from 'lucide-react';
+import { useCallback, useEffect, useState } from 'react';
+import { Info, Cpu, RefreshCw } from 'lucide-react';
 import { transicaoConteudo } from '../navigation/transitions';
 import { APP_VERSION } from '../app/screens';
 import { useApp } from '../app/AppContext';
 
 export function SettingsAboutScreen() {
-  const { navigateTo, t, showToast, handleClearCache, setIsDevModeActive } = useApp();
+  const { navigateTo, showToast } = useApp();
+
+  // Estado do motor de conversão
+  type Health = { python: string | null; edgeTts: boolean; ffmpeg: boolean; whisper: boolean };
+  const [health, setHealth] = useState<Health | 'checking' | 'offline'>('checking');
+  const checkEngine = useCallback(async () => {
+    setHealth('checking');
+    try {
+      const res = await fetch('/api/health');
+      setHealth(res.ok ? await res.json() : 'offline');
+    } catch {
+      setHealth('offline');
+    }
+  }, []);
+  useEffect(() => { checkEngine(); }, [checkEngine]);
+
+  let engineLabel = 'Verificando…';
+  let engineDetail = 'Python, vozes neurais (Edge TTS) e FFmpeg';
+  let engineTone = 'bg-card/75 border-[var(--text-main)]/10 text-[var(--text-muted)]';
+  if (health === 'offline') {
+    engineLabel = 'Sem resposta';
+    engineDetail = 'O serviço local não respondeu. Feche e abra o app.';
+    engineTone = 'bg-red-500/15 border-red-500/30 text-red-500';
+  } else if (health !== 'checking') {
+    const faltando = [
+      !health.python && 'Python',
+      !health.edgeTts && 'vozes (edge-tts)',
+      !health.ffmpeg && 'FFmpeg',
+    ].filter(Boolean) as string[];
+    if (faltando.length === 0) {
+      engineLabel = 'Pronto';
+      engineDetail = `Python ${health.python} · vozes neurais · FFmpeg${health.whisper ? ' · alinhamento de texto' : ''}`;
+      engineTone = 'bg-emerald-500/15 border-emerald-500/30 text-emerald-500';
+    } else {
+      engineLabel = 'Incompleto';
+      engineDetail = `Falta: ${faltando.join(', ')}. Rode o instalador de novo para corrigir.`;
+      engineTone = 'bg-amber-500/15 border-amber-500/30 text-amber-500';
+    }
+  }
   return (
     <motion.div
       key="screen-settings-about"
@@ -17,7 +56,7 @@ export function SettingsAboutScreen() {
       className="w-full flex flex-col"
     >
       <div className="mb-12 max-md:mb-6">
-        <h1 className="text-4xl md:text-5xl font-semibold text-[var(--text-main)] tracking-tight">Sistema e Sobre</h1>
+        <h1 className="text-4xl md:text-5xl font-semibold text-[var(--text-main)] tracking-tight">Sistema e sobre</h1>
       </div>
 
       <div className="space-y-2.5">
@@ -28,8 +67,8 @@ export function SettingsAboutScreen() {
               <Info size={20} />
             </div>
             <div className="flex flex-col">
-              <span className="font-semibold text-base text-[var(--text-main)]">Audiobook Generator Neural</span>
-              <span className="text-xs sm:text-sm text-[var(--text-muted)] mt-0.5">Versão oficial com design Fluent Glass & Mica</span>
+              <span className="font-semibold text-base text-[var(--text-main)]">Audiobook Generator</span>
+              <span className="text-xs sm:text-sm text-[var(--text-muted)] mt-0.5">Conversor de e-books em audiobooks com vozes neurais</span>
             </div>
           </div>
           <div className="h-8 px-4 rounded-full bg-winblue/15 text-winblue text-xs font-bold flex items-center justify-center">
@@ -37,70 +76,30 @@ export function SettingsAboutScreen() {
           </div>
         </div>
 
-        {/* Motor Neural */}
+        {/* Motor de conversão: verificado de verdade (Python, voz, FFmpeg e alinhamento) */}
         <div className="settings-list-row py-3 sm:py-3.5 px-4 sm:px-5 rounded-[32px] bg-card/60 backdrop-blur-xl border border-[var(--text-main)]/10 transition-colors flex items-center justify-between gap-4">
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-4 min-w-0">
             <div className="w-10 h-10 rounded-full bg-winblue/10 text-winblue flex items-center justify-center shrink-0">
               <Cpu size={20} />
             </div>
-            <div className="flex flex-col">
-              <span className="font-semibold text-base text-[var(--text-main)]">Motor de Síntese</span>
-              <span className="text-xs sm:text-sm text-[var(--text-muted)] mt-0.5">Microsoft Edge Neural Engine & FFmpeg</span>
-            </div>
-          </div>
-          <div className="h-8 px-4 rounded-full bg-emerald-500/15 text-emerald-500 text-xs font-bold flex items-center justify-center">
-            Ativo & Conectado
-          </div>
-        </div>
-
-        {/* Limpar cache */}
-        <div className="settings-list-row py-3 sm:py-3.5 px-4 sm:px-5 rounded-[32px] bg-card/60 backdrop-blur-xl border border-[var(--text-main)]/10 transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div className="flex items-start gap-4">
-            <div className="w-10 h-10 rounded-full bg-winblue/10 text-winblue flex items-center justify-center shrink-0 mt-0.5">
-              <Trash2 size={20} />
-            </div>
-            <div className="flex flex-col">
-              <span className="font-semibold text-base text-[var(--text-main)]">{(t as any).settings_clear_cache}</span>
-              <span className="text-xs sm:text-sm text-[var(--text-muted)] mt-0.5">{(t as any).settings_clear_cache_sub}</span>
+            <div className="flex flex-col min-w-0">
+              <span className="font-semibold text-base text-[var(--text-main)]">Motor de conversão</span>
+              <span className="text-xs sm:text-sm text-[var(--text-muted)] mt-0.5">{engineDetail}</span>
             </div>
           </div>
           <motion.button
+            type="button"
             whileHover={{ scale: 1.06 }}
             whileTap={{ scale: 0.94 }}
-            onClick={handleClearCache}
-            className="self-start sm:self-center h-8 px-4 rounded-full text-red-500 hover:text-red-600 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 font-semibold text-xs transition-all shadow-sm shrink-0 flex items-center gap-1.5 cursor-pointer"
+            onClick={checkEngine}
+            title="Verificar de novo"
+            className={`h-8 px-4 rounded-full text-xs font-bold flex items-center gap-1.5 shrink-0 cursor-pointer border transition-[background-color,box-shadow] ${engineTone}`}
           >
-            <span>{(t as any).settings_clear_cache_btn}</span>
-            <Trash2 size={14} />
+            <span>{engineLabel}</span>
+            <RefreshCw size={13} className={`shrink-0 ${health === 'checking' ? 'animate-spin' : ''}`} />
           </motion.button>
         </div>
 
-        {/* Modo Desenvolvedor */}
-        <div className="settings-list-row py-3 sm:py-3.5 px-4 sm:px-5 rounded-[32px] bg-card/60 backdrop-blur-xl border border-[var(--text-main)]/10 transition-colors flex items-center justify-between gap-4">
-          <div className="flex items-center gap-4">
-            <div className="w-10 h-10 rounded-full bg-amber-500/10 text-amber-500 flex items-center justify-center shrink-0">
-              <Code2 size={20} />
-            </div>
-            <div className="flex flex-col">
-              <span className="font-semibold text-base text-[var(--text-main)]">Painel de Desenvolvedor</span>
-              <span className="text-xs sm:text-sm text-[var(--text-muted)] mt-0.5">Simulação de testes, injeção de dados e depuração</span>
-            </div>
-          </div>
-          <motion.button
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            onClick={() => {
-              setIsDevModeActive(true);
-              localStorage.setItem('app_dev_mode', 'true');
-              navigateTo('search');
-              showToast("Modo Desenvolvedor ativado!");
-            }}
-            className="h-8 px-4 rounded-full bg-amber-500/15 text-amber-400 border border-amber-500/35 text-xs font-semibold shrink-0 cursor-pointer transition-all hover:bg-amber-500/25 hover:border-amber-500/60 hover:shadow-[0_0_12px_rgba(245,158,11,0.25)] [&_svg]:text-inherit inline-flex items-center gap-1.5"
-          >
-            <span>Ativar //dev</span>
-            <Code2 size={13} className="shrink-0" />
-          </motion.button>
-        </div>
       </div>
     </motion.div>
   );
