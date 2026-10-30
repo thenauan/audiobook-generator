@@ -2,13 +2,31 @@
 // do Audiobook Player. Cinco orbes desfocados com tons da capa se movem e trocam de cor; por cima, a capa
 // desfocada e uma camada de vidro (branca no tema claro, escura no escuro) para manter o texto legível.
 // O card pai precisa ser `relative isolate overflow-hidden`.
-import { useMemo } from 'react';
-import { motion, useReducedMotion } from 'motion/react';
+import { useMemo, useRef } from 'react';
+import { motion, useInView, useReducedMotion } from 'motion/react';
+import { useMotionPrefs } from '../../lib/motionPrefs';
 import { getCoverAmbientTones } from '../../lib/covers';
 
 export function CoverAmbientBackground({ color, cover, isDark }: { color: string; cover?: string; isDark: boolean }) {
   const reduce = useReducedMotion();
+  const { lite, paused } = useMotionPrefs();
+  const caixa = useRef<HTMLDivElement>(null);
+  const visivel = useInView(caixa, { margin: '120px' });
+  const parado = reduce || paused || !visivel; // anima só o que está na tela, com a janela em foco
   const t = useMemo(() => getCoverAmbientTones(color), [color]);
+
+  // Modo leve: sem orbes nem desfoque, só um gradiente parado com os tons da capa
+  if (lite) {
+    return (
+      <div
+        aria-hidden="true"
+        className="absolute inset-0 -z-10 pointer-events-none rounded-[inherit]"
+        style={{ background: isDark
+          ? `linear-gradient(135deg, ${t.toneDeep} 0%, ${t.toneVeryDark} 55%, #05070c 100%)`
+          : `linear-gradient(135deg, ${t.tonePastel} 0%, ${t.toneWhiteTint} 60%, #ffffff 100%)` }}
+      />
+    );
+  }
 
   const orbs = [
     {
@@ -44,13 +62,13 @@ export function CoverAmbientBackground({ color, cover, isDark }: { color: string
   ];
 
   return (
-    <div aria-hidden="true" className={`absolute inset-0 -z-10 overflow-hidden pointer-events-none rounded-[inherit] ${isDark ? 'bg-[#03060c]' : 'bg-white'}`}>
+    <div ref={caixa} aria-hidden="true" className={`absolute inset-0 -z-10 overflow-hidden pointer-events-none rounded-[inherit] ${isDark ? 'bg-[#03060c]' : 'bg-white'}`}>
       {orbs.map((orb, i) => (
         <motion.div
           key={i}
           className={`absolute aspect-square rounded-full transform-gpu will-change-transform ${orb.className}`}
           style={{ backgroundColor: orb.colors[0] }}
-          animate={reduce ? undefined : { x: orb.x, y: orb.y, scale: orb.scale, backgroundColor: orb.colors }}
+          animate={parado ? undefined : { x: orb.x, y: orb.y, scale: orb.scale, backgroundColor: orb.colors }}
           transition={{ duration: orb.duration, repeat: Infinity, ease: 'easeInOut' }}
         />
       ))}

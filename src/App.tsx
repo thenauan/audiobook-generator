@@ -1,8 +1,9 @@
 // ===== Casco do app =====
 // Menu lateral (computador), barra de abas (celular), cabeçalho com desfoque progressivo e a área das
 // telas com as transições do esqueleto. O estado fica em app/useAppState.tsx; cada tela em screens/.
+import { lazy, Suspense } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Search, Settings as SettingsIcon, BookHeadphones, HelpCircle, ChevronLeft, X, Pause, Play, MoreVertical, FileText, Power, CheckCircle2 } from 'lucide-react';
+import { Search, Settings as SettingsIcon, BookHeadphones, HelpCircle, ChevronLeft, X, Pause, Play, MoreVertical, FileText, Power, CheckCircle2, Loader2 } from 'lucide-react';
 import { RiApps2Line, RiAiGenerateText } from 'react-icons/ri';
 import { Sidebar } from './components/Navigation';
 import { HeaderActionButtons } from './components/HeaderActionButtons';
@@ -13,23 +14,33 @@ import { AppContext } from './app/AppContext';
 import { useAppState } from './app/useAppState';
 import { DevCrashScreen } from './app/DevCrashScreen';
 import { Overlays } from './app/Overlays';
-import { Onboarding } from './app/Onboarding';
 import { ConverterScreen } from './screens/ConverterScreen';
-import { HistoryHubScreen } from './screens/HistoryHubScreen';
-import { AllAudiobooksScreen } from './screens/AllAudiobooksScreen';
-import { AllTextsScreen } from './screens/AllTextsScreen';
-import { EditAudiobookScreen } from './screens/EditAudiobookScreen';
-import { EditTextScreen } from './screens/EditTextScreen';
-import { SearchScreen } from './screens/SearchScreen';
 import { AppGlyph, AiStarsIcon } from './components/AppGlyph';
-import { OtherAppsScreen } from './screens/OtherAppsScreen';
-import { HelpScreen } from './screens/HelpScreen';
-import { HelpTopicScreen } from './screens/HelpTopicScreen';
-import { SettingsScreen } from './screens/SettingsScreen';
-import { SettingsInterfaceScreen } from './screens/SettingsInterfaceScreen';
-import { SettingsConversionScreen } from './screens/SettingsConversionScreen';
-import { SettingsStorageScreen } from './screens/SettingsStorageScreen';
-import { SettingsAboutScreen } from './screens/SettingsAboutScreen';
+
+// Telas carregadas só quando abertas (o app abre mais rápido); enquanto carregam, só um ícone girando
+const Onboarding = lazy(() => import('./app/Onboarding').then(m => ({ default: m.Onboarding })));
+const HistoryHubScreen = lazy(() => import('./screens/HistoryHubScreen').then(m => ({ default: m.HistoryHubScreen })));
+const AllAudiobooksScreen = lazy(() => import('./screens/AllAudiobooksScreen').then(m => ({ default: m.AllAudiobooksScreen })));
+const AllTextsScreen = lazy(() => import('./screens/AllTextsScreen').then(m => ({ default: m.AllTextsScreen })));
+const EditAudiobookScreen = lazy(() => import('./screens/EditAudiobookScreen').then(m => ({ default: m.EditAudiobookScreen })));
+const EditTextScreen = lazy(() => import('./screens/EditTextScreen').then(m => ({ default: m.EditTextScreen })));
+const SearchScreen = lazy(() => import('./screens/SearchScreen').then(m => ({ default: m.SearchScreen })));
+const OtherAppsScreen = lazy(() => import('./screens/OtherAppsScreen').then(m => ({ default: m.OtherAppsScreen })));
+const HelpScreen = lazy(() => import('./screens/HelpScreen').then(m => ({ default: m.HelpScreen })));
+const HelpTopicScreen = lazy(() => import('./screens/HelpTopicScreen').then(m => ({ default: m.HelpTopicScreen })));
+const SettingsScreen = lazy(() => import('./screens/SettingsScreen').then(m => ({ default: m.SettingsScreen })));
+const SettingsInterfaceScreen = lazy(() => import('./screens/SettingsInterfaceScreen').then(m => ({ default: m.SettingsInterfaceScreen })));
+const SettingsConversionScreen = lazy(() => import('./screens/SettingsConversionScreen').then(m => ({ default: m.SettingsConversionScreen })));
+const SettingsStorageScreen = lazy(() => import('./screens/SettingsStorageScreen').then(m => ({ default: m.SettingsStorageScreen })));
+const SettingsAboutScreen = lazy(() => import('./screens/SettingsAboutScreen').then(m => ({ default: m.SettingsAboutScreen })));
+
+function TelaCarregando() {
+  return (
+    <div className="w-full flex items-center justify-center py-24" role="status" aria-label="Carregando">
+      <Loader2 size={28} className="animate-spin text-[var(--text-muted)]" />
+    </div>
+  );
+}
 
 export default function App() {
   const app = useAppState();
@@ -39,7 +50,9 @@ export default function App() {
   if (app.showWelcomeModal || app.showInitialConfigModal) {
     return (
       <AppContext.Provider value={app}>
-        <Onboarding />
+        <Suspense fallback={<div className="fixed inset-0 bg-mica flex items-center justify-center"><Loader2 size={28} className="animate-spin text-[var(--text-muted)]" /></div>}>
+          <Onboarding />
+        </Suspense>
         <Overlays />
       </AppContext.Provider>
     );
@@ -442,6 +455,7 @@ export default function App() {
           ref={mainScrollRef}
           className="app-scroll flex-1 min-w-0 overflow-y-auto overflow-x-hidden overscroll-contain custom-scrollbar px-4 md:px-8 pt-[calc(var(--app-header-top)+60px)] pb-32 md:pb-12 relative z-10"
         >
+        <Suspense fallback={<TelaCarregando />}>
         <AnimatePresence mode={isMobile ? 'sync' : 'wait'}>
           
           {/* =========================================================================
@@ -538,6 +552,7 @@ export default function App() {
           {currentScreen === 'settings-about' && <SettingsAboutScreen key="screen-settings-about" />}
 
         </AnimatePresence>
+        </Suspense>
         </div>
       </main>
 

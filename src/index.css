@@ -1183,3 +1183,33 @@ html.standalone #root {
     width: 420px;
   }
 }
+
+
+/* ===== Modo leve (Ajustes › Interface): sem desfoque de fundo, cards e pop-ups opacos ===== */
+/* (o tema escuro também põe .dark no contêiner do app, que redefinia as cores translúcidas: vale para os dois) */
+html.lite,
+html.lite .dark {
+  --bg-card-50: var(--bg-card);
+  --bg-card-60: var(--bg-card);
+  --bg-card-75: var(--bg-card);
+  --bg-card-80: var(--bg-card);
+  --bg-card-85: var(--bg-card);
+  --bg-card-90: var(--bg-card);
+  --bg-card-95: var(--bg-card);
+  --bg-card-40: var(--bg-card);
+}
+html.lite [class*="backdrop-blur"] {
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}
+html.lite [class*="blur-["]:not([class*="backdrop"]),
+html.lite [class*="blur-3xl"]:not([class*="backdrop"]) {
+  filter: none !important;
+}
+
+/* ===== Janela fora de foco: animações em CSS paradas até voltar ===== */
+html.app-paused *,
+html.app-paused *::before,
+html.app-paused *::after {
+  animation-play-state: paused !important;
+}

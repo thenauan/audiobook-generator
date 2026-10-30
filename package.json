@@ -5,7 +5,8 @@
   "type": "module",
   "main": "electron-main.cjs",
   "scripts": {
-    "dev": "npx esbuild server.ts --bundle --platform=node --format=esm --outfile=server.mjs --external:express --external:vite --external:multer --external:@vitejs/plugin-react --external:@tailwindcss/vite && node server.mjs",
+    "start": "node scripts/start.mjs",
+    "dev": "npx esbuild server.ts --bundle --platform=node --format=esm --outfile=server.mjs --external:express --external:vite --external:multer --external:@vitejs/plugin-react --external:@tailwindcss/vite && node server.mjs --dev",
     "build": "vite build",
     "preview": "vite preview",
     "clean": "rm -rf dist",

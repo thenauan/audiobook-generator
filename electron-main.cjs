@@ -78,7 +78,7 @@ async function startServer() {
     serverUrl = null;
     serverLog = '';
     clearTimeout(startTimer);
-    serverProcess = spawn('npm', ['run', 'dev'], {
+    serverProcess = spawn('npm', ['start'], {
         cwd: __dirname,
         shell: true,
         env: { ...process.env, ELECTRON_MODE: 'true' }

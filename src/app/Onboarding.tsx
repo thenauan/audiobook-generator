@@ -8,12 +8,13 @@ import { motion, AnimatePresence } from 'motion/react';
 import {
   ArrowRight, Check, ChevronDown, ChevronLeft, ChevronRight, FolderOpen, Globe, Monitor, Moon, Sun, Mic, FileText,
   FolderTree, Palette, Type, AArrowDown, AArrowUp, FileAudio2, CopyCheck, ExternalLink, X, Info,
-  Sparkles, Settings2, HardDrive, Volume2, Play, Pause, AlignLeft, WholeWord, Rows3,
+  Sparkles, Settings2, HardDrive, Volume2, Play, Pause, Feather, AlignLeft, WholeWord, Rows3,
 } from 'lucide-react';
 import { LuBookAudio } from 'react-icons/lu';
 import { AmbientOrbs } from '../components/AmbientOrbs';
 import { AppGlyph } from '../components/AppGlyph';
 import { useApp } from './AppContext';
+import { VoiceSampleButton } from '../lib/voiceSample';
 import { VOICES, voicesFor, hasSample, languageNamePt } from '../data/voices';
 import { AUDIO_FORMATS, AUDIO_QUALITIES, type AudioQuality } from './audioFormats';
 import { audioFormatIcon, audioQualityIcon } from './audioFormatIcons';
@@ -85,8 +86,6 @@ function OptionGroup({ title, description, children, footer, grow }: { title: st
 
 // Uma opção: ícone em círculo, nome, descrição e a marca de selecionado
 function OptionRow({ icon, label, description, selected, onClick, sampleCode }: { icon: React.ReactNode; label: string; description?: string; selected: boolean; onClick: () => void; sampleCode?: string }) {
-  const { playingVoiceCode, toggleVoiceSample } = useApp();
-  const tocando = Boolean(sampleCode) && playingVoiceCode === sampleCode;
   return (
     <motion.button
       type="button"
@@ -102,17 +101,7 @@ function OptionRow({ icon, label, description, selected, onClick, sampleCode }: 
         <span className={`text-sm font-semibold truncate ${selected ? 'text-winblue' : 'text-[var(--text-main)]'}`}>{label}</span>
         {description && <span className="text-xs text-[var(--text-muted)] truncate [@media(max-height:780px)]:hidden">{description}</span>}
       </span>
-      {sampleCode && (
-        <span
-          role="button"
-          tabIndex={-1}
-          title={tocando ? 'Parar amostra' : 'Ouvir amostra'}
-          onClick={(e) => toggleVoiceSample(e, sampleCode)}
-          className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 transition-all cursor-pointer border ${tocando ? 'opacity-100 bg-winblue/20 border-winblue/45 text-winblue' : 'opacity-0 group-hover:opacity-100 bg-card/80 border-[var(--text-main)]/15 text-[var(--text-main)] hover:bg-white/20 hover:border-white/35'}`}
-        >
-          {tocando ? <Pause size={12} fill="currentColor" /> : <Play size={12} fill="currentColor" className="ml-px" />}
-        </span>
-      )}
+      {sampleCode && <VoiceSampleButton code={sampleCode} size="md" />}
       <span className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 transition-all ${selected ? 'bg-winblue text-white scale-100' : 'border border-[var(--text-main)]/20 scale-90'}`}>
         {selected && <Check size={12} strokeWidth={3} />}
       </span>
@@ -123,7 +112,7 @@ function OptionRow({ icon, label, description, selected, onClick, sampleCode }: 
 export function Onboarding() {
   const {
     showWelcomeModal, setShowWelcomeModal, setShowInitialConfigModal, setActiveSettingSelector, activeSettingSelector,
-    interfaceLang, setInterfaceLang, themeMode, setThemeMode, accentPalette, accentColor, setAccentColor, uiFontSize, setUiFontSize,
+    interfaceLang, setInterfaceLang, themeMode, setThemeMode, liteMode, setLiteMode, accentPalette, accentColor, setAccentColor, uiFontSize, setUiFontSize,
     defaultVoice, setDefaultVoice, fileTypeOption, setFileTypeOption, audioQuality, setAudioQuality,
     generateSyncTextDefault, setGenerateSyncTextDefault, syncTextDestination, setSyncTextDestination, syncTextGranularity, setSyncTextGranularity,
     outputFolder, handleSelectOutputFolder, ensureOutputFolder, openOutputFolder, toastMessage,
@@ -303,6 +292,14 @@ export function Onboarding() {
                           onClick={() => setAccentColor(key)}
                         />
                       ))}
+                    </div>
+                  </OptionGroup>
+                </div>
+                <div className="col-span-2">
+                  <OptionGroup title="Desempenho" description="Para computadores mais fracos, deixe o app mais leve.">
+                    <div className="grid grid-cols-2 gap-0.5">
+                      <OptionRow icon={<Sparkles size={16} />} label="Efeitos completos" description="Fundos animados e desfoque" selected={!liteMode} onClick={() => setLiteMode(false)} />
+                      <OptionRow icon={<Feather size={16} />} label="Modo leve" description="Sem desfoque, fundos parados" selected={liteMode} onClick={() => setLiteMode(true)} />
                     </div>
                   </OptionGroup>
                 </div>

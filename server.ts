@@ -1026,7 +1026,12 @@ async function startServer() {
     res.status(404).json({ error: `API Route ${req.method} ${req.url} not found` });
   });
 
-  if (process.env.NODE_ENV !== "production") {
+  // Uso normal: a versão compilada e otimizada (dist/). O modo de desenvolvimento (Vite, código sem compactar,
+  // React checando tudo em dobro) só com --dev (npm run dev) ou sem a pasta dist.
+  const distIndex = path.join(process.cwd(), 'dist', 'index.html');
+  const modoDev = process.argv.includes('--dev') || process.env.NODE_ENV === 'development' || !fs.existsSync(distIndex);
+  console.log(modoDev ? 'Interface em modo de desenvolvimento' : 'Interface otimizada (dist)');
+  if (modoDev) {
     const { createServer: createViteServer } = await import('vite');
     const react = (await import('@vitejs/plugin-react')).default;
     const tailwindcss = (await import('@tailwindcss/vite')).default;
@@ -1056,7 +1061,9 @@ async function startServer() {
     app.use(vite.middlewares);
   } else {
     const distPath = path.join(process.cwd(), 'dist');
-    app.use(express.static(distPath));
+    app.use(express.static(distPath, { index: false, maxAge: '1h' }));
+    // Arquivos criados com o app rodando (trechos de audiobook em public/samples) não estão no dist
+    app.use(express.static(path.join(process.cwd(), 'public')));
     app.get('*', (req, res) => {
       res.sendFile(path.join(distPath, 'index.html'));
     });

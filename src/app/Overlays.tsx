@@ -17,6 +17,7 @@ import { PopupMorphContainer, MenuOptionItem, getButtonCoverPopupStyle, clearBut
 import { SortOption } from './types';
 import { getGenericBookCover, getGenericTextCover } from '../lib/covers';
 import { useApp } from './AppContext';
+import { VoiceSampleButton } from '../lib/voiceSample';
 import { splitGenres, joinGenres, toggleGenre } from '../data/genres';
 import { voiceLang } from '../data/voices';
 import { targetLanguageName } from '../data/languages';
@@ -251,22 +252,7 @@ export function Overlays() {
                                   )}
                                 </div>
                                 <div className="relative z-10 flex items-center gap-1.5 shrink-0 ml-2">
-                                  {option.sampleCode && (
-                                    <span
-                                      role="button"
-                                      tabIndex={-1}
-                                      title={playingVoiceCode === option.sampleCode ? 'Parar amostra' : 'Ouvir amostra'}
-                                      aria-label={playingVoiceCode === option.sampleCode ? 'Parar amostra' : 'Ouvir amostra'}
-                                      onClick={(e) => toggleVoiceSample(e, option.sampleCode!)}
-                                      className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 transition-all cursor-pointer border ${
-                                        playingVoiceCode === option.sampleCode
-                                          ? 'opacity-100 bg-winblue/20 border-winblue/45 text-winblue'
-                                          : 'opacity-0 group-hover:opacity-100 bg-card/80 border-[var(--text-main)]/15 text-[var(--text-main)] hover:bg-white/20 hover:border-white/35 hover:shadow-[0_0_10px_rgba(255,255,255,0.3)]'
-                                      }`}
-                                    >
-                                      {playingVoiceCode === option.sampleCode ? <Pause size={11} fill="currentColor" /> : <Play size={11} fill="currentColor" className="ml-px" />}
-                                    </span>
-                                  )}
+                                  {option.sampleCode && <VoiceSampleButton code={option.sampleCode} />}
                                   {option.hint && (
                                     <span className={`text-[11px] font-semibold whitespace-nowrap ${isSelected ? 'text-winblue' : 'text-[var(--text-muted)]'}`}>{option.hint}</span>
                                   )}

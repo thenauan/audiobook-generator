@@ -31,6 +31,6 @@ echo [OK] Iniciando aplicacao...
 echo [INFO] O navegador sera aberto automaticamente.
 echo.
 
-call npm run dev
+call npm start
 
 pause

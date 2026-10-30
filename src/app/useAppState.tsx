@@ -26,6 +26,8 @@ import { DEFAULT_AUDIOBOOKS, DEFAULT_RECENT_SEARCHES } from '../data/defaults';
 import { compareGroupKeys, compareTitles, getAlphabetGroupKey } from '../lib/grouping';
 import { translations } from '../translations';
 import { extractCoverColor } from '../lib/coverColor';
+import { setLiteMode } from '../lib/motionPrefs';
+import { toggleVoiceSample as toggleVoiceSampleLib } from '../lib/voiceSample';
 import { loadJSON, saveJSON, removeKey, isArray } from '../lib/storage';
 import { estimateConversion } from './estimates';
 import { VOICES, languageCode, voiceLang, effectiveVoice } from '../data/voices';
@@ -122,6 +124,13 @@ export function useAppState() {
   }, [resolvedTheme]);
 
   // Tamanho da fonte (conforme index.css)
+
+  // Modo leve: sem desfoque e com fundos parados, para computadores mais fracos
+  const [liteMode, setLiteModeState] = useState<boolean>(() => safeGet('lite_mode') === 'true');
+  useEffect(() => {
+    setLiteMode(liteMode);
+    safeSet('lite_mode', liteMode ? 'true' : 'false');
+  }, [liteMode]);
 
   const [uiFontSize, setUiFontSize] = useState<'standard' | 'small' | 'large'>(() => {
     if (typeof window === 'undefined') return 'standard';
@@ -263,28 +272,9 @@ export function useAppState() {
   };
 
   // Teste de Vozes (Amostras /samples/{code}.mp3)
-  const [playingVoiceCode, setPlayingVoiceCode] = useState<string | null>(null);
-  const voiceHowlRef = useRef<Howl | null>(null);
-
-  const toggleVoiceSample = (e: React.MouseEvent, code: string) => {
-    e.stopPropagation();
-    if (playingVoiceCode === code) {
-      voiceHowlRef.current?.stop();
-      setPlayingVoiceCode(null);
-    } else {
-      voiceHowlRef.current?.stop();
-      const sound = new Howl({
-        src: [`/samples/${code}.mp3`],
-        html5: true,
-        onend: () => setPlayingVoiceCode(null),
-        onloaderror: () => setPlayingVoiceCode(null),
-        onplayerror: () => setPlayingVoiceCode(null)
-      });
-      sound.play();
-      voiceHowlRef.current = sound;
-      setPlayingVoiceCode(code);
-    }
-  };
+  // Amostras de voz: estado próprio em lib/voiceSample (tocar não redesenha o app inteiro)
+  const playingVoiceCode = null;
+  const toggleVoiceSample = toggleVoiceSampleLib;
 
   // Estados de Conversão e Arquivos
   const [phase, setPhase] = useState<Phase>(0);
@@ -1640,10 +1630,18 @@ export function useAppState() {
     let eventSource: EventSource;
     if (phase === 2) {
       eventSource = new EventSource('/api/progress');
+      // Os eventos chegam em rajadas (cada parte narrada, a velocidade a cada 1,5 s por livro): são juntados e
+      // aplicados de uma vez a cada ¼ s, numa só atualização da tela
+      const fila: any[] = [];
+      let agendado: ReturnType<typeof setTimeout> | null = null;
       eventSource.onmessage = (event) => {
         let data: any;
         try { data = JSON.parse(event.data); } catch { return; }
         if (!data || typeof data !== 'object') return;
+        fila.push(data);
+        if (!agendado) agendado = setTimeout(() => { agendado = null; fila.splice(0).forEach(processarEvento); }, 250);
+      };
+      const processarEvento = (data: any) => {
         setFiles(prevFiles => {
           const newFiles = prevFiles.map((f): AppFile => {
             if (f.id === data.fileId) {
@@ -2726,6 +2724,8 @@ export function useAppState() {
     setResolvedTheme,
     uiFontSize,
     setUiFontSize,
+    liteMode,
+    setLiteMode: setLiteModeState,
     interfaceLang,
     setInterfaceLang,
     t,
@@ -2743,8 +2743,6 @@ export function useAppState() {
     snippetHowlRef,
     toggleSnippet,
     playingVoiceCode,
-    setPlayingVoiceCode,
-    voiceHowlRef,
     toggleVoiceSample,
     phase,
     setPhase,

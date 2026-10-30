@@ -24,6 +24,7 @@ fi
 
 echo "Installing Node.js dependencies..."
 npm install
+npm run build
 
 echo "Installing Python dependencies..."
 python3 -m pip install ebooklib beautifulsoup4 lxml pypdf pdfplumber mobi deep-translator langdetect mutagen edge-tts tqdm colorama faster-whisper

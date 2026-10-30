@@ -109,6 +109,8 @@ namespace AudiobookInstaller
 
                 lblStatus.Text = "Installing Node.js dependencies (This may take a while)...";
                 await RunCommand("npm", "install");
+                // Interface já compilada e otimizada: o app abre leve desde a primeira vez
+                await RunCommand("npm", "run build");
 
                 lblStatus.Text = "Installing Python dependencies (This may take a while)...";
                 await RunCommand("python", "-m pip install ebooklib beautifulsoup4 lxml pypdf pdfplumber mobi deep-translator langdetect mutagen edge-tts tqdm colorama faster-whisper");

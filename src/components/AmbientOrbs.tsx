@@ -3,6 +3,7 @@
 // arrastar arquivos do Conversor. O pai precisa ser `relative` e cortar o excesso (`overflow-hidden`).
 import type React from 'react';
 import { motion, useReducedMotion } from 'motion/react';
+import { useMotionPrefs } from '../lib/motionPrefs';
 import { cn } from '../lib/cn';
 
 const ORBS = [
@@ -13,6 +14,14 @@ const ORBS = [
 
 export function AmbientOrbs({ className, intensity = 1, style }: { className?: string; intensity?: number; style?: React.CSSProperties }) {
   const reduce = useReducedMotion();
+  const { lite, paused } = useMotionPrefs();
+  // Modo leve: as cores do ícone num gradiente parado, sem desfoque
+  if (lite) {
+    return (
+      <div aria-hidden="true" style={{ ...style, opacity: 0.5 * intensity, background: 'radial-gradient(circle at 15% 10%, #1f5fd6 0%, transparent 55%), radial-gradient(circle at 90% 20%, #b3214a 0%, transparent 50%), radial-gradient(circle at 40% 100%, #0f8a5a 0%, transparent 55%)' }}
+        className={cn('absolute inset-0 overflow-hidden pointer-events-none -z-10', className)} />
+    );
+  }
   return (
     <div aria-hidden="true" style={style} className={cn('absolute inset-0 overflow-hidden pointer-events-none -z-10', className)}>
       {ORBS.map((orb, i) => (
@@ -20,7 +29,7 @@ export function AmbientOrbs({ className, intensity = 1, style }: { className?: s
           key={i}
           className={cn('absolute rounded-full blur-[90px] transform-gpu', orb.className)}
           style={{ backgroundColor: orb.color, opacity: 0.38 * intensity }}
-          animate={reduce ? undefined : { x: orb.x, y: orb.y, scale: orb.scale }}
+          animate={reduce || paused ? undefined : { x: orb.x, y: orb.y, scale: orb.scale }}
           transition={{ duration: orb.duration, repeat: Infinity, ease: 'easeInOut' }}
         />
       ))}

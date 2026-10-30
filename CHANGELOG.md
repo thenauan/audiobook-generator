@@ -9,11 +9,16 @@ All notable changes to **Audiobook Generator** — the free ebook to audiobook c
 ## [Unreleased]
 
 ### Fixed
+- Voice sample buttons are white/gray (not the accent color), also while playing, and playing a sample no longer makes pop-ups and cards shake.
+- Conversion progress updates are grouped and only the card that changed is redrawn.
 - Converted audiobooks no longer appear twice in **Converted** (existing duplicates are removed when the app opens).
 - Audiobook preview play/pause: only one preview plays at a time, the button turns into pause right away and a second click stops it — no more double playback or previews that can't be paused.
 - The edit screen now shows when an audiobook has synchronized text (checked in the file itself: metadata and .lrc/.srt/.sync.json next to it).
 
 ### Added
+- **Lite mode** (Settings › Interface and initial setup): no background blur, opaque cards and pop-ups, still color backgrounds — for slower computers.
+- Animations pause when the window is minimized, hidden or out of focus, and only cards visible on screen animate.
+- The app opens in **optimized (production) mode**: the interface is compiled once (and again only after an update) instead of running in development mode; secondary screens load on demand with a loading icon.
 - **More genres and subgenres** (38 genres, 42 subgenres), including **LGBTQIA+**, Sapphic and MLM romance, Queer fiction, LGBTQIA+ memoirs, Diversity & inclusion, Romantasy, Dark romance, Cozy mystery and more.
 - **Several genres and subgenres per book**, separated by commas: pick as many as you want in the book card (the pop-up stays open) or tap them on the edit screen.
 - **Cards follow the real cover:** the book color (animated background, border, progress bar and highlights) now comes from the cover image itself instead of a palette color.

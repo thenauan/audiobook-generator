@@ -13,6 +13,7 @@ import { getButtonCoverPopupStyle, clearButtonCoverAnchorCache } from '../compon
 import { COVER_COLOR_PICKER, getGenericBookCover } from '../lib/covers';
 import { SettingToggle } from '../components/cards/SettingToggle';
 import { GENRES, SUBGENRES, toggleGenre, splitGenres } from '../data/genres';
+import { VoiceSampleButton } from '../lib/voiceSample';
 import { useApp } from '../app/AppContext';
 import { voicesFor, languageCode, voiceLang, hasSample } from '../data/voices';
 
@@ -389,7 +390,6 @@ export function EditAudiobookScreen() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
             {voiceOptions.map((v) => {
               const isSelected = editBookVoice === v.code;
-              const isPlaying = playingVoiceCode === v.code;
               return (
                 <div
                   key={v.code}
@@ -410,24 +410,7 @@ export function EditAudiobookScreen() {
                       <span className="text-[10px] text-[var(--text-muted)] truncate">{v.label.split(' - ')[0] || ''}</span>
                     </div>
                   </div>
-                  {hasSample(v.code) && <motion.button
-                    type="button"
-                    whileHover={{ scale: 1.18 }}
-                    whileTap={{ scale: 0.92 }}
-                    onClick={(e) => toggleVoiceSample(e, v.code)}
-                    className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 transition-all cursor-pointer shadow-xs ${
-                              isSelected
-                                ? 'bg-winblue/25 border border-winblue/50 text-winblue hover:bg-winblue/35 hover:border-winblue/80 hover:shadow-[0_0_12px_rgba(var(--winblue-rgb),0.45)]'
-                                : 'bg-card/90 border border-[var(--text-main)]/10 text-[var(--text-main)] hover:text-white hover:bg-white/20 hover:border-white/30 hover:shadow-[0_0_12px_rgba(255,255,255,0.25)]'
-                            }`}
-                    title="Ouvir amostra"
-                  >
-                    {isPlaying ? (
-                      <Pause size={12} className={isSelected ? "text-winblue" : "text-inherit"} />
-                    ) : (
-                      <Play size={12} className={isSelected ? "text-winblue" : "text-inherit"} />
-                    )}
-                  </motion.button>}
+                  {hasSample(v.code) && <VoiceSampleButton code={v.code} size="md" alwaysVisible />}
                 </div>
               );
             })}

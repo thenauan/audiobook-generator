@@ -14,7 +14,7 @@ export interface ConvertingEbookCardItemProps {
   onRetry?: (file: AppFile) => void;
 }
 
-export const ConvertingEbookCardItem: React.FC<ConvertingEbookCardItemProps> = ({
+const ConvertingEbookCardItemBase: React.FC<ConvertingEbookCardItemProps> = ({
   file,
   accentColor,
   resolvedTheme,
@@ -307,3 +307,7 @@ ${details}` : message).then(() => {
     </div>
   );
 }
+
+// Só redesenha quando o próprio livro (ou a cor/tema) muda: o progresso de um livro não redesenha os outros
+export const ConvertingEbookCardItem = React.memo(ConvertingEbookCardItemBase, (a, b) =>
+  a.file === b.file && a.accentColor === b.accentColor && a.resolvedTheme === b.resolvedTheme);
