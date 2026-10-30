@@ -1,23 +1,35 @@
-# Audiobook Generator — Free Ebook to Audiobook Converter (EPUB, PDF, MOBI, TXT → M4B, MP3)
+# Audiobook Generator — Free Ebook to Audiobook Converter (EPUB, PDF, MOBI, AZW3, TXT → M4B, MP3)
 
-**Audiobook Generator** is a free, open-source desktop app that converts ebooks into audiobooks with natural-sounding AI neural voices. Turn **EPUB, PDF, MOBI and TXT** files into **M4B or MP3 audiobooks** with chapters, cover art and text synchronized with the narration — on Windows, macOS and Linux.
+**Audiobook Generator** is a free, open-source desktop app that converts ebooks into audiobooks with natural-sounding AI neural voices. Turn **EPUB, PDF, MOBI, AZW3 (Kindle) and TXT** files into **M4B or MP3 audiobooks** with chapters, cover art and text synchronized with the narration — on Windows, macOS and Linux.
 
-- 📚 **Ebook to audiobook**: EPUB, PDF, MOBI/AZW and TXT, one book or many at once
+- 📚 **Ebook to audiobook**: EPUB, PDF, MOBI, AZW/AZW3 (Kindle) and TXT, one book or many at once
 - 🗣️ **300+ neural voices in 70+ languages** (Microsoft Edge text-to-speech)
 - 🎧 **M4B audiobooks** with chapters and cover, plus MP3, Opus, FLAC and WAV
 - 📝 **Synchronized text** (read along while you listen): .lrc, .srt and .sync.json, by sentence or word by word
 - 🌍 **Translation** before narrating, and automatic language detection
 - 🖥️ **Interface in 5 languages**: Português, English, Español, العربية, Русский
 
-**[⬇️ Download the latest version](https://github.com/thenauan/audiobook-generator/releases/latest)** · [Installation](#installation) · [How to use](#how-to-use) · [Supported languages](#supported-languages) · [FAQ](#faq)
+**[⬇️ Download the latest version](https://github.com/thenauan/audiobook-generator/releases/latest)** · [What's new](#whats-new-in-120) · [Installation](#installation) · [How to use](#how-to-use) · [Supported languages](#supported-languages) · [FAQ](#faq)
 
 ---
+
+## What's new in 1.2.0
+
+- **313 voices in 73 languages** — narrate books in any language with a Microsoft neural voice; samples for every Portuguese, English, Spanish, Arabic and Russian voice.
+- **Kindle formats** AZW / AZW3 / PRC can now be chosen in the file picker (DRM-free).
+- **M4B is the default** output format; synced text **by sentence, word by word, or both**.
+- **Fix language** and **Translate to** right on each book card.
+- All books in a batch convert **together**, with real download speed and progress until the final file.
+- Detailed, copyable error messages, **Retry all**, and deleted items go to the **Recycle Bin**.
+- New welcome screen and initial setup, automatic save folder, new icons.
+
+See the full list in the [CHANGELOG](CHANGELOG.md).
 
 ## Features
 
 | | |
 |---|---|
-| **Input formats** | EPUB, PDF (with selectable text), MOBI / AZW / AZW3, TXT |
+| **Input formats** | EPUB, PDF (with selectable text), MOBI, AZW / AZW3 / PRC (Kindle, without DRM), TXT |
 | **Output formats** | M4B (AAC, default), MP3 (single file or one per chapter), Opus, FLAC, WAV |
 | **Audio quality** | Standard, High or Maximum (up to MP3 320 kbps / AAC 256 kbps) |
 | **Chapters** | Detected from the book's table of contents and headings, editable before converting |
@@ -98,16 +110,16 @@ The **Help** screen inside the app has step-by-step guides for every feature.
 ## Other languages · Outros idiomas · Otros idiomas · لغات أخرى · Другие языки
 
 ### 🇧🇷 Português — Conversor de e-books em audiobooks
-O **Audiobook Generator** é um aplicativo gratuito para **converter e-books em audiobooks** com vozes neurais realistas. Transforme livros em **EPUB, PDF, MOBI e TXT** em **audiolivros M4B ou MP3**, com capítulos, capa e texto sincronizado com a narração. A interface está em português e a narração funciona em mais de 70 idiomas. Funciona no Windows, macOS e Linux. [Baixe a versão mais recente](https://github.com/thenauan/audiobook-generator/releases/latest), rode o instalador e arraste seus livros para o Conversor.
+O **Audiobook Generator** é um aplicativo gratuito para **converter e-books em audiobooks** com vozes neurais realistas. Transforme livros em **EPUB, PDF, MOBI, AZW3 (Kindle) e TXT** em **audiolivros M4B ou MP3**, com capítulos, capa e texto sincronizado com a narração. A interface está em português e a narração funciona em mais de 70 idiomas. Funciona no Windows, macOS e Linux. [Baixe a versão mais recente](https://github.com/thenauan/audiobook-generator/releases/latest), rode o instalador e arraste seus livros para o Conversor.
 
 ### 🇪🇸 Español — Convertir libros electrónicos en audiolibros
-**Audiobook Generator** es una aplicación gratuita para **convertir libros electrónicos en audiolibros** con voces neuronales naturales. Convierte archivos **EPUB, PDF, MOBI y TXT** en **audiolibros M4B o MP3**, con capítulos, portada y texto sincronizado con la narración. La interfaz está disponible en español y la narración funciona en más de 70 idiomas. Funciona en Windows, macOS y Linux. [Descarga la última versión](https://github.com/thenauan/audiobook-generator/releases/latest), ejecuta el instalador y arrastra tus libros al Conversor.
+**Audiobook Generator** es una aplicación gratuita para **convertir libros electrónicos en audiolibros** con voces neuronales naturales. Convierte archivos **EPUB, PDF, MOBI, AZW3 (Kindle) y TXT** en **audiolibros M4B o MP3**, con capítulos, portada y texto sincronizado con la narración. La interfaz está disponible en español y la narración funciona en más de 70 idiomas. Funciona en Windows, macOS y Linux. [Descarga la última versión](https://github.com/thenauan/audiobook-generator/releases/latest), ejecuta el instalador y arrastra tus libros al Conversor.
 
 ### 🇸🇦 العربية — تحويل الكتب الإلكترونية إلى كتب صوتية
-**Audiobook Generator** تطبيق مجاني **لتحويل الكتب الإلكترونية إلى كتب صوتية** بأصوات عصبية طبيعية. حوّل ملفات **EPUB وPDF وMOBI وTXT** إلى **كتب صوتية بصيغة M4B أو MP3** مع الفصول والغلاف ونص متزامن مع القراءة. الواجهة متوفرة باللغة العربية، والقراءة الصوتية تدعم أكثر من 70 لغة. يعمل على Windows وmacOS وLinux. [حمّل أحدث إصدار](https://github.com/thenauan/audiobook-generator/releases/latest) وشغّل برنامج التثبيت ثم اسحب كتبك إلى المحوّل.
+**Audiobook Generator** تطبيق مجاني **لتحويل الكتب الإلكترونية إلى كتب صوتية** بأصوات عصبية طبيعية. حوّل ملفات **EPUB وPDF وMOBI وAZW3 وTXT** إلى **كتب صوتية بصيغة M4B أو MP3** مع الفصول والغلاف ونص متزامن مع القراءة. الواجهة متوفرة باللغة العربية، والقراءة الصوتية تدعم أكثر من 70 لغة. يعمل على Windows وmacOS وLinux. [حمّل أحدث إصدار](https://github.com/thenauan/audiobook-generator/releases/latest) وشغّل برنامج التثبيت ثم اسحب كتبك إلى المحوّل.
 
 ### 🇷🇺 Русский — Конвертер электронных книг в аудиокниги
-**Audiobook Generator** — бесплатное приложение, которое **превращает электронные книги в аудиокниги** с помощью естественных нейронных голосов. Конвертируйте файлы **EPUB, PDF, MOBI и TXT** в **аудиокниги M4B или MP3** с главами, обложкой и текстом, синхронизированным с озвучкой. Интерфейс доступен на русском языке, а озвучка работает более чем на 70 языках. Работает в Windows, macOS и Linux. [Скачайте последнюю версию](https://github.com/thenauan/audiobook-generator/releases/latest), запустите установщик и перетащите книги в Конвертер.
+**Audiobook Generator** — бесплатное приложение, которое **превращает электронные книги в аудиокниги** с помощью естественных нейронных голосов. Конвертируйте файлы **EPUB, PDF, MOBI, AZW3 (Kindle) и TXT** в **аудиокниги M4B или MP3** с главами, обложкой и текстом, синхронизированным с озвучкой. Интерфейс доступен на русском языке, а озвучка работает более чем на 70 языках. Работает в Windows, macOS и Linux. [Скачайте последнюю версию](https://github.com/thenauan/audiobook-generator/releases/latest), запустите установщик и перетащите книги в Конвертер.
 
 ## Development
 
@@ -128,4 +140,4 @@ MIT License
 
 ---
 
-<sub>Keywords: ebook to audiobook converter, epub to audiobook, pdf to audiobook, epub to m4b, epub to mp3, mobi to audiobook, text to speech audiobook maker, AI audiobook generator, free audiobook creator, edge tts audiobook, conversor de ebook para audiobook, converter epub em audiolivro, conversor de pdf em audiobook, convertir epub a audiolibro, convertir pdf a audiolibro, конвертер epub в аудиокнигу, озвучка книг, تحويل الكتب إلى صوت, كتاب صوتي.</sub>
+<sub>Keywords: ebook to audiobook converter, epub to audiobook, pdf to audiobook, epub to m4b, epub to mp3, mobi to audiobook, azw3 to audiobook, kindle book to audiobook, text to speech audiobook maker, AI audiobook generator, free audiobook creator, edge tts audiobook, conversor de ebook para audiobook, converter epub em audiolivro, conversor de pdf em audiobook, convertir epub a audiolibro, convertir pdf a audiolibro, конвертер epub в аудиокнигу, озвучка книг, تحويل الكتب إلى صوت, كتاب صوتي.</sub>

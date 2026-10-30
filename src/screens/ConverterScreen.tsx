@@ -402,7 +402,7 @@ export function ConverterScreen() {
         ref={fileInputRef}
         type="file"
         multiple
-        accept=".epub,.pdf,.mobi,.txt"
+        accept=".epub,.pdf,.mobi,.azw,.azw3,.prc,.txt"
         className="hidden"
         onChange={handleFileUpload}
       />

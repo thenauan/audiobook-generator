@@ -31,20 +31,20 @@ export const HELP_TOPICS: HelpTopic[] = [
   {
     id: 'converter',
     title: 'Como converter e-books',
-    subtitle: 'Importar Epub, Pdf, Mobi ou Txt, vozes neurais, metadados e capítulos',
+    subtitle: 'Importar Epub, Pdf, Mobi, Azw3 ou Txt, vozes neurais, metadados e capítulos',
     gradient: 'from-blue-600 via-indigo-600 to-cyan-500',
     icon: AiStarsIcon,
     intro: 'O Audiobook Generator lê o texto de livros digitais, separa os capítulos e narra tudo com vozes neurais. Você pode converter vários e-books de uma vez, revisar os dados de cada um antes e acompanhar o progresso de cada livro.',
     steps: [
       { title: 'Abra o Conversor', text: 'No menu lateral esquerdo, clique em "Conversor".' },
-      { title: 'Adicione os e-books', text: 'Arraste os arquivos (.epub, .pdf, .mobi ou .txt) para a área colorida do Conversor ou clique nela para escolher. Com livros já na lista, use o botão de envio no canto superior direito para incluir mais.' },
+      { title: 'Adicione os e-books', text: 'Arraste os arquivos (.epub, .pdf, .mobi, .azw, .azw3 ou .txt) para a área colorida do Conversor ou clique nela para escolher. Com livros já na lista, use o botão de envio no canto superior direito para incluir mais.' },
       { title: 'Revise cada livro', text: 'Confira título e autor no próprio card. As etiquetas logo abaixo trocam voz, formato, gênero, idioma, narrador, ano e se o texto sincronizado será gerado.' },
       { title: 'Ajuste os detalhes (opcional)', text: 'O botão de lápis abre a edição completa: capa, sinopse, capítulos, tradução e dicionário de pronúncia.' },
       { title: 'Clique em Converter', text: 'O botão "Converter" aparece no cabeçalho quando há pelo menos um e-book na fila. A barra de cada livro mostra a etapa e o tempo estimado.' },
       { title: 'Ouça o resultado', text: 'Os audiobooks prontos vão para "Convertidos", onde você pode ouvir um trecho, abrir na pasta, editar os dados ou gerar o texto.' },
     ],
     features: [
-      { icon: Upload, title: 'Formatos aceitos', text: 'Epub, Pdf, Mobi e Txt. Vários livros podem ser carregados e convertidos em lote.' },
+      { icon: Upload, title: 'Formatos aceitos', text: 'Epub, Pdf (com texto selecionável), Mobi, Azw/Azw3 (Kindle, sem DRM) e Txt. Vários livros podem ser carregados e convertidos em lote.' },
       { icon: Tags, title: 'Metadados automáticos', text: 'Título, autor, idioma, ano e capa são lidos do arquivo e podem ser corrigidos antes da conversão.' },
       { icon: Mic, title: 'Vozes neurais', text: 'Vozes naturais como Antônio e Francisca em português, além de vozes em outros idiomas. Cada voz tem uma amostra para ouvir antes.' },
       { icon: ListOrdered, title: 'Capítulos', text: 'Os capítulos são detectados automaticamente. Na edição você renomeia, reordena ou divide capítulos longos.' },

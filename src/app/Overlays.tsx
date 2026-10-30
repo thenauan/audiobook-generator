@@ -764,7 +764,7 @@ export function Overlays() {
       />
 
 
-      <input type="file" ref={fileInputRef} onChange={handleFileUpload} multiple accept=".epub,.pdf,.mobi,.txt" className="hidden" />
+      <input type="file" ref={fileInputRef} onChange={handleFileUpload} multiple accept=".epub,.pdf,.mobi,.azw,.azw3,.prc,.txt" className="hidden" />
       <input type="file" ref={coverFileInputRef} onChange={handleCoverUpload} accept="image/*" className="hidden" />
       {/* Texto do livro para sincronizar com um audiobook do histórico ("áudio + texto") */}
       <input type="file" ref={syncTextInputRef} onChange={handleSyncTextFileChosen} accept=".epub,.pdf,.mobi,.txt" className="hidden" />

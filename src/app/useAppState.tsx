@@ -1682,7 +1682,7 @@ export function useAppState() {
     const selectedFiles = allFiles.filter(f => accepted.test(f.name) && f.size > 0);
     const rejected = allFiles.length - selectedFiles.length;
     if (rejected > 0) {
-      showToast(rejected === 1 ? 'Um arquivo foi ignorado: use Epub, Pdf, Mobi/Azw ou Txt.' : `${rejected} arquivos foram ignorados: use Epub, Pdf, Mobi/Azw ou Txt.`);
+      showToast(rejected === 1 ? 'Um arquivo foi ignorado: use Epub, Pdf, Mobi, Azw/Azw3 ou Txt.' : `${rejected} arquivos foram ignorados: use Epub, Pdf, Mobi, Azw/Azw3 ou Txt.`);
     }
     if (fileInputRef.current) fileInputRef.current.value = '';
     if (selectedFiles.length === 0) return;
