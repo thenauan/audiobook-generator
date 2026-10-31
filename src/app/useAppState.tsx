@@ -131,6 +131,11 @@ export function useAppState() {
     setLiteMode(liteMode);
     safeSet('lite_mode', liteMode ? 'true' : 'false');
   }, [liteMode]);
+  // Modo turbo: conversão mais rápida usando mais processador (não vale junto com o modo leve)
+  const [turboMode, setTurboModeState] = useState<boolean>(() => safeGet('turbo_mode') === 'true');
+  useEffect(() => { safeSet('turbo_mode', turboMode ? 'true' : 'false'); }, [turboMode]);
+  const setTurboMode = useCallback((v: boolean) => { setTurboModeState(v); if (v) setLiteModeState(false); }, []);
+  const setLiteModeExclusivo = useCallback((v: boolean) => { setLiteModeState(v); if (v) setTurboModeState(false); }, []);
 
   const [uiFontSize, setUiFontSize] = useState<'standard' | 'small' | 'large'>(() => {
     if (typeof window === 'undefined') return 'standard';
@@ -468,6 +473,118 @@ export function useAppState() {
   useEffect(() => {
     saveJSON('audiobook_generated_texts', generatedTexts);
   }, [generatedTexts]);
+
+  // ===== Convertidos em disco (igual para qualquer janela/porta) e recuperado da pasta de salvamento =====
+  const libraryReadyRef = useRef(false);
+  useEffect(() => {
+    let cancelado = false;
+    const exemplo = (id: string) => /^(default-|mock-)/.test(id);
+    const normal = (p?: string) => (p || '').replace(/\\/g, '/').toLowerCase();
+    (async () => {
+      let lib: { exists?: boolean; history?: HistoryItem[]; texts?: GeneratedTextItem[] } = {};
+      try { lib = await (await fetch('/api/library')).json(); } catch { /* sem servidor: fica o que está na janela */ }
+      if (cancelado) return;
+
+      // Junta a lista da janela com a do disco (por id e pelo arquivo de áudio)
+      const juntar = <T extends { id: string; path?: string }>(a: T[], b: T[]) => {
+        const ids = new Set<string>(), caminhos = new Set<string>(), out: T[] = [];
+        for (const item of [...a, ...b]) {
+          if (!item || !item.id || ids.has(item.id) || (item.path && caminhos.has(normal(item.path)))) continue;
+          ids.add(item.id);
+          if (item.path) caminhos.add(normal(item.path));
+          out.push(item);
+        }
+        return out;
+      };
+      let historico = juntar(lib.history || [], history);
+      let textos = juntar((lib.texts || []) as any[], generatedTexts as any[]) as GeneratedTextItem[];
+
+      // Audiobooks que estão na pasta de salvamento e faltam na lista (convertidos em outra janela)
+      const pasta = safeGet('output_folder') || outputFolder;
+      if (pasta) {
+        try {
+          const r = await (await fetch('/api/scan-library', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ folder: pasta }) })).json();
+          // Cada audiobook já na lista, pelo arquivo de áudio ou pela pasta de capítulos
+          const porCaminho = new Map<string, number>();
+          historico.forEach((h, i) => {
+            if (h.path) porCaminho.set(normal(h.path), i);
+            (h.files || []).forEach(f => porCaminho.set(normal(f), i));
+          });
+          const generica = (c?: string) => !c || c.startsWith('data:image/svg');
+          for (const it of (r.items || []) as any[]) {
+            const pastaCaps = it.files?.[0];
+            const h = Math.floor((it.duration || 0) / 3600), m = Math.round(((it.duration || 0) % 3600) / 60);
+            const ext = String(it.path).split('.').pop()?.toUpperCase() || '';
+            const capa: string | undefined = it.cover || undefined;
+            const cor = capa ? await extractCoverColor(capa).catch(() => null) : null;
+            if (cancelado) return;
+            // Metadados lidos do próprio arquivo (capa embutida, narrador, capítulos, descrição...)
+            const lidos: Partial<HistoryItem> = {
+              title: it.title || 'Audiobook',
+              author: it.author || 'Desconhecido',
+              narrator: it.narrator || undefined,
+              genre: it.genre || '',
+              subgenre: it.subgenre || undefined,
+              year: it.year || '',
+              language: it.language || undefined,
+              description: it.description || undefined,
+              chapters: it.chapters?.length ? it.chapters : undefined,
+              duration: it.duration ? (h ? `${h}h ${m}m` : `${m} min`) : '',
+              size: it.size ? `${(it.size / 1048576).toFixed(1)} MB` : '',
+              format: pastaCaps ? 'Pasta (um arquivo por capítulo)' : ext,
+              hasTranscript: Boolean(it.lyrics),
+            };
+            const i = porCaminho.get(normal(it.path)) ?? (pastaCaps ? porCaminho.get(normal(pastaCaps)) : undefined);
+            if (i !== undefined) {
+              // Já recuperado antes (com a capa genérica): completa com a capa e os dados do arquivo, sem
+              // apagar o que o usuário editou
+              const atual = historico[i];
+              if (!atual.id.startsWith('pasta-') && !generica(atual.cover)) continue;
+              const completo: HistoryItem = { ...atual };
+              for (const [k, v] of Object.entries(lidos)) {
+                const antigo = (atual as any)[k];
+                if (v !== undefined && v !== '' && (antigo === undefined || antigo === '' || antigo === 'Desconhecido')) (completo as any)[k] = v;
+              }
+              if (capa && generica(atual.cover)) { completo.cover = capa; if (cor && !atual.coverColor) completo.coverColor = cor; }
+              historico[i] = completo;
+              continue;
+            }
+            historico.push({
+              ...lidos,
+              id: `pasta-${normal(it.path).replace(/[^a-z0-9]/g, '').slice(-40)}`,
+              title: it.title || 'Audiobook',
+              author: it.author || 'Desconhecido',
+              date: new Date((it.mtime || 0) * 1000).toLocaleDateString(interfaceLang),
+              status: 'success',
+              cover: capa || getGenericBookCover(it.title, it.author),
+              coverColor: cor || undefined,
+              path: it.path,
+              files: it.files || [it.path],
+            });
+          }
+        } catch { /* pasta indisponível */ }
+      }
+      if (cancelado) return;
+
+      // Os livros de exemplo só aparecem quando não há nenhum de verdade
+      if (historico.some(h => !exemplo(h.id))) historico = historico.filter(h => !exemplo(h.id));
+      if (textos.some(t => !exemplo(t.id))) textos = textos.filter(t => !exemplo(t.id));
+      setHistory(historico);
+      setGeneratedTexts(textos);
+      libraryReadyRef.current = true;
+    })();
+    return () => { cancelado = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Grava no disco a cada mudança (agrupado em ~1 s)
+  useEffect(() => {
+    if (!libraryReadyRef.current) return;
+    const t = setTimeout(() => {
+      fetch('/api/library', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ history, texts: generatedTexts }) }).catch(() => {});
+    }, 800);
+    return () => clearTimeout(t);
+  }, [history, generatedTexts]);
 
   // Pesquisas Recentes
   const [recentSearches, setRecentSearches] = useState<string[]>(() => {
@@ -1978,7 +2095,9 @@ export function useAppState() {
       generate_sync_text: generateSyncTextDefault,
       sync_text_destination: syncTextDestination,
       sync_text_granularity: syncTextGranularity,
-      audio_quality: audioQuality
+      audio_quality: audioQuality,
+      lite: liteMode,
+      turbo: turboMode && !liteMode
     }));
 
     const ids = new Set(filesToConvert.map(f => f.id));
@@ -2725,7 +2844,9 @@ export function useAppState() {
     uiFontSize,
     setUiFontSize,
     liteMode,
-    setLiteMode: setLiteModeState,
+    setLiteMode: setLiteModeExclusivo,
+    turboMode,
+    setTurboMode,
     interfaceLang,
     setInterfaceLang,
     t,

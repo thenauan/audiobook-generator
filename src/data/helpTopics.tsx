@@ -6,6 +6,7 @@ import {
   FileText, AudioWaveform, Languages, FolderOpen, Keyboard, Upload, Tags, Mic, ListOrdered, BookA, RefreshCcw,
   Gauge, Layers, HardDrive, FileAudio, Music4, Captions, BookOpenText, Wand2, Globe, ShieldCheck, Search,
   MousePointerClick, Code2, Clock, FolderCog, BookHeadphones, Trash2, Play, Pencil, ArrowDownAZ, Info, LayoutGrid,
+  Feather, Cpu, Sparkles, Zap,
 } from 'lucide-react';
 import { AiStarsIcon } from '../components/AppGlyph';
 
@@ -191,6 +192,32 @@ export const HELP_TOPICS: HelpTopic[] = [
       { icon: HardDrive, title: 'Arquivos locais', text: 'Os audiobooks e textos ficam só no seu computador; apenas o texto a narrar (e a traduzir) passa pelos serviços de voz e tradução.' },
       { icon: FolderCog, title: 'Cache de conversão', text: 'Os capítulos prontos ficam em cache para retomar conversões. "Limpar cache" em Armazenamento libera esse espaço.' },
       { icon: ShieldCheck, title: 'Pasta obrigatória', text: 'Na primeira abertura, o app pede uma pasta para não salvar arquivos em um lugar inesperado.' },
+    ],
+  },
+  {
+    id: 'lite',
+    title: 'Modo leve e modo turbo',
+    subtitle: 'Deixar o app mais leve em computadores fracos ou converter mais rápido nos potentes',
+    gradient: 'from-teal-600 via-emerald-600 to-green-500',
+    icon: Feather,
+    intro: 'O modo leve deixa o app mais leve em duas frentes: na interface (menos efeitos visuais) e na conversão (menos coisas ao mesmo tempo). A conversão fica mais lenta, mas o computador e o app continuam rápidos enquanto os livros são narrados. O modo turbo faz o contrário: converte mais rápido usando mais recursos do computador. Os dois não ficam ligados juntos.',
+    steps: [
+      { title: 'Ligue o modo leve', text: 'Em Ajustes › Interface, ative "Modo leve". Ele também pode ser escolhido na configuração inicial, em Desempenho.' },
+      { title: 'Na interface, vale na hora', text: 'O desfoque some, os fundos animados ficam parados e os cards e pop-ups ficam opacos.' },
+      { title: 'Na conversão, vale na próxima', text: 'As novas conversões passam a usar o modo leve. Uma conversão que já está em andamento continua como começou.' },
+      { title: 'Ou ligue o modo turbo', text: 'Em computadores potentes, ative "Modo turbo" em Ajustes › Conversão. Ligar um dos modos desliga o outro.' },
+    ],
+    features: [
+      { icon: Sparkles, title: 'Interface', text: 'Sem desfoque de fundo, fundos de cor parados (no lugar das animações) e cards e pop-ups opacos.' },
+      { icon: ListOrdered, title: 'Um livro por vez', text: 'Em vez de converter todos os livros juntos, converte um e deixa os outros "Na fila".' },
+      { icon: Mic, title: 'Menos conexões de voz', text: 'A narração usa 4 conexões com o serviço de voz em vez de 10: menos rede e memória, narração mais lenta.' },
+      { icon: Zap, title: 'Modo turbo', text: '12 conexões de voz em vez de 10, uma etapa de áudio (FFmpeg) por núcleo do processador (até 8), mais partes traduzidas ao mesmo tempo e prioridade normal. Ganha mais com vários livros e livros longos.' },
+      { icon: Cpu, title: 'Processador livre (leve)', text: 'Uma etapa de áudio (FFmpeg) por vez, tradução de uma parte por vez e prioridade mínima: a conversão só usa o processador que estiver sobrando.' },
+    ],
+    faq: [
+      { q: 'Os modos mudam a qualidade do áudio?', a: 'Não. Voz, formato e qualidade são os mesmos; só muda a velocidade da conversão e o quanto ela usa do computador.' },
+      { q: 'O modo turbo usa a placa de vídeo?', a: 'A narração é feita pelo serviço de voz da Microsoft, pela internet, e a montagem do áudio usa o processador. A placa de vídeo (NVIDIA, CUDA) só é usada para transcrever o áudio no texto sincronizado "Só o áudio", e isso já acontece sempre que ela existe, com ou sem turbo.' },
+      { q: 'Quanto mais lenta fica a conversão?', a: 'Depende do computador e da internet. Com um livro só, a diferença vem principalmente das menos conexões de voz; com vários livros, eles passam a ser feitos um depois do outro.' },
     ],
   },
   {

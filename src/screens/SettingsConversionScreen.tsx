@@ -1,6 +1,6 @@
 // ===== Tela: settings-conversion =====
 import { motion } from 'motion/react';
-import { FileText, Headphones, ChevronDown, Volume2, FolderTree, Mic, HelpCircle, FileAudio2, FolderOpen, CopyCheck, Rows3, AlignLeft, WholeWord } from 'lucide-react';
+import { FileText, Headphones, ChevronDown, Volume2, FolderTree, Mic, HelpCircle, FileAudio2, FolderOpen, CopyCheck, Rows3, AlignLeft, WholeWord, Zap } from 'lucide-react';
 import { AUDIO_FORMATS, AUDIO_QUALITIES, audioFormatInfo, audioQualityLabel, type AudioQuality } from '../app/audioFormats';
 import { audioFormatIcon, audioQualityIcon } from '../app/audioFormatIcons';
 import type { SyncTextDestination, SyncTextGranularity } from '../app/types';
@@ -24,7 +24,7 @@ import { VOICES } from '../data/voices';
 import { voicePickerOptions } from '../data/voiceOptions';
 
 export function SettingsConversionScreen() {
-  const { showToast, interfaceLang, defaultVoice, setDefaultVoice, fileTypeOption, setFileTypeOption, generateSyncTextDefault, setGenerateSyncTextDefault, syncTextDestination, setSyncTextDestination, syncTextGranularity, setSyncTextGranularity, activeSettingSelector, setActiveSettingSelector, audioQuality, setAudioQuality } = useApp();
+  const { showToast, interfaceLang, defaultVoice, setDefaultVoice, fileTypeOption, setFileTypeOption, generateSyncTextDefault, setGenerateSyncTextDefault, syncTextDestination, setSyncTextDestination, syncTextGranularity, setSyncTextGranularity, activeSettingSelector, setActiveSettingSelector, audioQuality, setAudioQuality, turboMode, setTurboMode, liteMode } = useApp();
   return (
     <motion.div
       key="screen-settings-conversion"
@@ -149,6 +149,30 @@ export function SettingsConversionScreen() {
             <span>{audioQualityLabel(audioQuality)}</span>
             <ChevronDown size={14} className="-mr-0.5 text-inherit" />
           </motion.button>
+        </div>
+
+        {/* Modo turbo */}
+        <div className="settings-list-row py-3 sm:py-3.5 px-4 sm:px-5 rounded-[32px] bg-card/60 backdrop-blur-xl border border-[var(--text-main)]/10 transition-colors flex items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <div className="w-10 h-10 rounded-full bg-winblue/10 text-winblue flex items-center justify-center shrink-0">
+              <Zap size={20} />
+            </div>
+            <div className="flex flex-col">
+              <span className="font-semibold text-base text-[var(--text-main)]">Modo turbo</span>
+              <span className="text-xs sm:text-sm text-[var(--text-muted)] mt-0.5">
+                Para computadores potentes: mais conexões de voz, várias etapas de áudio ao mesmo tempo (uma por núcleo) e prioridade normal. Converte mais rápido, mas usa bem mais processador e memória. Desliga o modo leve
+              </span>
+            </div>
+          </div>
+          <SettingToggle
+            checked={turboMode && !liteMode}
+            onChange={(checked) => {
+              setTurboMode(checked);
+              showToast(checked ? "Modo turbo ligado: as próximas conversões usam mais recursos." : "Modo turbo desligado.");
+            }}
+            enabledLabel="Ligado"
+            disabledLabel="Desligado"
+          />
         </div>
 
         {/* Texto Sincronizado por Padrão */}

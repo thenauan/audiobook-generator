@@ -6,7 +6,7 @@ All notable changes to **Audiobook Generator** — the free ebook to audiobook c
 
 ---
 
-## [Unreleased]
+## [1.3.0] — 2026-10-31
 
 ### Fixed
 - Voice sample buttons are white/gray (not the accent color), also while playing, and playing a sample no longer makes pop-ups and cards shake.
@@ -16,7 +16,14 @@ All notable changes to **Audiobook Generator** — the free ebook to audiobook c
 - The edit screen now shows when an audiobook has synchronized text (checked in the file itself: metadata and .lrc/.srt/.sync.json next to it).
 
 ### Added
-- **Lite mode** (Settings › Interface and initial setup): no background blur, opaque cards and pop-ups, still color backgrounds — for slower computers.
+- **Lite mode** (Settings › Interface and initial setup), for slower computers. It changes the interface **and** the conversion:
+  - Interface: no background blur, opaque cards and pop-ups, still color backgrounds.
+  - Conversion: one book at a time (the others wait "In queue"), 4 voice connections instead of 10, one FFmpeg at a time, one translation part at a time and the lowest CPU priority. Slower, same audio quality, and the computer stays free. Applies to conversions started after it is turned on.
+  - Explained in Settings and in a new **Lite mode and Turbo mode** Help topic.
+- **Turbo mode** (Settings › Conversion), for powerful computers: 12 voice connections instead of 10, one FFmpeg per CPU core (up to 8), 6 translation parts at a time and normal CPU priority. Faster, especially with several or long books, using more CPU and memory. Lite and Turbo are mutually exclusive.
+- **Converted is saved on disk** (`~/.audiobook-generator/library.json`), the same for every window and port: converted audiobooks no longer disappear after closing and reopening the app.
+- Audiobooks found in the save folder are **recovered in Converted with their embedded cover and metadata**: title, author, narrator, genre, subgenre, year, language, description, duration, chapters and synced text. Books recovered earlier with the generic cover are completed automatically.
+- On first launch only the welcome screen and initial setup load; the rest of the app loads afterwards.
 - Animations pause when the window is minimized, hidden or out of focus, and only cards visible on screen animate.
 - The app opens in **optimized (production) mode**: the interface is compiled once (and again only after an update) instead of running in development mode; secondary screens load on demand with a loading icon.
 - **More genres and subgenres** (38 genres, 42 subgenres), including **LGBTQIA+**, Sapphic and MLM romance, Queer fiction, LGBTQIA+ memoirs, Diversity & inclusion, Romantasy, Dark romance, Cozy mystery and more.

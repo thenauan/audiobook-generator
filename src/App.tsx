@@ -14,11 +14,12 @@ import { AppContext } from './app/AppContext';
 import { useAppState } from './app/useAppState';
 import { DevCrashScreen } from './app/DevCrashScreen';
 import { Overlays } from './app/Overlays';
-import { ConverterScreen } from './screens/ConverterScreen';
 import { AppGlyph, AiStarsIcon } from './components/AppGlyph';
 
 // Telas carregadas só quando abertas (o app abre mais rápido); enquanto carregam, só um ícone girando
 const Onboarding = lazy(() => import('./app/Onboarding').then(m => ({ default: m.Onboarding })));
+// Na primeira abertura só carrega as boas-vindas e a configuração inicial; o Conversor vem depois
+const ConverterScreen = lazy(() => import('./screens/ConverterScreen').then(m => ({ default: m.ConverterScreen })));
 const HistoryHubScreen = lazy(() => import('./screens/HistoryHubScreen').then(m => ({ default: m.HistoryHubScreen })));
 const AllAudiobooksScreen = lazy(() => import('./screens/AllAudiobooksScreen').then(m => ({ default: m.AllAudiobooksScreen })));
 const AllTextsScreen = lazy(() => import('./screens/AllTextsScreen').then(m => ({ default: m.AllTextsScreen })));

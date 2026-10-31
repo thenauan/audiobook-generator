@@ -562,6 +562,42 @@ async function startServer() {
       res.status(500).json({ error: `N\xE3o foi poss\xEDvel excluir os arquivos: ${e?.message || e}`, skipped });
     }
   });
+  const LIB_DIR = path.join(os.homedir(), ".audiobook-generator");
+  const LIB_FILE = path.join(LIB_DIR, "library.json");
+  app.get("/api/library", (req, res) => {
+    try {
+      if (!fs.existsSync(LIB_FILE)) return res.json({ exists: false, history: [], texts: [] });
+      const data = JSON.parse(fs.readFileSync(LIB_FILE, "utf8"));
+      res.json({ exists: true, history: Array.isArray(data.history) ? data.history : [], texts: Array.isArray(data.texts) ? data.texts : [] });
+    } catch (e) {
+      res.json({ exists: false, history: [], texts: [], error: String(e) });
+    }
+  });
+  app.post("/api/library", express.json({ limit: "200mb" }), (req, res) => {
+    try {
+      const history = Array.isArray(req.body?.history) ? req.body.history : null;
+      const texts = Array.isArray(req.body?.texts) ? req.body.texts : null;
+      if (!history || !texts) return res.status(400).json({ error: "dados inv\xE1lidos" });
+      fs.mkdirSync(LIB_DIR, { recursive: true });
+      const tmp = LIB_FILE + ".tmp";
+      fs.writeFileSync(tmp, JSON.stringify({ version: 1, history, texts }));
+      fs.renameSync(tmp, LIB_FILE);
+      res.json({ success: true });
+    } catch (e) {
+      res.status(500).json({ error: String(e) });
+    }
+  });
+  app.post("/api/scan-library", express.json(), (req, res) => {
+    const pasta = typeof req.body?.folder === "string" ? path.resolve(req.body.folder) : "";
+    if (!pasta || !fs.existsSync(pasta)) return res.json({ items: [] });
+    execFile(PYTHON_CMD, ["library_scan.py", pasta], { env: PY_ENV, windowsHide: true, timeout: 18e4, maxBuffer: 200 * 1024 * 1024 }, (err, stdout) => {
+      try {
+        res.json({ items: err ? [] : JSON.parse(String(stdout).trim() || "[]") });
+      } catch {
+        res.json({ items: [] });
+      }
+    });
+  });
   app.post("/api/sync-text-status", express.json(), (req, res) => {
     const audio = typeof req.body?.path === "string" ? path.resolve(req.body.path) : "";
     if (!audio || !fs.existsSync(audio) || !AUDIO_EXTENSIONS.has(path.extname(audio).toLowerCase())) {
@@ -759,7 +795,9 @@ async function startServer() {
         file_format: fileFormat,
         generate_sync_text: generateSyncText,
         sync_text_destination: syncTextDestination,
-        sync_text_granularity: syncTextGranularity
+        sync_text_granularity: syncTextGranularity,
+        lite: Boolean(config.lite),
+        turbo: Boolean(config.turbo)
       };
       const configPath = path.join(process.cwd(), `config_${Date.now()}.json`);
       fs.writeFileSync(configPath, JSON.stringify(pythonConfig));

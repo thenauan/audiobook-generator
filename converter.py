@@ -24,12 +24,13 @@ import subprocess
 
 # O conversor roda fora do console do app (para o Ctrl+C não derrubá-lo). Sem console, cada programa que
 # ele abre (FFmpeg etc.) criaria uma janela própria na tela: no Windows, todos abrem sem janela.
+_CLASSE_PRIORIDADE = 0x00004000  # BELOW_NORMAL; IDLE (0x40) no modo leve, NORMAL (0x20) no turbo
 if os.name == "nt":
     _popen_init = subprocess.Popen.__init__
 
     def _popen_sem_janela(self, *args, **kwargs):
-        # CREATE_NO_WINDOW | BELOW_NORMAL_PRIORITY_CLASS: sem janela e sem disputar a CPU com o app
-        kwargs["creationflags"] = kwargs.get("creationflags", 0) | 0x08000000 | 0x00004000
+        # CREATE_NO_WINDOW + prioridade da conversão (abaixo do normal; mínima no modo leve)
+        kwargs["creationflags"] = kwargs.get("creationflags", 0) | 0x08000000 | _CLASSE_PRIORIDADE
         _popen_init(self, *args, **kwargs)
 
     subprocess.Popen.__init__ = _popen_sem_janela
@@ -979,13 +980,32 @@ async def main():
             config = json.load(f)
     else:
         config = json.loads(arg)
+    global _vagas, TTS_CONEXOES, FFMPEG_PARALELO
+    leve = bool(config.get("lite"))
+    turbo = bool(config.get("turbo")) and not leve
+    if leve:
+        # Modo leve: um livro por vez, menos conexões de voz, um FFmpeg por vez e prioridade mínima.
+        # Converte mais devagar, mas o computador e o app ficam livres.
+        TTS_CONEXOES, FFMPEG_PARALELO = 4, 1
+        _prioridade_baixa(minima=True)
+    elif turbo:
+        # Modo turbo: mais conexões de voz, um FFmpeg por núcleo (até 8) e prioridade normal. Usa bem mais
+        # processador e memória; a transcrição por IA já usa a placa de vídeo (CUDA) quando existe.
+        TTS_CONEXOES, FFMPEG_PARALELO = 12, max(2, min(8, os.cpu_count() or 2))
+        _prioridade_baixa(normal=True)
     _sem_tts = asyncio.Semaphore(TTS_CONEXOES)
     _sem_ffmpeg = asyncio.Semaphore(FFMPEG_PARALELO)
-    global _vagas
     _vagas = asyncio.Condition()
-    _sem_traducao = asyncio.Semaphore(3)
+    _sem_traducao = asyncio.Semaphore(1 if leve else 6 if turbo else 3)
+    livros = config.get("files", [])
     try:
-        await asyncio.gather(*[process_file(f, config) for f in config.get("files", [])])
+        if leve:
+            for f in livros[1:]:
+                emit({"type": "progress", "fileId": f.get("id"), "progress": 0, "message": "Na fila (modo leve: um livro por vez)"})
+            for f in livros:
+                await process_file(f, config)
+        else:
+            await asyncio.gather(*[process_file(f, config) for f in livros])
     finally:
         for trava in _TRAVAS:
             try:
@@ -1027,15 +1047,19 @@ def _encerrar_se_o_app_fechar():
     threading.Thread(target=vigiar, daemon=True).start()
 
 
-def _prioridade_baixa():
+def _prioridade_baixa(minima=False, normal=False):
     """A conversão roda com prioridade abaixo do normal: o app (carregar livros, capas) e o resto do
-    computador continuam rápidos; a conversão usa a CPU que sobra, que costuma ser quase toda."""
+    computador continuam rápidos; a conversão usa a CPU que sobra, que costuma ser quase toda.
+    No modo leve, prioridade mínima (só usa a CPU que ninguém está usando), também para o FFmpeg; no modo
+    turbo, prioridade normal (disputa a CPU de igual para igual com os outros programas)."""
+    global _CLASSE_PRIORIDADE
     try:
         if os.name == "nt":
             import ctypes
-            ctypes.windll.kernel32.SetPriorityClass(ctypes.windll.kernel32.GetCurrentProcess(), 0x00004000)
+            _CLASSE_PRIORIDADE = 0x00000040 if minima else 0x00000020 if normal else 0x00004000
+            ctypes.windll.kernel32.SetPriorityClass(ctypes.windll.kernel32.GetCurrentProcess(), _CLASSE_PRIORIDADE)
         else:
-            os.nice(5)
+            os.nice(10 if minima else 0 if normal else 5)
     except Exception:
         pass
 

@@ -299,7 +299,7 @@ export function Onboarding() {
                   <OptionGroup title="Desempenho" description="Para computadores mais fracos, deixe o app mais leve.">
                     <div className="grid grid-cols-2 gap-0.5">
                       <OptionRow icon={<Sparkles size={16} />} label="Efeitos completos" description="Fundos animados e desfoque" selected={!liteMode} onClick={() => setLiteMode(false)} />
-                      <OptionRow icon={<Feather size={16} />} label="Modo leve" description="Sem desfoque, fundos parados" selected={liteMode} onClick={() => setLiteMode(true)} />
+                      <OptionRow icon={<Feather size={16} />} label="Modo leve" description="Interface sem desfoque e conversão de um livro por vez" selected={liteMode} onClick={() => setLiteMode(true)} />
                     </div>
                   </OptionGroup>
                 </div>
