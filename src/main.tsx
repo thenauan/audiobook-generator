@@ -5,8 +5,10 @@ import './platform';
 import './index.css';
 import App from './App.tsx';
 import { ErrorBoundary } from './app/ErrorBoundary';
+import { loadSettingsFromDisk } from './lib/settingsSync';
 
-createRoot(document.getElementById('root')!).render(
+// Os ajustes salvos em disco são carregados antes de o app abrir
+loadSettingsFromDisk().finally(() => createRoot(document.getElementById('root')!).render(
   <StrictMode>
     {/* Respeita "Reduzir movimento" do sistema */}
     <MotionConfig reducedMotion="user">
@@ -15,4 +17,4 @@ createRoot(document.getElementById('root')!).render(
       </ErrorBoundary>
     </MotionConfig>
   </StrictMode>,
-);
+));

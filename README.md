@@ -10,9 +10,16 @@
 - 🖥️ **Interface in 5 languages**: Português, English, Español, العربية, Русский
 - 🪶 **Lite mode** for slower computers (lighter interface and conversion) and ⚡ **Turbo mode** for powerful ones (faster conversion)
 
-**[⬇️ Download the latest version](https://github.com/thenauan/audiobook-generator/releases/latest)** · [What's new](#whats-new-in-130) · [Installation](#installation) · [How to use](#how-to-use) · [Supported languages](#supported-languages) · [FAQ](#faq)
+**[⬇️ Download the latest version](https://github.com/thenauan/audiobook-generator/releases/latest)** · [What's new](#whats-new-in-140) · [Installation](#installation) · [How to use](#how-to-use) · [Supported languages](#supported-languages) · [FAQ](#faq)
 
 ---
+
+## What's new in 1.4.0
+
+- **New "Voice" audio quality (default):** the voices arrive as 24 kHz mono, so the app keeps them at 24 kHz (MP3 96k, AAC 64k, Opus 40k) instead of resampling to 44.1 kHz — **the same sound in files about half the size** (a 10-hour book: ~430 MB in MP3 and ~290 MB in M4B) and a faster final step. Standard, High and Maximum are still available.
+- **Works without FFmpeg in MP3:** chapters are joined directly in Python and chapters and cover are added by the tags. Without FFmpeg, other formats switch to MP3 with a warning (without volume levelling and the 1.5 s pause at chapter starts).
+- **Settings are saved on disk** and come back after closing the app, in any window.
+- Every engine message carries a stable code, so other interfaces (like the terminal version) translate them without depending on the Portuguese text.
 
 ## What's new in 1.3.0
 
@@ -43,7 +50,7 @@ See the full list in the [CHANGELOG](CHANGELOG.md).
 |---|---|
 | **Input formats** | EPUB, PDF (with selectable text), MOBI, AZW / AZW3 / PRC (Kindle, without DRM), TXT |
 | **Output formats** | M4B (AAC, default), MP3 (single file or one per chapter), Opus, FLAC, WAV |
-| **Audio quality** | Standard, High or Maximum (up to MP3 320 kbps / AAC 256 kbps) |
+| **Audio quality** | Voice (default: same sound, about half the size), Standard, High or Maximum (up to MP3 320 kbps / AAC 256 kbps) |
 | **Chapters** | Detected from the book's table of contents and headings, editable before converting |
 | **Cover & metadata** | Title, author, genre, cover and chapters extracted automatically and editable |
 | **Voices** | 300+ Microsoft neural voices in 70+ languages, with audio samples to preview |

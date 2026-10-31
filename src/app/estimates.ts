@@ -6,12 +6,12 @@ import type { AudioFormat, AudioQuality } from './audioFormats';
 const CHARS_POR_MINUTO = 900;
 // Taxa média de cada formato (kbps); FLAC/WAV guardam a voz de 24 kHz sem perda
 const KBPS: Record<AudioFormat, Record<AudioQuality, number>> = {
-  single: { standard: 128, high: 192, max: 320 },
-  multiple: { standard: 128, high: 192, max: 320 },
-  m4b: { standard: 96, high: 128, max: 256 },
-  opus: { standard: 48, high: 64, max: 128 },
-  flac: { standard: 210, high: 210, max: 210 },
-  wav: { standard: 384, high: 384, max: 384 },
+  single: { voice: 96, standard: 128, high: 192, max: 320 },
+  multiple: { voice: 96, standard: 128, high: 192, max: 320 },
+  m4b: { voice: 64, standard: 96, high: 128, max: 256 },
+  opus: { voice: 40, standard: 48, high: 64, max: 128 },
+  flac: { voice: 210, standard: 210, high: 210, max: 210 },
+  wav: { voice: 384, standard: 384, high: 384, max: 384 },
 };
 
 export interface ConversionEstimate {
@@ -52,7 +52,7 @@ export function formatWait(seconds: number): string {
 
 export function estimateConversion(chars: number, format: AudioFormat, quality: AudioQuality, translate = false): ConversionEstimate {
   const minutes = chars > 0 ? chars / CHARS_POR_MINUTO : 0;
-  const kbps = (KBPS[format] || KBPS.single)[quality] || 192;
+  const kbps = (KBPS[format] || KBPS.single)[quality] || 96;
   const sizeMB = (minutes * 60 * kbps) / 8 / 1000;
   // Síntese em paralelo (~1.000 caracteres/s, medido com 10 conexões) + normalização e codificação (~0,5 s por minuto de áudio)
   const seconds = chars > 0 ? chars / 1000 + minutes * 0.5 + (translate ? chars / 4000 : 0) + 15 : 0;

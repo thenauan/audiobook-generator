@@ -3,7 +3,7 @@
 // 24 kHz a 96 kbps; o capítulo é guardado sem perda e o arquivo final é codificado uma única vez.
 
 export type AudioFormat = 'm4b' | 'single' | 'opus' | 'flac' | 'wav' | 'multiple';
-export type AudioQuality = 'standard' | 'high' | 'max';
+export type AudioQuality = 'voice' | 'standard' | 'high' | 'max';
 
 export interface AudioFormatInfo {
   value: AudioFormat;
@@ -23,14 +23,15 @@ export const AUDIO_FORMATS: AudioFormatInfo[] = [
 ];
 
 export const AUDIO_QUALITIES: { value: AudioQuality; label: string; description: string }[] = [
-  { value: 'standard', label: 'Padrão', description: 'Arquivos menores (MP3 128k, AAC 96k, Opus 48k)' },
+  { value: 'voice', label: 'Voz', description: 'Recomendada: o mesmo som da voz em arquivos menores (MP3 96k e AAC 64k a 24 kHz, Opus 40k)' },
+  { value: 'standard', label: 'Padrão', description: 'Arquivos médios (MP3 128k, AAC 96k, Opus 48k)' },
   { value: 'high', label: 'Alta', description: 'Equilíbrio (MP3 192k, AAC 128k, Opus 64k)' },
   { value: 'max', label: 'Máxima', description: 'Sem perdas audíveis (MP3 320k, AAC 256k, Opus 128k)' },
 ];
 
 export const isAudioFormat = (v: unknown): v is AudioFormat => AUDIO_FORMATS.some(f => f.value === v);
 export const audioFormatInfo = (v?: string | null) => AUDIO_FORMATS.find(f => f.value === v) || AUDIO_FORMATS[0];
-export const audioQualityLabel = (v?: string | null) => AUDIO_QUALITIES.find(q => q.value === v)?.label || 'Alta';
+export const audioQualityLabel = (v?: string | null) => AUDIO_QUALITIES.find(q => q.value === v)?.label || 'Voz';
 
 // Formato a partir da extensão de um arquivo já gerado (edição de audiobooks do histórico)
 export function audioFormatFromPath(path?: string | null): AudioFormat {

@@ -419,8 +419,14 @@ export function useAppState() {
 
   // Qualidade do áudio gerado (taxa de bits dos formatos com compressão)
   const [audioQuality, setAudioQuality] = useState<AudioQuality>(() => {
-    const saved = safeGet('audio_quality');
-    return saved === 'standard' || saved === 'high' || saved === 'max' ? saved : 'high';
+    // "Voz" é o padrão: o mesmo som em arquivos menores. "Alta" era o padrão antes: quem nunca trocou passa
+    // para "Voz" uma vez.
+    let saved = safeGet('audio_quality');
+    if (!safeGet('default_quality_voice_v1')) {
+      if (saved === 'high') saved = 'voice';
+      safeSet('default_quality_voice_v1', 'true');
+    }
+    return saved === 'voice' || saved === 'standard' || saved === 'high' || saved === 'max' ? saved : 'voice';
   });
 
   useEffect(() => {
@@ -2060,6 +2066,17 @@ export function useAppState() {
       return f;
     }));
 
+    // Sem FFmpeg só o MP3 funciona (os capítulos são juntados direto): os outros formatos viram MP3, com aviso
+    let semFfmpeg = false;
+    try { semFfmpeg = (await (await fetch('/api/health')).json()).ffmpeg === false; } catch { /* sem resposta: segue */ }
+    const formatoFinal = (f: AppFile): AudioFormat => {
+      const fmt = f.fileType || fileType;
+      return semFfmpeg && fmt !== 'single' && fmt !== 'multiple' ? 'single' : fmt;
+    };
+    if (semFfmpeg && filesToConvert.some(f => formatoFinal(f) !== (f.fileType || fileType))) {
+      showToast('FFmpeg não encontrado: os audiobooks serão gerados em MP3, sem o ajuste de volume. Instale o FFmpeg para usar M4B, Opus, FLAC ou WAV.');
+    }
+
     const formData = new FormData();
     filesToConvert.forEach(f => {
       if (f.fileObj) {
@@ -2080,7 +2097,7 @@ export function useAppState() {
       translate: f.requiresTranslation,
       cover: f.customCover || f.cover || null,
       generate_sync_text: f.generateSyncText !== undefined ? f.generateSyncText : true,
-      fileType: f.fileType || fileType,
+      fileType: formatoFinal(f),
       chapters: f.chapters || [],
       pronunciationMap: f.pronunciationMap || [],
       pronunciation_map: f.pronunciationMap || []
@@ -2705,7 +2722,7 @@ export function useAppState() {
             setFileTypeOption('m4b');
             setSyncTextDestination('both');
             setSyncTextGranularity('sentences');
-            setAudioQuality('high');
+            setAudioQuality('voice');
             showToast("Ajustes restaurados com sucesso!");
           },
         },

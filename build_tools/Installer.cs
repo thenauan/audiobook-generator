@@ -6,14 +6,14 @@ using System.Windows.Forms;
 using System.Net;
 using System.Reflection;
 
-// Define Assembly Information for the executable (Version 1.3)
+// Define Assembly Information for the executable (Version 1.4)
 [assembly: AssemblyTitle("Audiobook Generator with AI Installer")]
 [assembly: AssemblyDescription("Installer for Audiobook Generator with AI")]
 [assembly: AssemblyCompany("Audiobook Generator")]
 [assembly: AssemblyProduct("Audiobook Generator with AI")]
 [assembly: AssemblyCopyright("Copyright © 2026")]
-[assembly: AssemblyVersion("1.3.0.0")]
-[assembly: AssemblyFileVersion("1.3.0.0")]
+[assembly: AssemblyVersion("1.4.0.0")]
+[assembly: AssemblyFileVersion("1.4.0.0")]
 
 namespace AudiobookInstaller
 {

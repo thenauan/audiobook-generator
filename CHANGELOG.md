@@ -6,6 +6,17 @@ All notable changes to **Audiobook Generator** — the free ebook to audiobook c
 
 ---
 
+## [1.4.0] — 2026-10-31
+
+### Added
+- **"Voice" audio quality, now the default:** MP3 96k and AAC 64k at 24 kHz (the voices' own sample rate) and Opus 40k. Same sound as "High" in files about half the size, and a faster final step. Users who never changed the quality move to "Voice" once.
+- **MP3 without FFmpeg:** the chapters are concatenated in Python and chapters and cover go in the ID3 tags; without FFmpeg, other formats are converted to MP3 with a warning (no volume levelling or 1.5 s chapter pause).
+- **Settings saved on disk** (`~/.audiobook-generator/settings.json`), loaded before the app opens: they no longer reset after closing the app or opening it in another window or port.
+- Engine events and errors carry stable codes (`code`, `args`, `unitCode`) next to the Portuguese text, for other interfaces to translate.
+
+### Fixed
+- A missing FFmpeg no longer crashes the chapter step: it is skipped and the voice is kept as it came.
+
 ## [1.3.0] — 2026-10-31
 
 ### Fixed

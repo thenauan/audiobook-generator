@@ -122,7 +122,7 @@ export function SettingsConversionScreen() {
             </div>
             <div className="flex flex-col">
               <span className="font-semibold text-base text-[var(--text-main)]">Qualidade de áudio</span>
-              <span className="text-xs sm:text-sm text-[var(--text-muted)] mt-0.5">Voz neural a 96 kbps, codificada uma única vez</span>
+              <span className="text-xs sm:text-sm text-[var(--text-muted)] mt-0.5">A voz chega em 24 kHz: a qualidade Voz guarda todo o som dela em arquivos menores</span>
             </div>
           </div>
           <motion.button

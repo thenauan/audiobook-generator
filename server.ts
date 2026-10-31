@@ -639,6 +639,31 @@ async function startServer() {
     }
   });
 
+  // Ajustes (tema, idioma, voz, formato, pasta...) em disco, iguais para qualquer janela ou porta
+  const SETTINGS_FILE = path.join(LIB_DIR, 'settings.json');
+  app.get("/api/settings", (req, res) => {
+    try {
+      if (!fs.existsSync(SETTINGS_FILE)) return res.json({ exists: false, settings: {} });
+      const data = JSON.parse(fs.readFileSync(SETTINGS_FILE, 'utf8'));
+      res.json({ exists: true, settings: data.settings && typeof data.settings === 'object' ? data.settings : {} });
+    } catch (e) {
+      res.json({ exists: false, settings: {}, error: String(e) });
+    }
+  });
+  app.post("/api/settings", express.json({ limit: '20mb' }), (req, res) => {
+    try {
+      const settings = req.body?.settings;
+      if (!settings || typeof settings !== 'object' || Array.isArray(settings)) return res.status(400).json({ error: 'dados inválidos' });
+      fs.mkdirSync(LIB_DIR, { recursive: true });
+      const tmp = SETTINGS_FILE + '.tmp';
+      fs.writeFileSync(tmp, JSON.stringify({ version: 1, settings }));
+      fs.renameSync(tmp, SETTINGS_FILE);
+      res.json({ success: true });
+    } catch (e) {
+      res.status(500).json({ error: String(e) });
+    }
+  });
+
   // Audiobooks que estão na pasta de salvamento (para recuperar em Convertidos o que foi convertido em outra janela)
   app.post("/api/scan-library", express.json(), (req, res) => {
     const pasta = typeof req.body?.folder === 'string' ? path.resolve(req.body.folder) : '';
