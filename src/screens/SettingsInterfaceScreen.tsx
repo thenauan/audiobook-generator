@@ -111,7 +111,7 @@ export function SettingsInterfaceScreen() {
             </div>
             <div className="flex flex-col">
               <span className="font-semibold text-base text-[var(--text-main)]">Modo leve</span>
-              <span className="text-xs sm:text-sm text-[var(--text-muted)] mt-0.5">Para computadores mais fracos. Na interface: sem desfoque, fundos parados e pop-ups opacos. Na conversão: um livro por vez, menos conexões de voz e prioridade mínima (mais lenta, mas o computador fica livre). Desliga o modo turbo</span>
+              <span className="text-xs sm:text-sm text-[var(--text-muted)] mt-0.5">Para computadores mais fracos. Na interface: sem desfoque, fundos parados e pop-ups opacos. Na conversão: um livro por vez, menos conexões de voz e prioridade mínima (mais lenta, mas o computador fica livre). Desligado, a conversão se adapta sozinha ao computador e à internet</span>
             </div>
           </div>
           <SettingToggle checked={liteMode} onChange={setLiteMode} enabledLabel="Ligado" disabledLabel="Desligado" />
