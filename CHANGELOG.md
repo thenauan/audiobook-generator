@@ -6,6 +6,11 @@ All notable changes to **Audiobook Generator** — the free ebook to audiobook c
 
 ---
 
+## [1.5.2] — 2026-11-11
+
+### Fixed
+- Version 1.5.1 was published with an invisible character at the start of `package.json`, which could stop the app from starting. Everything from 1.5.1 is included.
+
 ## [1.5.1] — 2026-11-11
 
 ### Added
