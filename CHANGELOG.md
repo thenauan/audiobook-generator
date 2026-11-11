@@ -6,6 +6,15 @@ All notable changes to **Audiobook Generator** — the free ebook to audiobook c
 
 ---
 
+## [1.5.1] — 2026-11-11
+
+### Added
+- **Poetry books are split by poem:** each poem becomes a chapter with its title, also when the book has no chapters (EPUB with or without a table of contents, titles in bold, one poem per file, TXT). Untitled poems get their first line as title, numbered poems keep the number ("V. First line"), and each line of verse is its own line in the synced text.
+
+### Fixed
+- Poems with the same title ("Sonnet") or without a title were removed from the audiobook. Lines of verse were joined into one line in TXT files.
+- **Subtitles no longer become chapters:** in books with chapters and subtitles inside them (in the table of contents or as headings), and in chapters divided by narrator, the subtitles stay inside their chapter. Books with parts and chapters keep their chapters.
+
 ## [1.5.0] — 2026-11-11
 
 ### Changed
