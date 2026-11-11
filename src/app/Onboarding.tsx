@@ -3,7 +3,7 @@
 // configuração inicial em páginas por tipo: Interface, Conversão e Armazenamento e pastas.
 // Cada página mostra grupos de opções em card; tudo o que é escolhido aqui vale para o app na hora.
 // Se a pasta de salvamento não for escolhida, o app cria uma (Documentos/Audiobook Generator).
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   ArrowRight, Check, ChevronDown, ChevronLeft, ChevronRight, FolderOpen, Globe, Monitor, Moon, Sun, Mic, FileText,
@@ -15,6 +15,7 @@ import { AmbientOrbs } from '../components/AmbientOrbs';
 import { AppGlyph } from '../components/AppGlyph';
 import { useApp } from './AppContext';
 import { VoiceSampleButton } from '../lib/voiceSample';
+import { useSystemInfo } from '../lib/systemInfo';
 import { VOICES, voicesFor, hasSample, languageNamePt } from '../data/voices';
 import { AUDIO_FORMATS, AUDIO_QUALITIES, type AudioQuality } from './audioFormats';
 import { audioFormatIcon, audioQualityIcon } from './audioFormatIcons';
@@ -46,7 +47,7 @@ const DESTINATIONS: { value: SyncTextDestination; label: string; description: st
 const GRANULARITIES: { value: SyncTextGranularity; label: string; description: string; icon: React.ReactNode }[] = [
   { value: 'sentences', label: 'Frases', description: 'Uma linha por frase', icon: <AlignLeft size={16} /> },
   { value: 'words', label: 'Palavras', description: 'Cada palavra com seu próprio tempo', icon: <WholeWord size={16} /> },
-  { value: 'both', label: 'Frases e palavras', description: 'Frases, com o tempo de cada palavra dentro delas', icon: <Rows3 size={16} /> },
+  { value: 'both', label: 'Frases e palavras', description: 'Recomendado: frases, com o tempo de cada palavra dentro delas', icon: <Rows3 size={16} /> },
 ];
 
 type PageId = 'welcome' | 'interface' | 'conversion' | 'text' | 'storage';
@@ -85,7 +86,7 @@ function OptionGroup({ title, description, children, footer, grow }: { title: st
 }
 
 // Uma opção: ícone em círculo, nome, descrição e a marca de selecionado
-function OptionRow({ icon, label, description, selected, onClick, sampleCode }: { icon: React.ReactNode; label: string; description?: string; selected: boolean; onClick: () => void; sampleCode?: string }) {
+function OptionRow({ icon, label, description, selected, onClick, sampleCode, badge }: { icon: React.ReactNode; label: string; description?: string; selected: boolean; onClick: () => void; sampleCode?: string; badge?: string }) {
   return (
     <motion.button
       type="button"
@@ -98,7 +99,10 @@ function OptionRow({ icon, label, description, selected, onClick, sampleCode }: 
         {icon}
       </span>
       <span className="flex flex-col min-w-0 flex-1">
-        <span className={`text-sm font-semibold truncate ${selected ? 'text-winblue' : 'text-[var(--text-main)]'}`}>{label}</span>
+        <span className="flex items-center gap-2 min-w-0">
+          <span className={`text-sm font-semibold truncate ${selected ? 'text-winblue' : 'text-[var(--text-main)]'}`}>{label}</span>
+          {badge && <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-500 border border-emerald-500/20 shrink-0">{badge}</span>}
+        </span>
         {description && <span className="text-xs text-[var(--text-muted)] truncate [@media(max-height:780px)]:hidden">{description}</span>}
       </span>
       {sampleCode && <VoiceSampleButton code={sampleCode} size="md" />}
@@ -117,6 +121,16 @@ export function Onboarding() {
     generateSyncTextDefault, setGenerateSyncTextDefault, syncTextDestination, setSyncTextDestination, syncTextGranularity, setSyncTextGranularity,
     outputFolder, handleSelectOutputFolder, ensureOutputFolder, openOutputFolder, toastMessage,
   } = useApp();
+  const computador = useSystemInfo();
+  useEffect(() => {
+    if (!computador?.weak || liteMode) return;
+    try {
+      if (localStorage.getItem('lite_suggested_v1')) return;
+      localStorage.setItem('lite_suggested_v1', 'true');
+    } catch { return; }
+    setLiteMode(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [computador]);
 
   const [page, setPage] = useState(() => (showWelcomeModal ? 0 : 1));
   const [direction, setDirection] = useState(1);
@@ -296,10 +310,10 @@ export function Onboarding() {
                   </OptionGroup>
                 </div>
                 <div className="col-span-2">
-                  <OptionGroup title="Desempenho" description="Para computadores mais fracos, deixe o app mais leve.">
+                  <OptionGroup title="Desempenho" description={computador?.weak ? `Este computador (${computador.summary}) é mais simples: recomendamos o modo leve.` : computador ? `Este computador: ${computador.summary}.` : 'Para computadores mais fracos, deixe o app mais leve.'}>
                     <div className="grid grid-cols-2 gap-0.5">
-                      <OptionRow icon={<Sparkles size={16} />} label="Efeitos completos" description="Fundos animados e desfoque" selected={!liteMode} onClick={() => setLiteMode(false)} />
-                      <OptionRow icon={<Feather size={16} />} label="Modo leve" description="Interface sem desfoque e conversão de um livro por vez" selected={liteMode} onClick={() => setLiteMode(true)} />
+                      <OptionRow icon={<Sparkles size={16} />} label="Efeitos completos" description="Fundos animados e desfoque" selected={!liteMode} onClick={() => setLiteMode(false)} badge={computador && !computador.weak ? 'Recomendado' : undefined} />
+                      <OptionRow icon={<Feather size={16} />} label="Modo leve" description="Interface sem desfoque e conversão de um livro por vez" selected={liteMode} onClick={() => setLiteMode(true)} badge={computador?.weak ? 'Recomendado' : undefined} />
                     </div>
                   </OptionGroup>
                 </div>

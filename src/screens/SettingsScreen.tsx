@@ -28,7 +28,7 @@ export function SettingsScreen() {
             { id: 'settings-interface', title: 'Interface', subtitle: 'Personalize a aparência do aplicativo', icon: <Palette size={18} />, gradient: 'from-violet-500 to-pink-600' },
             { id: 'settings-conversion', title: 'Conversão de áudio', subtitle: 'Formato de arquivo, qualidade e vozes neurais', icon: <Mic size={18} />, gradient: 'from-blue-500 to-cyan-600' },
             { id: 'settings-storage', title: t.storageAndFolders, subtitle: 'Diretório de exportação de áudio e limpeza de cache', icon: <FolderOpen size={18} />, gradient: 'from-amber-500 to-rose-500' },
-            { id: 'settings-about', title: 'Sistema e sobre', subtitle: `Informações da versão v${APP_VERSION}, atalhos e licença`, icon: <Info size={18} />, gradient: 'from-slate-500 to-slate-700' },
+            { id: 'settings-about', title: 'Sistema e sobre', subtitle: `Versão v${APP_VERSION}, atualizações, modo leve e motor de conversão`, icon: <Info size={18} />, gradient: 'from-slate-500 to-slate-700' },
           ].map(row => (
             <ListRow
               key={row.id}

@@ -1,7 +1,7 @@
 // ===== Tela: settings-conversion =====
 import { motion } from 'motion/react';
 import { FileText, Headphones, ChevronDown, Volume2, FolderTree, Mic, HelpCircle, FileAudio2, FolderOpen, CopyCheck, Rows3, AlignLeft, WholeWord } from 'lucide-react';
-import { AUDIO_FORMATS, AUDIO_QUALITIES, audioFormatInfo, audioQualityLabel, type AudioQuality } from '../app/audioFormats';
+import { AUDIO_FORMATS, AUDIO_QUALITIES, audioFormatInfo, audioQualityLabel, formatKeepsTextInside, type AudioQuality } from '../app/audioFormats';
 import { audioFormatIcon, audioQualityIcon } from '../app/audioFormatIcons';
 import type { SyncTextDestination, SyncTextGranularity } from '../app/types';
 
@@ -188,7 +188,9 @@ export function SettingsConversionScreen() {
             <div className="flex flex-col">
               <span className="font-semibold text-base text-[var(--text-main)]">Onde salvar o texto sincronizado</span>
               <span className="text-xs sm:text-sm text-[var(--text-muted)] mt-0.5">
-                Dentro do arquivo do audiobook, na pasta da biblioteca (aparece em Convertidos) ou nos dois
+                {formatKeepsTextInside(fileTypeOption)
+                  ? 'Dentro do arquivo do audiobook, na pasta da biblioteca (aparece em Convertidos) ou nos dois'
+                  : `${audioFormatInfo(fileTypeOption).short} não guarda texto no áudio: ele será salvo só na pasta da biblioteca`}
               </span>
             </div>
           </div>
@@ -205,10 +207,10 @@ export function SettingsConversionScreen() {
                 captions: true,
                 triggerEl: e.currentTarget,
                 title: 'Onde salvar o texto',
-                subtitle: 'Vale para a conversão e para "Gerar texto" em Convertidos',
+                subtitle: 'Vale para a conversão e para "Gerar texto" em Convertidos. WAV e "Um .mp3 por capítulo" salvam só na biblioteca',
                 currentValue: syncTextDestination,
                 options: [
-                  { value: 'metadata', label: DESTINATION_LABELS.metadata, description: 'Grava o texto dentro do arquivo (letras sincronizadas)', icon: <FileAudio2 size={14} className="shrink-0" /> },
+                  { value: 'metadata', label: DESTINATION_LABELS.metadata, description: 'Grava o texto dentro do arquivo, sem arquivos extras (letras sincronizadas)', icon: <FileAudio2 size={14} className="shrink-0" /> },
                   { value: 'library', label: DESTINATION_LABELS.library, description: 'Salva .lrc, .srt e .sync.json ao lado do áudio e em Convertidos', icon: <FolderOpen size={14} className="shrink-0" /> },
                   { value: 'both', label: DESTINATION_LABELS.both, description: 'Grava no audiobook e salva na biblioteca', icon: <CopyCheck size={14} className="shrink-0" /> },
                 ],
@@ -255,7 +257,7 @@ export function SettingsConversionScreen() {
                 options: [
                   { value: 'sentences', label: GRANULARITY_LABELS.sentences, description: 'Uma linha por frase, destacada enquanto é lida', icon: <AlignLeft size={14} className="shrink-0" /> },
                   { value: 'words', label: GRANULARITY_LABELS.words, description: 'Cada palavra acende no momento em que é falada', icon: <WholeWord size={14} className="shrink-0" /> },
-                  { value: 'both', label: GRANULARITY_LABELS.both, description: 'Frases, com o tempo de cada palavra dentro delas', icon: <Rows3 size={14} className="shrink-0" /> },
+                  { value: 'both', label: `${GRANULARITY_LABELS.both} (padrão)`, description: 'Frases, com o tempo de cada palavra dentro delas', icon: <Rows3 size={14} className="shrink-0" /> },
                 ],
                 onSelect: (val) => {
                   setSyncTextGranularity(val as SyncTextGranularity);

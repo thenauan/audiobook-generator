@@ -1185,7 +1185,7 @@ html.standalone #root {
 }
 
 
-/* ===== Modo leve (Ajustes › Interface): sem desfoque de fundo, cards e pop-ups opacos ===== */
+/* ===== Modo leve (Ajustes › Sistema e sobre): sem desfoque de fundo, cards e pop-ups opacos ===== */
 /* (o tema escuro também põe .dark no contêiner do app, que redefinia as cores translúcidas: vale para os dois) */
 html.lite,
 html.lite .dark {
@@ -1202,8 +1202,26 @@ html.lite [class*="backdrop-blur"] {
   -webkit-backdrop-filter: none !important;
   backdrop-filter: none !important;
 }
-html.lite [class*="blur-["]:not([class*="backdrop"]),
-html.lite [class*="blur-3xl"]:not([class*="backdrop"]) {
+/* Halos e brilhos desfocados (atrás do título do cabeçalho, da capa na transição, do ícone da pesquisa): sem o
+   desfoque eles viravam manchas de cor com borda dura, então no modo leve somem */
+html.lite :is([class^="blur-"], [class*=" blur-"]):not([class*="backdrop"]) {
+  display: none !important;
+}
+/* Brilhos ao redor de botões, selos e ícones (sombras de brilho e brilho no passar do mouse) */
+html.lite [class*="shadow-[0_0_"],
+html.lite .group:hover [class*="group-hover:shadow-[0_0_"] {
+  box-shadow: none !important;
+}
+html.lite [class*="drop-shadow-[0_0_"],
+html.lite .group:hover [class*="group-hover:drop-shadow"] {
+  filter: none !important;
+}
+html.lite input[type="range"].apple-slider::-webkit-slider-thumb,
+html.lite input[type="range"].apple-slider::-moz-range-thumb {
+  box-shadow: none !important;
+}
+/* Entradas de cards e pop-ups sem o desfoque animado (só aparecem, mais leve para a placa de vídeo) */
+html.lite [style*="blur("] {
   filter: none !important;
 }
 

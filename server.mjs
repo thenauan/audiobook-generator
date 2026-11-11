@@ -370,6 +370,20 @@ async function startServer() {
     }
   });
   const runningPythonProcesses = /* @__PURE__ */ new Set();
+  let appInForeground = true;
+  app.post("/api/foreground", express.json(), (req, res) => {
+    const foreground = Boolean(req.body?.foreground);
+    if (foreground !== appInForeground) {
+      appInForeground = foreground;
+      for (const proc of runningPythonProcesses) {
+        try {
+          proc.stdin?.write(JSON.stringify({ foreground }) + "\n");
+        } catch {
+        }
+      }
+    }
+    res.json({ success: true });
+  });
   app.post("/api/cancel", (req, res) => {
     const killed = runningPythonProcesses.size > 0;
     for (const proc of runningPythonProcesses) {
@@ -587,6 +601,136 @@ async function startServer() {
       res.status(500).json({ error: String(e) });
     }
   });
+  const RELEASES_API = "https://api.github.com/repos/thenauan/audiobook-generator/releases/latest";
+  const APP_ROOT = process.cwd();
+  const versaoAtual = () => {
+    try {
+      return String(JSON.parse(fs.readFileSync(path.join(APP_ROOT, "package.json"), "utf8")).version || "0.0.0");
+    } catch {
+      return "0.0.0";
+    }
+  };
+  const maisNova = (a, b) => {
+    const pa = a.replace(/^v/, "").split(".").map((n) => parseInt(n, 10) || 0);
+    const pb = b.replace(/^v/, "").split(".").map((n) => parseInt(n, 10) || 0);
+    for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+      if ((pa[i] || 0) !== (pb[i] || 0)) return (pa[i] || 0) > (pb[i] || 0);
+    }
+    return false;
+  };
+  const pastaDev = () => fs.existsSync(path.join(APP_ROOT, ".git"));
+  let atualizacao = { stage: "idle", progress: 0 };
+  app.get("/api/update/check", async (req, res) => {
+    try {
+      const r = await fetch(RELEASES_API, { headers: { "User-Agent": "audiobook-generator", "Accept": "application/vnd.github+json" } });
+      if (!r.ok) return res.json({ error: `GitHub respondeu ${r.status}`, current: versaoAtual() });
+      const rel = await r.json();
+      const latest = String(rel.tag_name || "").replace(/^v/, "");
+      const nomeZip = process.platform === "win32" ? "Audiobook-Generator-with-AI-Windows.zip" : "Audiobook-Generator-with-AI-Unix.zip";
+      const asset = (rel.assets || []).find((a) => a.name === nomeZip);
+      res.json({
+        current: versaoAtual(),
+        latest,
+        available: maisNova(latest, versaoAtual()),
+        notes: String(rel.body || ""),
+        url: rel.html_url,
+        publishedAt: rel.published_at,
+        downloadSize: asset?.size || 0,
+        canInstall: Boolean(asset) && !pastaDev(),
+        devFolder: pastaDev()
+      });
+    } catch (e) {
+      res.json({ error: `Sem conex\xE3o com o GitHub (${String(e.message || e)})`, current: versaoAtual() });
+    }
+  });
+  app.get("/api/update/status", (req, res) => res.json(atualizacao));
+  app.post("/api/update/install", express.json(), async (req, res) => {
+    if (["downloading", "installing", "deps"].includes(atualizacao.stage)) return res.json({ started: false, ...atualizacao });
+    if (pastaDev()) return res.status(409).json({ error: "Esta \xE9 uma pasta de desenvolvimento (git): atualize com git pull." });
+    res.json({ started: true });
+    const falhar = (message) => {
+      atualizacao = { ...atualizacao, stage: "error", message };
+    };
+    try {
+      atualizacao = { stage: "downloading", progress: 0 };
+      const r = await fetch(RELEASES_API, { headers: { "User-Agent": "audiobook-generator", "Accept": "application/vnd.github+json" } });
+      const rel = await r.json();
+      const versao = String(rel.tag_name || "").replace(/^v/, "");
+      const nomeZip = process.platform === "win32" ? "Audiobook-Generator-with-AI-Windows.zip" : "Audiobook-Generator-with-AI-Unix.zip";
+      const asset = (rel.assets || []).find((a) => a.name === nomeZip);
+      if (!asset) return falhar(`A vers\xE3o ${versao} n\xE3o tem o arquivo ${nomeZip}.`);
+      atualizacao.version = versao;
+      const zipPath = path.join(os.tmpdir(), `audiobook-generator-${versao}.zip`);
+      const dl = await fetch(asset.browser_download_url, { headers: { "User-Agent": "audiobook-generator" } });
+      if (!dl.ok || !dl.body) return falhar(`Falha no download (${dl.status}).`);
+      const total = Number(dl.headers.get("content-length")) || asset.size || 0;
+      const saida = fs.createWriteStream(zipPath);
+      let recebido = 0;
+      const leitor = dl.body.getReader();
+      for (; ; ) {
+        const { done, value } = await leitor.read();
+        if (done) break;
+        recebido += value.length;
+        if (!saida.write(Buffer.from(value))) await new Promise((ok) => saida.once("drain", () => ok()));
+        if (total) atualizacao.progress = Math.min(1, recebido / total);
+      }
+      await new Promise((ok) => saida.end(() => ok()));
+      atualizacao = { stage: "installing", progress: 0, version: versao };
+      const resultado = await new Promise((ok) => {
+        const proc = spawn(PYTHON_CMD, ["updater.py", zipPath, APP_ROOT], { cwd: APP_ROOT, env: PY_ENV, windowsHide: true });
+        let fim = { error: "O instalador da atualiza\xE7\xE3o parou sem responder." };
+        let resto = "";
+        proc.stdout.on("data", (d) => {
+          resto += d.toString();
+          const linhas = resto.split("\n");
+          resto = linhas.pop() || "";
+          for (const l of linhas) {
+            try {
+              const ev = JSON.parse(l);
+              if (typeof ev.progress === "number") atualizacao.progress = ev.progress;
+              if (ev.done || ev.error) fim = ev;
+            } catch {
+            }
+          }
+        });
+        proc.on("error", (e) => ok({ error: String(e) }));
+        proc.on("close", () => ok(fim));
+      });
+      fs.rmSync(zipPath, { force: true });
+      if (resultado.error) return falhar(resultado.error);
+      if (resultado.packageChanged) {
+        atualizacao = { stage: "deps", progress: 0, version: versao };
+        const npm = await new Promise((ok) => {
+          const p = spawn("npm", ["install", "--no-audit", "--no-fund"], { cwd: APP_ROOT, shell: true, windowsHide: true });
+          p.on("error", () => ok(1));
+          p.on("close", (c) => ok(c ?? 1));
+        });
+        if (npm !== 0) return falhar('A atualiza\xE7\xE3o foi extra\xEDda, mas "npm install" falhou. Rode o instalador de novo.');
+      }
+      atualizacao = { stage: "ready", progress: 1, version: versao };
+    } catch (e) {
+      falhar(String(e.message || e));
+    }
+  });
+  app.post("/api/update/restart", (req, res) => {
+    res.json({ restarting: true });
+    setTimeout(() => {
+      if (process.env.ELECTRON_MODE) {
+        try {
+          fs.writeFileSync(path.join(APP_ROOT, ".reiniciar"), String(Date.now()));
+        } catch {
+        }
+      } else {
+        const raiz = JSON.stringify(APP_ROOT);
+        spawn(
+          process.execPath,
+          ["-e", `setTimeout(()=>require('child_process').spawn('npm',['start'],{cwd:${raiz},shell:true,detached:true,stdio:'ignore',windowsHide:true}).unref(),2500)`],
+          { detached: true, stdio: "ignore", windowsHide: true }
+        ).unref();
+      }
+      process.exit(0);
+    }, 300);
+  });
   const SETTINGS_FILE = path.join(LIB_DIR, "settings.json");
   app.get("/api/settings", (req, res) => {
     try {
@@ -741,6 +885,15 @@ async function startServer() {
     }
     res.status(500).json({ error: "N\xE3o foi poss\xEDvel criar a pasta padr\xE3o." });
   });
+  app.get("/api/system-info", (req, res) => {
+    const cpus = os.cpus();
+    res.json({
+      cores: cpus.length,
+      cpuModel: (cpus[0]?.model || "").replace(/\s+/g, " ").trim(),
+      ramGB: Math.round(os.totalmem() / 1024 ** 3 * 10) / 10,
+      platform: process.platform
+    });
+  });
   app.get("/api/health", (req, res) => {
     const check = [
       "import importlib.util as u, json, shutil, sys",
@@ -779,7 +932,7 @@ async function startServer() {
       const isMultiple = fileFormat === "multiple" || config.mode_folder === true || config.mode_folder === "true";
       const generateSyncText = config.generate_sync_text !== void 0 ? config.generate_sync_text : req.body.generate_sync_text !== void 0 ? req.body.generate_sync_text === true || req.body.generate_sync_text === "true" : true;
       const syncTextDestination = ["metadata", "library", "both"].includes(config.sync_text_destination) ? config.sync_text_destination : "both";
-      const syncTextGranularity = ["sentences", "words", "both"].includes(config.sync_text_granularity) ? config.sync_text_granularity : "sentences";
+      const syncTextGranularity = ["sentences", "words", "both"].includes(config.sync_text_granularity) ? config.sync_text_granularity : "both";
       const files = req.files.map((file, index) => {
         const info = filesInfo[index] || {};
         const originalExt = path.extname(info.filename || file.originalname);
@@ -799,11 +952,16 @@ async function startServer() {
           audio_quality: config.audio_quality,
           translate: info.requiresTranslation || info.translate || false,
           cover: info.cover || null,
+          generic_cover: Boolean(info.generic_cover),
+          cover_color: info.cover_color || "",
           chapters: info.chapters || [],
           fileType: info.fileType || fileFormat,
           file_format: info.fileType || fileFormat,
           pronunciation_map: info.pronunciationMap || info.pronunciation_map || [],
           generate_sync_text: info.generate_sync_text !== void 0 ? info.generate_sync_text : generateSyncText,
+          strict_sync_text: Boolean(info.strict_sync_text),
+          skip_sync_text: Boolean(info.skip_sync_text),
+          replace_outputs: Array.isArray(info.replace_outputs) ? info.replace_outputs : [],
           sync_text_destination: syncTextDestination,
           sync_text_granularity: syncTextGranularity,
           config: { ...info.config || config, file_format: info.fileType || fileFormat, pronunciation_map: info.pronunciationMap || info.pronunciation_map || [], generate_sync_text: info.generate_sync_text !== void 0 ? info.generate_sync_text : generateSyncText, sync_text_destination: syncTextDestination, sync_text_granularity: syncTextGranularity }
@@ -820,7 +978,7 @@ async function startServer() {
         sync_text_destination: syncTextDestination,
         sync_text_granularity: syncTextGranularity,
         lite: Boolean(config.lite),
-        turbo: Boolean(config.turbo)
+        foreground: appInForeground
       };
       const configPath = path.join(process.cwd(), `config_${Date.now()}.json`);
       fs.writeFileSync(configPath, JSON.stringify(pythonConfig));
@@ -930,6 +1088,7 @@ ${stderrTail.trim().split("\n").slice(-25).join("\n") || "(nenhuma mensagem)"}`
         tempFilesToClean.push(ebookPath);
       }
       const destination = ["metadata", "library", "both"].includes(req.body.destination) ? req.body.destination : "both";
+      const granularity = ["sentences", "words", "both"].includes(req.body.granularity) ? req.body.granularity : "both";
       const outputFolder = req.body.outputFolder || path.join(process.cwd(), "meus audiobooks");
       const args = [
         "-u",
@@ -943,7 +1102,9 @@ ${stderrTail.trim().split("\n").slice(-25).join("\n") || "(nenhuma mensagem)"}`
         "--author",
         String(req.body.author || ""),
         "--destination",
-        destination
+        destination,
+        "--granularity",
+        granularity
       ];
       if (ebookPath) args.push("--ebook", ebookPath);
       const child = spawn(PYTHON_CMD, args, { stdio: ["ignore", "pipe", "pipe"], env: PY_ENV, windowsHide: true });

@@ -1,12 +1,13 @@
 // ===== Tela: settings-interface =====
 import { motion } from 'motion/react';
-import { Moon, ChevronDown, Globe, Palette, Type, Monitor, Sun, AArrowDown, AArrowUp, Feather } from 'lucide-react';
+import { Moon, ChevronDown, Globe, Palette, Type, Monitor, Sun, AArrowDown, AArrowUp } from 'lucide-react';
 import { SettingToggle } from '../components/cards/SettingToggle';
 import { transicaoConteudo } from '../navigation/transitions';
 import { useApp } from '../app/AppContext';
+import { AVISO_TRADUCAO_AUTOMATICA } from '../lib/autoTranslate';
 
 export function SettingsInterfaceScreen() {
-  const { accentPalette, accentColor, setAccentColor, themeMode, setThemeMode, uiFontSize, setUiFontSize, interfaceLang, setInterfaceLang, activeSettingSelector, setActiveSettingSelector , liteMode, setLiteMode } = useApp();
+  const { accentPalette, accentColor, setAccentColor, themeMode, setThemeMode, uiFontSize, setUiFontSize, interfaceLang, setInterfaceLang, activeSettingSelector, setActiveSettingSelector } = useApp();
   return (
     <motion.div
       key="screen-settings-interface"
@@ -103,20 +104,6 @@ export function SettingsInterfaceScreen() {
           </motion.button>
         </div>
 
-        {/* Modo leve */}
-        <div className="settings-list-row py-3 sm:py-3.5 px-4 sm:px-5 rounded-[32px] bg-card/60 backdrop-blur-xl border border-[var(--text-main)]/10 transition-colors flex items-center justify-between gap-4">
-          <div className="flex items-center gap-4">
-            <div className="w-10 h-10 rounded-full bg-winblue/10 text-winblue flex items-center justify-center shrink-0">
-              <Feather size={20} />
-            </div>
-            <div className="flex flex-col">
-              <span className="font-semibold text-base text-[var(--text-main)]">Modo leve</span>
-              <span className="text-xs sm:text-sm text-[var(--text-muted)] mt-0.5">Para computadores mais fracos. Na interface: sem desfoque, fundos parados e pop-ups opacos. Na conversão: um livro por vez, menos conexões de voz e prioridade mínima (mais lenta, mas o computador fica livre). Desligado, a conversão se adapta sozinha ao computador e à internet</span>
-            </div>
-          </div>
-          <SettingToggle checked={liteMode} onChange={setLiteMode} enabledLabel="Ligado" disabledLabel="Desligado" />
-        </div>
-
         {/* 3. Tamanho da fonte */}
         <div className="settings-list-row py-3 sm:py-3.5 px-4 sm:px-5 rounded-[32px] bg-card/60 backdrop-blur-xl border border-[var(--text-main)]/10 transition-colors flex items-center justify-between gap-4">
           <div className="flex items-center gap-4">
@@ -167,6 +154,9 @@ export function SettingsInterfaceScreen() {
             <div className="flex flex-col">
               <span className="font-semibold text-base text-[var(--text-main)]">Idioma</span>
               <span className="text-xs sm:text-sm text-[var(--text-muted)] mt-0.5">Selecione o idioma da interface</span>
+              {AVISO_TRADUCAO_AUTOMATICA[interfaceLang] && (
+                <span translate="no" className="text-xs sm:text-sm text-amber-500 mt-0.5">{AVISO_TRADUCAO_AUTOMATICA[interfaceLang]}</span>
+              )}
             </div>
           </div>
           <motion.button 

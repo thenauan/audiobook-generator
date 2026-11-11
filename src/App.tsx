@@ -3,7 +3,7 @@
 // telas com as transições do esqueleto. O estado fica em app/useAppState.tsx; cada tela em screens/.
 import { lazy, Suspense } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Search, Settings as SettingsIcon, BookHeadphones, HelpCircle, ChevronLeft, X, Pause, Play, MoreVertical, FileText, Power, CheckCircle2, Loader2 } from 'lucide-react';
+import { Search, Settings as SettingsIcon, BookHeadphones, HelpCircle, ChevronLeft, X, Pause, Play, MoreVertical, FileText, Power, CheckCircle2, Loader2, ChevronRight } from 'lucide-react';
 import { RiApps2Line, RiAiGenerateText } from 'react-icons/ri';
 import { Sidebar } from './components/Navigation';
 import { HeaderActionButtons } from './components/HeaderActionButtons';
@@ -45,7 +45,7 @@ function TelaCarregando() {
 
 export default function App() {
   const app = useAppState();
-  const { mainScrollRef, isMobile, currentScreen, activeScreenKey, currentRoot, navigateBack, resolvedTheme, t, headerBlurRef, isTitleScrolledPast, editingBook, editingFileId, editingText, currentScreenTitle, getPreviousScreenTitle, headerActions, selectRoot, historyBadge, showBack, navigateTo, interfaceLang, showToast, playingSnippet, toggleSnippet, addToSearchHistory, setViewingTextModal, setViewingTextAnchor, activeBookMenu, setActiveBookMenu, activeTextMenu, setActiveTextMenu, searchInputRef, searchQuery, setSearchQuery, computedSearchResults, setIsDevModeActive, handleExitDevMode, devModeOptions, toastMessage } = app;
+  const { mainScrollRef, isMobile, currentScreen, activeScreenKey, currentRoot, navigateBack, resolvedTheme, t, headerBlurRef, isTitleScrolledPast, editingBook, editingFileId, editingText, currentScreenTitle, getPreviousScreenTitle, headerActions, selectRoot, historyBadge, showBack, navigateTo, interfaceLang, showToast, playingSnippet, toggleSnippet, addToSearchHistory, setViewingTextModal, setViewingTextAnchor, activeBookMenu, setActiveBookMenu, activeTextMenu, setActiveTextMenu, searchInputRef, searchQuery, setSearchQuery, computedSearchResults, setIsDevModeActive, handleExitDevMode, devModeOptions, toastMessage, toastAction, setToastMessage } = app;
 
   // Primeira abertura: boas-vindas e configuração inicial antes do app
   if (app.showWelcomeModal || app.showInitialConfigModal) {
@@ -167,10 +167,12 @@ export default function App() {
                   animate={{ opacity: 1, y: 0, scale: 1, x: '-50%' }}
                   exit={{ opacity: 0, y: -8, scale: 0.92, x: '-50%' }}
                   transition={{ type: 'spring', stiffness: 520, damping: 36, mass: 0.55 }}
-                  className={`absolute left-1/2 ${currentScreen === 'search' ? 'top-[calc(var(--app-header-top)+52px)]' : 'top-[var(--app-header-top)]'} z-50 h-9 max-w-[min(520px,50%)] px-4 rounded-full bg-card/90 backdrop-blur-3xl border border-winblue/60 shadow-[0_0_16px_rgba(var(--winblue-rgb),0.25)] text-xs font-semibold text-winblue pointer-events-none flex items-center gap-2`}
+                  onClick={toastAction ? () => { toastAction(); setToastMessage(null); } : undefined}
+                  className={`absolute left-1/2 ${currentScreen === 'search' ? 'top-[calc(var(--app-header-top)+52px)]' : 'top-[var(--app-header-top)]'} z-50 h-9 max-w-[min(520px,50%)] px-4 rounded-full bg-card/90 backdrop-blur-3xl border border-winblue/60 shadow-[0_0_16px_rgba(var(--winblue-rgb),0.25)] text-xs font-semibold text-winblue ${toastAction ? 'pointer-events-auto cursor-pointer hover:bg-winblue/15' : 'pointer-events-none'} flex items-center gap-2`}
                 >
                   <CheckCircle2 size={15} className="text-winblue shrink-0" />
                   <span className="truncate">{toastMessage}</span>
+                  {toastAction && <ChevronRight size={14} className="text-winblue shrink-0 -mr-1" />}
                 </motion.div>
               )}
             </AnimatePresence>

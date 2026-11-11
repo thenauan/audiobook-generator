@@ -18,8 +18,8 @@ export const AUDIO_FORMATS: AudioFormatInfo[] = [
   { value: 'single', label: 'Arquivo único .mp3', short: 'MP3', description: 'Compatível com qualquer player, com capítulos e capa' },
   { value: 'opus', label: 'Arquivo único .opus', short: 'Opus', description: 'Melhor qualidade por tamanho, com capítulos e capa' },
   { value: 'flac', label: 'Arquivo único .flac', short: 'FLAC', description: 'Sem perda de qualidade, com capítulos e capa (arquivo maior)', lossless: true },
-  { value: 'wav', label: 'Arquivo único .wav', short: 'WAV', description: 'Sem compressão, para edição (sem capítulos nem capa)', lossless: true },
-  { value: 'multiple', label: 'Um .mp3 por capítulo', short: 'Capítulos', description: 'Faixas separadas, organizadas numa pasta' },
+  { value: 'wav', label: 'Arquivo único .wav', short: 'WAV', description: 'Sem compressão, para edição (capa e capítulos só em alguns players; o texto fica fora do áudio)', lossless: true },
+  { value: 'multiple', label: 'Um .mp3 por capítulo', short: 'Capítulos', description: 'Faixas separadas, organizadas numa pasta (o texto fica fora do áudio)' },
 ];
 
 export const AUDIO_QUALITIES: { value: AudioQuality; label: string; description: string }[] = [
@@ -28,6 +28,9 @@ export const AUDIO_QUALITIES: { value: AudioQuality; label: string; description:
   { value: 'high', label: 'Alta', description: 'Equilíbrio (MP3 192k, AAC 128k, Opus 64k)' },
   { value: 'max', label: 'Máxima', description: 'Sem perdas audíveis (MP3 320k, AAC 256k, Opus 128k)' },
 ];
+
+// Formatos sem lugar para o texto sincronizado dentro do áudio: ele fica só nos arquivos separados
+export const formatKeepsTextInside = (v?: string | null) => v !== 'wav' && v !== 'multiple';
 
 export const isAudioFormat = (v: unknown): v is AudioFormat => AUDIO_FORMATS.some(f => f.value === v);
 export const audioFormatInfo = (v?: string | null) => AUDIO_FORMATS.find(f => f.value === v) || AUDIO_FORMATS[0];

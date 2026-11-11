@@ -34,7 +34,7 @@ function roundedFadeMask(w: number, h: number): React.CSSProperties {
 }
 
 export function ConverterScreen() {
-  const { accentColor, resolvedTheme, t, showToast, playingSnippet, toggleSnippet, phase, setPhase, files, setFiles, fileInputRef, coverColorsMap, outputFolder, fileTypeOption, selectedVoice, setSelectedVoice, setShowCancelModal, cancelModalAnchor, setCancelModalAnchor, setEditingCoverFileId, coverFileInputRef, handleOpenMetadataModal, activeSettingSelector, setActiveSettingSelector, handleFileUpload, handleRetryFile, handleRetryAllFailed, availableVoices } = useApp();
+  const { accentColor, resolvedTheme, t, showToast, playingSnippet, toggleSnippet, phase, setPhase, files, setFiles, fileInputRef, coverColorsMap, outputFolder, fileTypeOption, selectedVoice, setSelectedVoice, setShowCancelModal, cancelModalAnchor, setCancelModalAnchor, setEditingCoverFileId, coverFileInputRef, handleOpenMetadataModal, activeSettingSelector, setActiveSettingSelector, handleFileUpload, handleRetryFile, handleContinueWithoutTranslation, handleContinueWithoutText, handleRetryAllFailed, availableVoices } = useApp();
   // Sem e-books: a área de arrastar ocupa todo o conteúdo, alinhando a base com a do menu lateral (16 px da borda)
   const showDropzone = phase === 0 || (phase === 1 && files.length === 0);
   const [dropHover, setDropHover] = useState(false);
@@ -303,6 +303,8 @@ export function ConverterScreen() {
                           accentColor={accentColor}
                           resolvedTheme={resolvedTheme}
                           onRetry={handleRetryFile}
+                          onSkipTranslation={handleContinueWithoutTranslation}
+                          onSkipText={handleContinueWithoutText}
                           onCancel={(triggerEl) => {
                             if (file.status === 'error') {
                               setFiles(prev => prev.filter(f => f.id !== file.id));

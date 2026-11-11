@@ -3,7 +3,7 @@
 // As telas leem este objeto com useApp() (app/AppContext.tsx).
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Search, Settings as SettingsIcon, Upload, FileText, X, CheckCircle2, Clock, BookOpen, AlertTriangle, RefreshCw, AlertCircle, Trash2, Check, Sparkles, ArrowUpDown, RotateCcw, Code2, Power, Bell, LayoutList } from 'lucide-react';
+import { Download, Feather, Search, Settings as SettingsIcon, Upload, FileText, X, CheckCircle2, Clock, BookOpen, AlertTriangle, RefreshCw, AlertCircle, Trash2, Check, Sparkles, ArrowUpDown, RotateCcw, Code2, Power, Bell, LayoutList } from 'lucide-react';
 import { AiStarsIcon } from '../components/AppGlyph';
 import { ConfirmItemList, type ConfirmItem } from '../components/ConfirmItemList';
 import { RiVoiceAiLine, RiAiGenerateText } from 'react-icons/ri';
@@ -16,6 +16,7 @@ import { useIsMobile } from '../components/MobileContextMenu';
 import { installTouchMenus } from '../components/touchMenu';
 import { installScrollFades } from '../components/scrollFade';
 import { setUiLanguage } from '../i18n';
+import { applyInterfaceLanguage, AVISO_TRADUCAO_AUTOMATICA } from '../lib/autoTranslate';
 import { HELP_TOPICS } from '../data/helpTopics';
 import { isAudioFormat, audioFormatFromPath, type AudioFormat, type AudioQuality } from './audioFormats';
 import { clearButtonCoverAnchorCache } from '../components/Popovers';
@@ -27,12 +28,19 @@ import { compareGroupKeys, compareTitles, getAlphabetGroupKey } from '../lib/gro
 import { translations } from '../translations';
 import { extractCoverColor } from '../lib/coverColor';
 import { setLiteMode } from '../lib/motionPrefs';
+import { useUpdater } from './useUpdater';
+import { getSystemInfo, simularComputadorFraco, type SystemInfo } from '../lib/systemInfo';
 import { toggleVoiceSample as toggleVoiceSampleLib } from '../lib/voiceSample';
 import { loadJSON, saveJSON, removeKey, isArray } from '../lib/storage';
 import { estimateConversion } from './estimates';
-import { VOICES, languageCode, voiceLang, effectiveVoice } from '../data/voices';
+import { VOICES, languageCode, voiceLang, effectiveVoice, voiceName } from '../data/voices';
 
 // Leitura/gravação de preferências sem risco: armazenamento cheio ou bloqueado não derruba o app
+// Nomes dos metadados conferidos no arquivo pronto (aviso quando algo não pôde ser gravado)
+const METADATA_LABELS: Record<string, string> = {
+  title: 'título', author: 'autor', narrator: 'narrador', genre: 'gênero', year: 'ano', cover: 'capa', chapters: 'capítulos',
+};
+
 const safeGet = (key: string): string | null => { try { return localStorage.getItem(key); } catch { return null; } };
 const safeSet = (key: string, value: string) => { try { localStorage.setItem(key, value); } catch { /* cheio ou bloqueado */ } };
 
@@ -131,11 +139,30 @@ export function useAppState() {
     setLiteMode(liteMode);
     safeSet('lite_mode', liteMode ? 'true' : 'false');
   }, [liteMode]);
-  // Modo turbo: conversão mais rápida usando mais processador (não vale junto com o modo leve)
-  const [turboMode, setTurboModeState] = useState<boolean>(() => safeGet('turbo_mode') === 'true');
-  useEffect(() => { safeSet('turbo_mode', turboMode ? 'true' : 'false'); }, [turboMode]);
-  const setTurboMode = useCallback((v: boolean) => { setTurboModeState(v); if (v) setLiteModeState(false); }, []);
-  const setLiteModeExclusivo = useCallback((v: boolean) => { setLiteModeState(v); if (v) setTurboModeState(false); }, []);
+  // O modo turbo saiu (a conversão adaptável, padrão, já vai além dele): apaga o ajuste antigo
+  useEffect(() => { try { localStorage.removeItem('turbo_mode'); } catch { /* bloqueado */ } }, []);
+
+  // Janela em primeiro plano: a conversão tem prioridade; minimizada ou atrás de outras janelas, fica mais
+  // leve para o computador continuar livre. O servidor repassa o estado às conversões em andamento.
+  useEffect(() => {
+    let ultimo: boolean | null = null;
+    const avisar = () => {
+      const frente = document.visibilityState === 'visible' && document.hasFocus();
+      if (frente === ultimo) return;
+      ultimo = frente;
+      fetch('/api/foreground', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ foreground: frente }) })
+        .catch(() => { ultimo = null; /* servidor fora do ar: tenta de novo na próxima mudança */ });
+    };
+    avisar();
+    window.addEventListener('focus', avisar);
+    window.addEventListener('blur', avisar);
+    document.addEventListener('visibilitychange', avisar);
+    return () => {
+      window.removeEventListener('focus', avisar);
+      window.removeEventListener('blur', avisar);
+      document.removeEventListener('visibilitychange', avisar);
+    };
+  }, []);
 
   const [uiFontSize, setUiFontSize] = useState<'standard' | 'small' | 'large'>(() => {
     if (typeof window === 'undefined') return 'standard';
@@ -166,7 +193,7 @@ export function useAppState() {
     document.documentElement.setAttribute('lang', interfaceLang);
   }, [interfaceLang]);
 
-  useEffect(() => { setUiLanguage(interfaceLang); }, [interfaceLang]);
+  useEffect(() => { setUiLanguage(interfaceLang); applyInterfaceLanguage(interfaceLang); }, [interfaceLang]);
 
   const t = (translations as any)[interfaceLang] || translations['pt-BR'];
 
@@ -174,11 +201,24 @@ export function useAppState() {
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const toastTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  const showToast = (msg: string) => {
+  // Aviso com ação (opcional): o aviso fica clicável (ex.: "Nova versão disponível" abre as atualizações)
+  const [toastAction, setToastAction] = useState<(() => void) | null>(null);
+  const showToast = (msg: string, opcoes?: { action?: () => void; duration?: number }) => {
     if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
     setToastMessage(msg);
-    toastTimeoutRef.current = setTimeout(() => setToastMessage(null), 3500);
+    setToastAction(() => opcoes?.action || null);
+    toastTimeoutRef.current = setTimeout(() => { setToastMessage(null); setToastAction(null); }, opcoes?.duration ?? 3500);
   };
+
+  // Interface em tradução automática: avisa nas notificações do cabeçalho, uma vez por idioma
+  useEffect(() => {
+    const aviso = AVISO_TRADUCAO_AUTOMATICA[interfaceLang];
+    const chave = `aviso_traducao_${interfaceLang}`;
+    if (!aviso || safeGet(chave)) return;
+    safeSet(chave, 'true');
+    showToast(aviso, { duration: 8000 });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [interfaceLang]);
 
   // Comportamentos globais do esqueleto: pop-ups no toque (destaque + arrastar) e bordas de rolagem
   useEffect(() => installTouchMenus(), []);
@@ -286,6 +326,34 @@ export function useAppState() {
   const [files, setFiles] = useState<AppFile[]>([]);
   // Livros cuja conclusão já foi registrada em Convertidos (evita registrar o mesmo livro duas vezes)
   const completedFileIdsRef = useRef<Set<string>>(new Set());
+
+  // Computador fraco com o modo leve desligado: sugere uma vez, nas notificações do cabeçalho (quem ainda
+  // está na configuração inicial vê a sugestão lá)
+  const showToastRef = useRef(showToast);
+  showToastRef.current = showToast;
+  const navigateToRef = useRef(navigateTo);
+  navigateToRef.current = navigateTo;
+  const sugerirModoLeve = useCallback((info: SystemInfo | null, forcar = false) => {
+    if (!info?.weak) return;
+    if (!forcar) {
+      if (safeGet('lite_mode') === 'true' || safeGet('lite_suggested_v1') || safeGet('has_seen_initial_config_v3') !== 'true') return;
+      safeSet('lite_suggested_v1', 'true');
+    }
+    showToastRef.current(`Este computador é mais simples (${info.reasons.join(', ')}): ative o modo leve`, {
+      action: () => navigateToRef.current('settings-about'), duration: 10000,
+    });
+  }, []);
+  useEffect(() => {
+    const t = setTimeout(() => getSystemInfo().then(info => sugerirModoLeve(info)), 9000);
+    return () => clearTimeout(t);
+  }, [sugerirModoLeve]);
+
+  // Atualizações (GitHub Releases): avisos no cabeçalho; clicar no aviso abre Ajustes › Sistema e sobre
+  const updater = useUpdater(
+    showToast,
+    () => navigateTo('settings-about'),
+    files.some(f => f.status === 'processing' || f.status === 'translating' || f.status === 'editing' || f.status === 'syncing'),
+  );
 
   // Cor de cada livro a partir da própria capa (fundo, destaques e barra dos cards seguem a capa). Lida de novo
   // só quando a capa muda; uma cor escolhida pelo usuário na edição é mantida.
@@ -725,10 +793,13 @@ export function useAppState() {
   // Separação do texto sincronizado (frases, palavras ou as duas)
   const [syncTextGranularity, setSyncTextGranularity] = useState<SyncTextGranularity>(() => {
     const saved = safeGet('sync_text_granularity');
-    return saved === 'sentences' || saved === 'words' || saved === 'both' ? saved : 'sentences';
+    // "Frases" era gravado sozinho quando era o padrão: passa uma vez para o padrão novo (frases e palavras)
+    if (saved === 'sentences' && !safeGet('sync_text_granularity_v2')) return 'both';
+    return saved === 'sentences' || saved === 'words' || saved === 'both' ? saved : 'both';
   });
   useEffect(() => {
     safeSet('sync_text_granularity', syncTextGranularity);
+    safeSet('sync_text_granularity_v2', 'true');
   }, [syncTextGranularity]);
 
   // Texto gerado e salvo na biblioteca: entra no histórico como os demais textos
@@ -771,6 +842,7 @@ export function useAppState() {
     formData.append('title', book.title);
     formData.append('author', book.author || '');
     formData.append('destination', syncTextDestination);
+    formData.append('granularity', syncTextGranularity);
     if (outputFolder) formData.append('outputFolder', outputFolder);
     if (ebookFile) formData.append('ebook', ebookFile);
 
@@ -1801,7 +1873,7 @@ export function useAppState() {
                   author: f.author,
                   genre: f.genre,
                   subgenre: f.subgenre,
-                  narrator: f.narrator,
+                  narrator: f.narrator || voiceName(effectiveVoice(f, defaultVoice)) || undefined,
                   language: normalizeLanguageName(f.language),
                   date: new Date().toLocaleDateString(interfaceLang),
                   status: 'success',
@@ -1822,7 +1894,14 @@ export function useAppState() {
                 if (data.syncText?.savedToLibrary && data.syncText.content) {
                   addSyncTextToLibrary(f.title, f.author, f.coverColor, data.syncText.content, data.syncText.wordCount, data.syncText.files);
                 }
-                showToast(`"${f.title}" concluído com sucesso e adicionado a Convertidos!`);
+                const faltando = (data.missingMetadata || []).map((c: string) => METADATA_LABELS[c] || c).join(', ');
+                showToast(faltando
+                  ? `"${f.title}" concluído, mas não foi possível gravar no arquivo: ${faltando}.`
+                  : data.syncTextError
+                    ? `"${f.title}" está pronto, mas o texto sincronizado falhou. Para tentar de novo, use "Gerar texto" em Convertidos.`
+                    : data.syncText?.fallbackToLibrary
+                    ? `"${f.title}" concluído! Este formato não guarda texto: ele foi salvo na biblioteca.`
+                    : `"${f.title}" concluído com sucesso e adicionado a Convertidos!`);
 
                 // Remove da lista para sumir ao concluir a conversão conforme solicitado pelo usuário
                 setTimeout(() => {
@@ -1847,7 +1926,7 @@ export function useAppState() {
               } else if (data.type === 'speed') {
                 return { ...f, speedBps: typeof data.bytesPerSec === 'number' ? data.bytesPerSec : f.speedBps };
               } else if (data.type === 'error') {
-                return { ...f, status: 'error', errorMessage: data.error, errorDetails: data.details };
+                return { ...f, status: 'error', errorMessage: data.error, errorDetails: data.details, failedPart: data.failedPart === 'sync' ? 'sync' : data.failedPart === 'translation' && languageCode(f.language) ? 'translation' : undefined, errorOutputs: Array.isArray(data.outputs) ? data.outputs : undefined };
               }
             }
             return f;
@@ -2091,12 +2170,18 @@ export function useAppState() {
       genre: f.genre || '',
       subgenre: f.subgenre || '',
       year: f.year || '',
-      narrator: f.narrator || '',
+      narrator: f.narrator || voiceName(effectiveVoice(f, voiceCode)),
       language: normalizeLanguageName(f.language),
       voice: effectiveVoice(f, voiceCode),
       translate: f.requiresTranslation,
       cover: f.customCover || f.cover || null,
+      // Sem capa no e-book: grava a capa genérica, a mesma cor mostrada no app
+      generic_cover: true,
+      cover_color: coverColorsMap[f.id] || f.coverColor || '',
       generate_sync_text: f.generateSyncText !== undefined ? f.generateSyncText : true,
+      strict_sync_text: true,
+      skip_sync_text: Boolean(f.skipSyncText),
+      replace_outputs: f.errorOutputs || [],
       fileType: formatoFinal(f),
       chapters: f.chapters || [],
       pronunciationMap: f.pronunciationMap || [],
@@ -2113,8 +2198,7 @@ export function useAppState() {
       sync_text_destination: syncTextDestination,
       sync_text_granularity: syncTextGranularity,
       audio_quality: audioQuality,
-      lite: liteMode,
-      turbo: turboMode && !liteMode
+      lite: liteMode
     }));
 
     const ids = new Set(filesToConvert.map(f => f.id));
@@ -2134,6 +2218,8 @@ export function useAppState() {
           data.error || `O serviço de conversão recusou o pedido (código ${res.status}). Tente de novo.`,
           `POST /api/process respondeu ${res.status} ${res.statusText}.\nResposta: ${body.slice(0, 1500) || '(vazia)'}`
         );
+      } else if (!liteMode) {
+        showToast('Com o app em primeiro plano, a conversão tem prioridade e fica mais rápida. Minimizado ou atrás de outras janelas, ela usa um pouco menos para você continuar usando o computador.', { duration: 9000 });
       }
     } catch (e) {
       // Sem resposta nenhuma: o servidor local do app não está rodando (a página continua aberta sem ele)
@@ -2151,7 +2237,7 @@ export function useAppState() {
       await fetch('/api/cancel', { method: 'POST' });
       setPhase(1);
       // Só os que estavam convertendo voltam para a fila; os já concluídos ficam como estão
-      setFiles(prev => prev.map(f => (f.status === 'success' ? f : { ...f, status: 'idle', progress: 0, errorMessage: undefined, errorDetails: undefined })));
+      setFiles(prev => prev.map(f => (f.status === 'success' ? f : { ...f, status: 'idle', progress: 0, errorMessage: undefined, errorDetails: undefined, failedPart: undefined, errorOutputs: undefined })));
       setShowCancelModal(false);
       setCancelModalAnchor(null);
       showToast("Conversão cancelada.");
@@ -2163,11 +2249,29 @@ export function useAppState() {
   };
 
   const handleRetryFile = (file: AppFile) => {
-    setFiles(prev => prev.map(f => f.id === file.id ? { ...f, status: 'processing', progress: 0, errorMessage: undefined, errorDetails: undefined } : f));
+    setFiles(prev => prev.map(f => f.id === file.id ? { ...f, status: 'processing', progress: 0, errorMessage: undefined, errorDetails: undefined, failedPart: undefined, errorOutputs: undefined } : f));
     const retryVoice = effectiveVoice(file, defaultVoice);
     const effectiveFileType: AudioFormat = (file.fileType || (fileTypeOption === 'ask' ? 'm4b' : fileTypeOption)) as any;
     proceedWithConversion(retryVoice, effectiveFileType, [file]);
     showToast(`Reiniciando conversão de "${file.title}"...`);
+  };
+
+  // A tradução falhou: segue sem ela, narrando no idioma do livro (a voz passa a ser desse idioma)
+  const handleContinueWithoutTranslation = (file: AppFile) => {
+    const semTraducao: AppFile = { ...file, requiresTranslation: false, translateTo: undefined };
+    setFiles(prev => prev.map(f => f.id === file.id ? { ...semTraducao, status: 'processing', progress: 0, errorMessage: undefined, errorDetails: undefined, failedPart: undefined, errorOutputs: undefined } : f));
+    const effectiveFileType: AudioFormat = (file.fileType || (fileTypeOption === 'ask' ? 'm4b' : fileTypeOption)) as any;
+    proceedWithConversion(effectiveVoice(semTraducao, defaultVoice), effectiveFileType, [semTraducao]);
+    showToast(`Convertendo "${file.title}" sem traduzir...`);
+  };
+
+  // O texto sincronizado falhou com o áudio pronto: termina sem ele, sem narrar de novo
+  const handleContinueWithoutText = (file: AppFile) => {
+    const semTexto: AppFile = { ...file, skipSyncText: true };
+    setFiles(prev => prev.map(f => f.id === file.id ? { ...semTexto, status: 'processing', progress: 0, errorMessage: undefined, errorDetails: undefined, failedPart: undefined, errorOutputs: undefined } : f));
+    const effectiveFileType: AudioFormat = (file.fileType || (fileTypeOption === 'ask' ? 'm4b' : fileTypeOption)) as any;
+    proceedWithConversion(effectiveVoice(semTexto, defaultVoice), effectiveFileType, [semTexto]);
+    showToast(`Terminando "${file.title}" sem o texto sincronizado...`);
   };
 
   // Tenta de novo, num pedido só, todos os livros que falharam (cada um com a própria voz e formato)
@@ -2175,7 +2279,7 @@ export function useAppState() {
     const failed = files.filter(f => f.status === 'error');
     if (failed.length === 0) return;
     const ids = new Set(failed.map(f => f.id));
-    setFiles(prev => prev.map(f => ids.has(f.id) ? { ...f, status: 'processing', progress: 0, errorMessage: undefined, errorDetails: undefined } : f));
+    setFiles(prev => prev.map(f => ids.has(f.id) ? { ...f, status: 'processing', progress: 0, errorMessage: undefined, errorDetails: undefined, failedPart: undefined, errorOutputs: undefined } : f));
     const effectiveFileType: AudioFormat = fileTypeOption === 'ask' ? 'm4b' : fileTypeOption;
     proceedWithConversion(defaultVoice, effectiveFileType, failed);
     showToast(failed.length === 1 ? `Reiniciando conversão de "${failed[0].title}"...` : `Reiniciando ${failed.length} conversões...`);
@@ -2612,6 +2716,18 @@ export function useAppState() {
       onClick: handleSimulateFirstLaunch,
     },
     {
+      title: 'Simular Computador Fraco',
+      desc: 'Finge um computador simples (2 núcleos, 4 GB) para ver a sugestão do modo leve no cabeçalho, nos Ajustes e na configuração inicial.',
+      icon: <Feather size={16} className="text-teal-400 shrink-0" />,
+      onClick: () => { sugerirModoLeve(simularComputadorFraco(), true); },
+    },
+    {
+      title: 'Simular Atualização Disponível',
+      desc: 'Mostra uma versão nova (9.9.9) com novidades e simula o download, a instalação e o reinício, sem baixar nada.',
+      icon: <Download size={16} className="text-emerald-400 shrink-0" />,
+      onClick: () => { updater.simulateUpdate(); navigateTo('settings-about'); },
+    },
+    {
       title: 'Disparar Notificações de Teste',
       desc: 'Emite avisos e notificações sequenciais para testar o sistema de alertas e responsividade.',
       icon: <Bell size={16} className="text-yellow-400 shrink-0" />,
@@ -2633,7 +2749,9 @@ export function useAppState() {
     handleShowInitialConfigModal,
     handleSimulateFirstLaunch,
     handleTestDevNotifications,
-    handleSimulateFullScreenError
+    handleSimulateFullScreenError,
+    updater.simulateUpdate,
+    sugerirModoLeve
   ]);
 
   const currentScreenTitle = useMemo(() => {
@@ -2712,7 +2830,7 @@ export function useAppState() {
           confirmLabel: 'Restaurar',
           icon: <RotateCcw size={13} />,
           onConfirm: () => {
-            ['app_theme_mode', 'app_accent_color', 'app_font_size', 'app_interface_lang', 'app_default_voice', 'file_type_option', 'sync_text_destination', 'audio_quality']
+            ['app_theme_mode', 'app_accent_color', 'app_font_size', 'app_interface_lang', 'app_default_voice', 'file_type_option', 'sync_text_destination', 'sync_text_granularity', 'audio_quality']
               .forEach(key => removeKey(key));
             setThemeMode('system');
             setAccentColor('blue');
@@ -2721,7 +2839,7 @@ export function useAppState() {
             setDefaultVoice('pt-BR-AntonioNeural');
             setFileTypeOption('m4b');
             setSyncTextDestination('both');
-            setSyncTextGranularity('sentences');
+            setSyncTextGranularity('both');
             setAudioQuality('voice');
             showToast("Ajustes restaurados com sucesso!");
           },
@@ -2861,14 +2979,14 @@ export function useAppState() {
     uiFontSize,
     setUiFontSize,
     liteMode,
-    setLiteMode: setLiteModeExclusivo,
-    turboMode,
-    setTurboMode,
+    setLiteMode: setLiteModeState,
     interfaceLang,
     setInterfaceLang,
     t,
     toastMessage,
     setToastMessage,
+    toastAction,
+    ...updater,
     toastTimeoutRef,
     showToast,
     headerBlurRef,
@@ -3072,6 +3190,8 @@ export function useAppState() {
     proceedWithConversion,
     handleCancelProcessing,
     handleRetryFile,
+    handleContinueWithoutTranslation,
+    handleContinueWithoutText,
     sendGeneratedTextToConverter,
     searchQuery,
     setSearchQuery,

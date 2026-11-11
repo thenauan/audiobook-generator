@@ -492,7 +492,8 @@ export function Overlays() {
                 <div className="flex flex-col space-y-1.5 p-3">
                   <PopupBackHeader title="Gerar texto" backLabel="Mais opções" onBack={() => setActiveBookMenu({ ...activeBookMenu, mode: 'options', direction: -1 })} />
                   <p className="text-xs text-[var(--text-muted)] px-1 leading-relaxed">
-                    {syncTextDestination === 'metadata' ? 'O texto será gravado nos metadados do audiobook.'
+                    {/\.wav$/i.test(activeBookMenu.item?.path || '') ? 'WAV não guarda texto no áudio: ele será salvo na pasta da biblioteca.'
+                      : syncTextDestination === 'metadata' ? 'O texto será gravado nos metadados do audiobook.'
                       : syncTextDestination === 'library' ? 'O texto será salvo na pasta da biblioteca.'
                       : 'O texto será gravado no audiobook e salvo na biblioteca.'}
                   </p>

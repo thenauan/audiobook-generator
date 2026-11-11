@@ -104,6 +104,14 @@ async function startServer() {
     serverProcess.on('exit', (code) => {
         clearTimeout(startTimer);
         if (quitting) return;
+        // Reinício pedido por uma atualização: sobe o servidor de novo (com a versão nova), sem contar como queda
+        const marca = path.join(__dirname, '.reiniciar');
+        if (fs.existsSync(marca)) {
+            try { fs.unlinkSync(marca); } catch (e) {}
+            showSplash('Aplicando a atualização');
+            setTimeout(startServer, 1000);
+            return;
+        }
         const wasReady = Boolean(serverUrl);
         if (wasReady && restarts < MAX_RESTARTS) {
             restarts += 1;

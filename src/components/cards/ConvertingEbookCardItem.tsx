@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { X, Clock, Download, AlertCircle, RotateCcw, Layers, ChevronDown, Copy, Check } from 'lucide-react';
+import { X, Clock, Download, AlertCircle, RotateCcw, Layers, ChevronDown, Copy, Check, SkipForward } from 'lucide-react';
 import { AppFile } from '../../app/types';
 import { getCoverAmbientStyle, getCoverProgressStyle, getGenericBookCover } from '../../lib/covers';
 import { CoverAmbientBackground } from './CoverAmbientBackground';
@@ -12,6 +12,8 @@ export interface ConvertingEbookCardItemProps {
   resolvedTheme: 'light' | 'dark';
   onCancel: (triggerEl: HTMLElement) => void;
   onRetry?: (file: AppFile) => void;
+  onSkipTranslation?: (file: AppFile) => void;
+  onSkipText?: (file: AppFile) => void;
 }
 
 const ConvertingEbookCardItemBase: React.FC<ConvertingEbookCardItemProps> = ({
@@ -20,6 +22,8 @@ const ConvertingEbookCardItemBase: React.FC<ConvertingEbookCardItemProps> = ({
   resolvedTheme,
   onCancel,
   onRetry,
+  onSkipTranslation,
+  onSkipText,
 }) => {
   const isError = file.status === 'error';
   const coverUrl = file.customCover || file.cover || getGenericBookCover(file.title || 'Desconhecido', file.author || 'Desconhecido', file.coverColor);
@@ -189,17 +193,18 @@ const ConvertingEbookCardItemBase: React.FC<ConvertingEbookCardItemProps> = ({
                   e.stopPropagation();
                   onCancel(e.currentTarget);
                 }}
-                className="w-8 h-8 rounded-full flex items-center justify-center bg-card/75 border border-red-500/25 text-red-500 hover:bg-red-500/20 hover:border-red-500/40 hover:shadow-[0_0_14px_rgba(239,68,68,0.4)] transition-all cursor-pointer shadow-sm shrink-0"
-                title={isError ? "Remover" : "Cancelar geração"}
+                className={`${isError ? 'h-8 px-3.5 gap-1.5 text-xs font-semibold' : 'w-8 h-8'} rounded-full flex items-center justify-center bg-card/75 border border-red-500/25 text-red-500 hover:bg-red-500/20 hover:border-red-500/40 hover:shadow-[0_0_14px_rgba(239,68,68,0.4)] transition-all cursor-pointer shadow-sm shrink-0`}
+                title={isError ? "Cancelar este livro" : "Cancelar geração"}
               >
-                <X size={15} />
+                <X size={isError ? 13 : 15} />
+                {isError && <span>Cancelar</span>}
               </motion.button>
             </div>
           </div>
 
           {/* Área Inferior: Se der erro, a barra com suas informações some e surge a mensagem de erro */}
           {isError ? (
-            <ErrorPanel message={file.errorMessage || 'Falha na conversão deste audiobook. Verifique o arquivo e tente novamente.'} details={file.errorDetails} />
+            <ErrorPanel message={file.errorMessage || 'Falha na conversão deste audiobook. Verifique o arquivo e tente novamente.'} details={file.errorDetails} onSkipTranslation={file.failedPart === 'translation' && onSkipTranslation ? () => onSkipTranslation(file) : undefined} onSkipText={file.failedPart === 'sync' && onSkipText ? () => onSkipText(file) : undefined} />
           ) : (
             <div className="w-full min-w-0 mt-3">
               {/* Linha de Textos e Estatísticas */}
@@ -261,7 +266,7 @@ const ConvertingEbookCardItemBase: React.FC<ConvertingEbookCardItemProps> = ({
 
 
 // Erro da conversão: mensagem inteira (sem cortar) e detalhes técnicos; tudo pode ser selecionado e copiado
-function ErrorPanel({ message, details }: { message: string; details?: string }) {
+function ErrorPanel({ message, details, onSkipTranslation, onSkipText }: { message: string; details?: string; onSkipTranslation?: () => void; onSkipText?: () => void }) {
   const [open, setOpen] = React.useState(false);
   const [copied, setCopied] = React.useState(false);
   const copy = () => {
@@ -279,7 +284,19 @@ ${details}` : message).then(() => {
         <AlertCircle size={16} className="shrink-0 text-red-500 mt-0.5" />
         <p className="flex-1 min-w-0 text-xs sm:text-sm font-semibold leading-relaxed break-words select-text cursor-text">{message}</p>
       </div>
-      <div className="flex items-center gap-2 mt-2.5 pl-[26px]">
+      <div className="flex flex-wrap items-center gap-2 mt-2.5 pl-[26px]">
+        {onSkipText && (
+          <motion.button type="button" whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} onClick={onSkipText} className={btn} title="Termina o audiobook sem o texto sincronizado, sem narrar de novo">
+            <SkipForward size={13} />
+            <span>Seguir sem o texto</span>
+          </motion.button>
+        )}
+        {onSkipTranslation && (
+          <motion.button type="button" whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} onClick={onSkipTranslation} className={btn} title="Narra no idioma do livro, com uma voz desse idioma">
+            <SkipForward size={13} />
+            <span>Seguir sem traduzir</span>
+          </motion.button>
+        )}
         {details && (
           <motion.button type="button" whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} onClick={() => setOpen(o => !o)} className={btn} aria-expanded={open}>
             <ChevronDown size={13} className={`transition-transform ${open ? 'rotate-180' : ''}`} />

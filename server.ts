@@ -412,6 +412,20 @@ async function startServer() {
   // Todas as conversões em andamento (uma por pedido); "Cancelar" encerra todas
   const runningPythonProcesses = new Set<ReturnType<typeof spawn>>();
 
+  // Janela do app em primeiro plano (o app avisa ao ganhar ou perder o foco e ao minimizar): a conversão tem
+  // prioridade; fora dela, fica mais leve. O conversor recebe o estado ao começar e a cada mudança.
+  let appInForeground = true;
+  app.post("/api/foreground", express.json(), (req, res) => {
+    const foreground = Boolean(req.body?.foreground);
+    if (foreground !== appInForeground) {
+      appInForeground = foreground;
+      for (const proc of runningPythonProcesses) {
+        try { proc.stdin?.write(JSON.stringify({ foreground }) + "\n"); } catch { /* conversor já encerrado */ }
+      }
+    }
+    res.json({ success: true });
+  });
+
   app.post("/api/cancel", (req, res) => {
     const killed = runningPythonProcesses.size > 0;
     for (const proc of runningPythonProcesses) {
@@ -639,6 +653,135 @@ async function startServer() {
     }
   });
 
+  // ===== Atualizações (GitHub Releases) =====
+  // Procura a versão mais recente, baixa o zip do sistema, extrai por cima da pasta do app (updater.py) e roda
+  // "npm install" se as dependências mudaram. A versão nova passa a valer depois de reiniciar o app.
+  const RELEASES_API = 'https://api.github.com/repos/thenauan/audiobook-generator/releases/latest';
+  const APP_ROOT = process.cwd();
+  const versaoAtual = () => {
+    try { return String(JSON.parse(fs.readFileSync(path.join(APP_ROOT, 'package.json'), 'utf8')).version || '0.0.0'); }
+    catch { return '0.0.0'; }
+  };
+  const maisNova = (a: string, b: string) => {
+    const pa = a.replace(/^v/, '').split('.').map(n => parseInt(n, 10) || 0);
+    const pb = b.replace(/^v/, '').split('.').map(n => parseInt(n, 10) || 0);
+    for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+      if ((pa[i] || 0) !== (pb[i] || 0)) return (pa[i] || 0) > (pb[i] || 0);
+    }
+    return false;
+  };
+  const pastaDev = () => fs.existsSync(path.join(APP_ROOT, '.git'));
+  type EstadoAtualizacao = { stage: 'idle' | 'downloading' | 'installing' | 'deps' | 'ready' | 'error'; progress: number; version?: string; message?: string };
+  let atualizacao: EstadoAtualizacao = { stage: 'idle', progress: 0 };
+
+  app.get("/api/update/check", async (req, res) => {
+    try {
+      const r = await fetch(RELEASES_API, { headers: { 'User-Agent': 'audiobook-generator', 'Accept': 'application/vnd.github+json' } });
+      if (!r.ok) return res.json({ error: `GitHub respondeu ${r.status}`, current: versaoAtual() });
+      const rel: any = await r.json();
+      const latest = String(rel.tag_name || '').replace(/^v/, '');
+      const nomeZip = process.platform === 'win32' ? 'Audiobook-Generator-with-AI-Windows.zip' : 'Audiobook-Generator-with-AI-Unix.zip';
+      const asset = (rel.assets || []).find((a: any) => a.name === nomeZip);
+      res.json({
+        current: versaoAtual(), latest, available: maisNova(latest, versaoAtual()),
+        notes: String(rel.body || ''), url: rel.html_url, publishedAt: rel.published_at,
+        downloadSize: asset?.size || 0, canInstall: Boolean(asset) && !pastaDev(), devFolder: pastaDev(),
+      });
+    } catch (e) {
+      res.json({ error: `Sem conexão com o GitHub (${String((e as Error).message || e)})`, current: versaoAtual() });
+    }
+  });
+
+  app.get("/api/update/status", (req, res) => res.json(atualizacao));
+
+  app.post("/api/update/install", express.json(), async (req, res) => {
+    if (['downloading', 'installing', 'deps'].includes(atualizacao.stage)) return res.json({ started: false, ...atualizacao });
+    if (pastaDev()) return res.status(409).json({ error: 'Esta é uma pasta de desenvolvimento (git): atualize com git pull.' });
+    res.json({ started: true });
+    const falhar = (message: string) => { atualizacao = { ...atualizacao, stage: 'error', message }; };
+    try {
+      atualizacao = { stage: 'downloading', progress: 0 };
+      const r = await fetch(RELEASES_API, { headers: { 'User-Agent': 'audiobook-generator', 'Accept': 'application/vnd.github+json' } });
+      const rel: any = await r.json();
+      const versao = String(rel.tag_name || '').replace(/^v/, '');
+      const nomeZip = process.platform === 'win32' ? 'Audiobook-Generator-with-AI-Windows.zip' : 'Audiobook-Generator-with-AI-Unix.zip';
+      const asset = (rel.assets || []).find((a: any) => a.name === nomeZip);
+      if (!asset) return falhar(`A versão ${versao} não tem o arquivo ${nomeZip}.`);
+      atualizacao.version = versao;
+
+      // Download com progresso
+      const zipPath = path.join(os.tmpdir(), `audiobook-generator-${versao}.zip`);
+      const dl = await fetch(asset.browser_download_url, { headers: { 'User-Agent': 'audiobook-generator' } });
+      if (!dl.ok || !dl.body) return falhar(`Falha no download (${dl.status}).`);
+      const total = Number(dl.headers.get('content-length')) || asset.size || 0;
+      const saida = fs.createWriteStream(zipPath);
+      let recebido = 0;
+      const leitor = (dl.body as any).getReader();
+      for (;;) {
+        const { done, value } = await leitor.read();
+        if (done) break;
+        recebido += value.length;
+        if (!saida.write(Buffer.from(value))) await new Promise<void>(ok => saida.once('drain', () => ok()));
+        if (total) atualizacao.progress = Math.min(1, recebido / total);
+      }
+      await new Promise<void>(ok => saida.end(() => ok()));
+
+      // Extração por cima da pasta do app
+      atualizacao = { stage: 'installing', progress: 0, version: versao };
+      const resultado: any = await new Promise((ok) => {
+        const proc = spawn(PYTHON_CMD, ['updater.py', zipPath, APP_ROOT], { cwd: APP_ROOT, env: PY_ENV, windowsHide: true });
+        let fim: any = { error: 'O instalador da atualização parou sem responder.' };
+        let resto = '';
+        proc.stdout.on('data', (d) => {
+          resto += d.toString();
+          const linhas = resto.split('\n');
+          resto = linhas.pop() || '';
+          for (const l of linhas) {
+            try {
+              const ev = JSON.parse(l);
+              if (typeof ev.progress === 'number') atualizacao.progress = ev.progress;
+              if (ev.done || ev.error) fim = ev;
+            } catch { /* linha incompleta */ }
+          }
+        });
+        proc.on('error', (e) => ok({ error: String(e) }));
+        proc.on('close', () => ok(fim));
+      });
+      fs.rmSync(zipPath, { force: true });
+      if (resultado.error) return falhar(resultado.error);
+
+      // Dependências novas
+      if (resultado.packageChanged) {
+        atualizacao = { stage: 'deps', progress: 0, version: versao };
+        const npm = await new Promise<number>((ok) => {
+          const p = spawn('npm', ['install', '--no-audit', '--no-fund'], { cwd: APP_ROOT, shell: true, windowsHide: true });
+          p.on('error', () => ok(1));
+          p.on('close', (c) => ok(c ?? 1));
+        });
+        if (npm !== 0) return falhar('A atualização foi extraída, mas "npm install" falhou. Rode o instalador de novo.');
+      }
+      atualizacao = { stage: 'ready', progress: 1, version: versao };
+    } catch (e) {
+      falhar(String((e as Error).message || e));
+    }
+  });
+
+  // Reinicia o servidor com a versão nova. Aberto pelo app (Electron): ele vê o aviso e sobe o servidor de novo.
+  // Aberto pelo navegador: um processo separado inicia o app de novo depois que este fechar.
+  app.post("/api/update/restart", (req, res) => {
+    res.json({ restarting: true });
+    setTimeout(() => {
+      if (process.env.ELECTRON_MODE) {
+        try { fs.writeFileSync(path.join(APP_ROOT, '.reiniciar'), String(Date.now())); } catch { /* sem marca: o app reinicia como queda */ }
+      } else {
+        const raiz = JSON.stringify(APP_ROOT);
+        spawn(process.execPath, ['-e', `setTimeout(()=>require('child_process').spawn('npm',['start'],{cwd:${raiz},shell:true,detached:true,stdio:'ignore',windowsHide:true}).unref(),2500)`],
+          { detached: true, stdio: 'ignore', windowsHide: true }).unref();
+      }
+      process.exit(0);
+    }, 300);
+  });
+
   // Ajustes (tema, idioma, voz, formato, pasta...) em disco, iguais para qualquer janela ou porta
   const SETTINGS_FILE = path.join(LIB_DIR, 'settings.json');
   app.get("/api/settings", (req, res) => {
@@ -792,6 +935,17 @@ async function startServer() {
     res.status(500).json({ error: 'Não foi possível criar a pasta padrão.' });
   });
 
+  // Configuração do computador (processador e memória), para sugerir o modo leve em computadores fracos
+  app.get("/api/system-info", (req, res) => {
+    const cpus = os.cpus();
+    res.json({
+      cores: cpus.length,
+      cpuModel: (cpus[0]?.model || '').replace(/\s+/g, ' ').trim(),
+      ramGB: Math.round(os.totalmem() / 1024 ** 3 * 10) / 10,
+      platform: process.platform,
+    });
+  });
+
   // Estado do motor de conversão: Python, voz (edge-tts), FFmpeg e alinhamento (faster-whisper)
   app.get("/api/health", (req, res) => {
     const check = [
@@ -834,7 +988,7 @@ async function startServer() {
         : (req.body.generate_sync_text !== undefined ? (req.body.generate_sync_text === true || req.body.generate_sync_text === 'true') : true);
       // Onde guardar o texto sincronizado: metadados do áudio, pasta da biblioteca ou ambos
       const syncTextDestination = ['metadata', 'library', 'both'].includes(config.sync_text_destination) ? config.sync_text_destination : 'both';
-      const syncTextGranularity = ['sentences', 'words', 'both'].includes(config.sync_text_granularity) ? config.sync_text_granularity : 'sentences';
+      const syncTextGranularity = ['sentences', 'words', 'both'].includes(config.sync_text_granularity) ? config.sync_text_granularity : 'both';
 
       const files = (req.files as Express.Multer.File[]).map((file, index) => {
         const info = filesInfo[index] || {};
@@ -856,11 +1010,16 @@ async function startServer() {
           audio_quality: config.audio_quality,
           translate: info.requiresTranslation || info.translate || false,
           cover: info.cover || null,
+          generic_cover: Boolean(info.generic_cover),
+          cover_color: info.cover_color || '',
           chapters: info.chapters || [],
           fileType: info.fileType || fileFormat,
           file_format: info.fileType || fileFormat,
           pronunciation_map: info.pronunciationMap || info.pronunciation_map || [],
           generate_sync_text: info.generate_sync_text !== undefined ? info.generate_sync_text : generateSyncText,
+          strict_sync_text: Boolean(info.strict_sync_text),
+          skip_sync_text: Boolean(info.skip_sync_text),
+          replace_outputs: Array.isArray(info.replace_outputs) ? info.replace_outputs : [],
           sync_text_destination: syncTextDestination,
           sync_text_granularity: syncTextGranularity,
           config: { ...(info.config || config), file_format: info.fileType || fileFormat, pronunciation_map: info.pronunciationMap || info.pronunciation_map || [], generate_sync_text: info.generate_sync_text !== undefined ? info.generate_sync_text : generateSyncText, sync_text_destination: syncTextDestination, sync_text_granularity: syncTextGranularity }
@@ -878,7 +1037,7 @@ async function startServer() {
         sync_text_destination: syncTextDestination,
         sync_text_granularity: syncTextGranularity,
         lite: Boolean(config.lite),
-        turbo: Boolean(config.turbo)
+        foreground: appInForeground
       };
 
       // Write configuration payload to a temp JSON file to completely bypass Windows CLI string limits
@@ -1006,10 +1165,11 @@ async function startServer() {
       }
 
       const destination = ['metadata', 'library', 'both'].includes(req.body.destination) ? req.body.destination : 'both';
+      const granularity = ['sentences', 'words', 'both'].includes(req.body.granularity) ? req.body.granularity : 'both';
       const outputFolder = req.body.outputFolder || path.join(process.cwd(), 'meus audiobooks');
       const args = ['-u', 'sync_text_tools.py', '--audio', audioPath, '--out-dir', outputFolder,
         '--title', String(req.body.title || path.basename(audioPath, path.extname(audioPath))),
-        '--author', String(req.body.author || ''), '--destination', destination];
+        '--author', String(req.body.author || ''), '--destination', destination, '--granularity', granularity];
       if (ebookPath) args.push('--ebook', ebookPath);
 
       const child = spawn(PYTHON_CMD, args, { stdio: ['ignore', 'pipe', 'pipe'], env: PY_ENV, windowsHide: true });

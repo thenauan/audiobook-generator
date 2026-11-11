@@ -463,7 +463,7 @@ export function EditAudiobookScreen() {
               </div>
               <div>
                 <span className="text-xs font-bold text-[var(--text-main)] block">Gerar texto sincronizado</span>
-                <span className="text-[11px] text-[var(--text-muted)]">Cria arquivos .LRC e .VTT para acompanhar leitura</span>
+                <span className="text-[11px] text-[var(--text-muted)]">Destaca o texto enquanto o livro é narrado</span>
               </div>
             </div>
             <SettingToggle

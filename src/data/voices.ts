@@ -12,6 +12,12 @@ export interface Voice {
   flag: string;
 }
 
+// Nome da voz para o campo "narrador" ("Português (BR) - Antônio (Masculino)" -> "Antônio")
+export const voiceName = (code: string): string => {
+  const label = VOICES.find(v => v.code === code)?.label || '';
+  return label.split(' - ')[1]?.split(' (')[0]?.trim() || '';
+};
+
 const ESCOLHIDAS: Voice[] = [
   { code: 'pt-BR-AntonioNeural', lang: 'pt', label: 'Português (BR) - Antônio (Masculino)', flag: '🇧🇷' },
   { code: 'pt-BR-FranciscaNeural', lang: 'pt', label: 'Português (BR) - Francisca (Feminino)', flag: '🇧🇷' },

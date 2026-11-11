@@ -6,6 +6,44 @@ All notable changes to **Audiobook Generator** — the free ebook to audiobook c
 
 ---
 
+## [1.5.0] — 2026-11-11
+
+### Changed
+- **Easier-to-read synced text:** words now show the punctuation of the book (`Hi!`, `so:`, `—Come`, `“Yes?”`), sentences that clearly ended without a period are split (a pause before a capital letter, or a period left in the middle of a line), and very long sentences are split at `;`, `:`, dashes or commas instead of filling a whole paragraph. Dialogue stays together ("—Are you coming? —she asked."), and names and abbreviations (Mr., Dr.) are not split. This applies to conversions and to "Generate text" in Converted.
+- **Priority while the app is in front:** with the app window in front, the conversion runs at normal priority and with up to 32 voice connections; minimized or behind other windows, it goes back to below-normal priority and up to 20 connections, so you can keep using the computer. The app says this when a conversion starts. Lite mode is not affected.
+- **Synced text now defaults to sentences and words together.** Settings saved under the old default move to the new one once.
+- WAV no longer keeps the synced text inside the audio, where almost no player could read it: WAV and "One MP3 per chapter" always save it to the library folder, and the app says so.
+- **Adaptive conversion by default, much faster:** voice connections tune themselves between 3 and 32 to what Microsoft's service handles at the moment (up while it keeps up, down on errors or slowness; retries no longer hold a connection while waiting, and the timeout follows the real time of each block). Audio steps use all CPU cores but one, at below-normal priority.
+- **M4B assembled in parallel by chapter** (a 2 h 16 min book: 92 s → 16 s).
+- Lite mode stays as the option for slower computers (one book at a time, 4 connections, lowest priority).
+- **Lite mode moved to Settings › System and about**, and it now also removes the glow effects (halos behind the header title, glows around buttons and icons, the blurred entrance of cards and pop-ups), which looked like hard-edged color patches without the blur.
+
+### Removed
+- **Turbo mode:** the adaptive conversion already goes beyond it. Anyone who had it on moves to adaptive.
+
+### Fixed
+- **A book with Roman numerals in lowercase ("século xix") no longer fails** while preparing the text. Only valid numerals are converted ("século mil" stays as it is), and from now on a reading rule that fails leaves only that piece of text unchanged instead of stopping the conversion.
+- On Windows, the conversion's lower priority (and the lowest one in Lite mode) was never applied because of a 64-bit call error. It works now.
+- **Every audiobook now gets a narrator and a cover in the file:** the narrator falls back to the voice's name, and books without a cover get the generic cover shown in the app.
+- The app now reads the finished file back and warns if a title, author, narrator, genre, year, cover or chapters could not be written.
+- **Failures now say why in plain words:** a full disk, a file open in another program, no permission, no internet, not enough memory or an FFmpeg problem each get their own message.
+- **A failed book offers clear choices:** Try again, Cancel and, when the translation failed, Continue without translating (the book is narrated in its own language, with a voice of that language).
+- If the synced text fails, the audio is kept and the book offers Try again and Continue without the text: neither narrates the book again, and the file is replaced instead of creating a "(2)" copy.
+- The WAV description no longer says it has no cover, and the help explains what each format can hold.
+- Blocks with the same text no longer compete for the same temporary file, and a failed block write is retried.
+
+### Added
+- **The narrator no longer reads things literally, on any subject:** "Brasil x Noruega" is read as "contra" instead of "multiplicação", "3 x 1" as a score, "10 x 20 cm" as a size and "2 x 3 = 6" as math. The same goes for law (art. 5º, § 2º, inc. II, Lei nº 8.666/93), medicine and units with singular and plural (500 mg/dia, 1 ml, mmHg), recipes (1/2 xícara, ½), science (CO₂, 10⁶, x², ≥, π), Bible citations (Jo 3:16), academic references (p. 12, pp. 12-15, et al., op. cit.), finance (R$ 5 mi, p.p., US$), technology (C++, 16 GB), full dates, ordinals (1º, 2ª), times, Roman numerals, @names, #tags and links. Footnote marks, asterisks, dividers, invisible ebook characters and PDF ligatures no longer break the reading, and paragraphs in all capitals are read as normal text, keeping the acronyms. These rules cover Portuguese, English and Spanish, live in tables in `texto_falado.py`, and your pronunciation dictionary comes first.
+- **Emojis are read by name** in the voice's language (⚽ → "bola de futebol"), in 13 languages; repeated emojis are read once, and in other languages they are skipped.
+- **The whole interface in English, Spanish, Arabic and Russian:** texts written in Portuguese throughout the app are now translated on screen, including Help. English was translated by hand; Spanish, Arabic and Russian were translated automatically and may contain errors, which the app says in Settings and in a header notification.
+- **Generate text in Converted** now follows the sentences/words choice from the settings.
+- **Lite mode suggestion for weaker computers:** the app reads the processor (model and cores) and memory and, with 4 cores or fewer, less than 8 GB of RAM or an entry-level processor (Celeron, Pentium, Atom, Athlon…), recommends Lite mode: pre-selected in the initial setup, a "Recommended for this computer" badge with the computer's specs in Settings › System and about (where Lite mode now lives), and a one-time header notification for existing users. Developer mode: *Simulate weak computer*.
+- **Automatic updates** (Settings › System and about): the app checks GitHub Releases when it opens and every 6 hours, downloads the zip for your system, installs it over the app folder (and runs `npm install` when dependencies change) and asks you to restart. It can be turned off.
+- **Updates button**: check now, see the new version and its release notes, download and install, and restart — with progress.
+- Every update notice (new version, downloading, installing, ready, error) appears in the header notifications; clicking it opens the updates panel.
+- Developer mode: **Simulate update available** (version 9.9.9 with release notes; download, install and restart are simulated).
+- Development folders (with `.git`) are never overwritten: they are told to use `git pull`.
+
 ## [1.4.0] — 2026-10-31
 
 ### Added

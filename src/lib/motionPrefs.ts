@@ -1,5 +1,5 @@
 // ===== Efeitos visuais: modo leve e pausa fora de foco =====
-// - Modo leve (Ajustes › Interface e configuração inicial): sem desfoque de fundo, cards opacos e fundos de
+// - Modo leve (Ajustes › Sistema e sobre e configuração inicial): sem desfoque de fundo, cards opacos e fundos de
 //   cor parados, para computadores mais fracos. Classe `lite` no <html> (regras em index.css).
 // - Fora de foco (janela minimizada, escondida ou em segundo plano): todas as animações param e voltam ao
 //   focar. Classe `app-paused` no <html> para as animações em CSS; os fundos animados leem `paused`.

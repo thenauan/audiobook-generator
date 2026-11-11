@@ -70,6 +70,12 @@ export interface AppFile {
   errorMessage?: string;
   /** Detalhes técnicos do erro (etapa, código, mensagens do sistema), para copiar ou mostrar a quem ajuda */
   errorDetails?: string;
+  /** Parte que falhou e que dá para pular (o livro pode seguir sem traduzir ou sem o texto) */
+  failedPart?: 'translation' | 'sync';
+  /** Áudio que a conversão com falha já gerou (é trocado ao refazer, sem criar cópia) */
+  errorOutputs?: string[];
+  /** "Seguir sem o texto": refaz sem gerar o texto sincronizado, aproveitando o que já foi narrado */
+  skipSyncText?: boolean;
   syncMessage?: string;
   cover?: string;
   customCover?: string;

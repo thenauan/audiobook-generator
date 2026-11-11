@@ -49,7 +49,8 @@ export const HELP_TOPICS: HelpTopic[] = [
       { icon: Tags, title: 'Metadados automáticos', text: 'Título, autor, idioma, ano e capa são lidos do arquivo e podem ser corrigidos antes da conversão.' },
       { icon: Mic, title: 'Vozes neurais', text: 'Vozes naturais como Antônio e Francisca em português, além de vozes em outros idiomas. Cada voz tem uma amostra para ouvir antes.' },
       { icon: ListOrdered, title: 'Capítulos', text: 'Os capítulos são detectados automaticamente. Na edição você renomeia, reordena ou divide capítulos longos.' },
-      { icon: BookA, title: 'Dicionário de pronúncia', text: 'Ensine a voz a falar nomes e termos difíceis (ex.: "Nietzsche" → "Nitche"). Vale só para aquele livro.' },
+      { icon: BookA, title: 'Dicionário de pronúncia', text: 'Ensine a voz a falar nomes e termos difíceis (ex.: "Nietzsche" → "Nitche"). Vale só para aquele livro e tem prioridade sobre os ajustes automáticos.' },
+      { icon: Mic, title: 'Leitura automática', text: 'O app prepara o que a voz leria ao pé da letra, em qualquer assunto: placares e medidas ("Brasil x Noruega", "3 x 1", "10 x 20 cm"), leis (art. 5º, § 2º), doses e unidades (500 mg/dia), receitas (1/2 xícara), fórmulas e símbolos (CO₂, ≥, π), citações bíblicas (Jo 3:16), referências (p. 12, et al.), datas, ordinais e números romanos. Notas de rodapé, asteriscos e caracteres invisíveis não são lidos, e emojis são lidos pelo nome (⚽ vira "bola de futebol"). As regras de texto valem para português, inglês e espanhol; os emojis, para 13 idiomas.' },
       { icon: Info, title: 'Informações de conversão', text: 'O botão (i) no card mostra o tempo estimado da conversão, a duração e o tamanho do audiobook e o formato do áudio.' },
       { icon: RefreshCcw, title: 'Conversão que continua', text: 'Se a conversão for interrompida, os capítulos prontos ficam guardados e o app retoma de onde parou.' },
     ],
@@ -75,11 +76,11 @@ export const HELP_TOPICS: HelpTopic[] = [
     features: [
       { icon: BookOpenText, title: 'Áudio + texto do livro', text: 'O resultado mais fiel: nomes, termos raros e pontuação vêm do livro original.' },
       { icon: Wand2, title: 'Só o áudio', text: 'Funciona sem o arquivo do livro. A IA transcreve a narração, então nomes incomuns podem sair com outra grafia.' },
-      { icon: Music4, title: 'Dentro do arquivo', text: 'MP3 recebe letras sincronizadas (SYLT/USLT), M4B recebe a letra no campo ©lyr e FLAC/Opus no campo LYRICS.' },
+      { icon: Music4, title: 'Dentro do arquivo', text: 'MP3 recebe letras sincronizadas (SYLT/USLT), M4B recebe a letra no campo ©lyr e FLAC/Opus no campo LYRICS. WAV e "Um .mp3 por capítulo" não guardam texto: nesses, ele é salvo só na pasta da biblioteca.' },
       { icon: Captions, title: 'Na pasta da biblioteca', text: 'Salva .lrc, .srt e .sync.json ao lado do áudio, e o texto aparece em "Meus textos".' },
     ],
     faq: [
-      { q: 'Onde escolho o destino do texto?', a: 'Em Ajustes › Conversão de áudio › "Salvar texto sincronizado em".' },
+      { q: 'Onde escolho o destino do texto?', a: 'Em Ajustes › Conversão de áudio › "Onde salvar o texto sincronizado". Logo abaixo, "Separação do texto sincronizado" escolhe entre frases, palavras ou os dois (padrão).' },
       { q: 'E audiobooks com um arquivo por capítulo?', a: 'Nesse caso o texto é sempre salvo na pasta da biblioteca, porque não há um arquivo único para guardá-lo.' },
       { q: 'Posso editar o texto depois?', a: 'Sim. Em "Meus textos", use "Editar dados" no menu do texto. Na edição de um audiobook também é possível trocar ou remover o texto anexado.' },
     ],
@@ -125,11 +126,12 @@ export const HELP_TOPICS: HelpTopic[] = [
       { icon: FileAudio, title: 'M4B (AAC)', text: 'Formato padrão do app. Um arquivo com capítulos e capa, o preferido dos apps de audiobook.' },
       { icon: Music4, title: 'MP3', text: 'Toca em qualquer aparelho. Leva capítulos e capa; também pode ser gerado como um MP3 por capítulo.' },
       { icon: Gauge, title: 'Opus', text: 'A melhor qualidade pelo menor tamanho, com capítulos e capa.' },
-      { icon: Layers, title: 'FLAC e WAV', text: 'Sem perda. FLAC mantém capítulos e capa; WAV é para edição e não guarda capítulos.' },
+      { icon: Layers, title: 'FLAC e WAV', text: 'Sem perda. FLAC mantém capítulos e capa. WAV é para edição: as tags aparecem só em alguns programas (o Explorador do Windows não as mostra) e capa e capítulos só em alguns players.' },
     ],
     faq: [
       { q: 'Qual qualidade escolher?', a: 'Padrão já soa bem para voz. Alta é um equilíbrio; Máxima (MP3 320k, AAC 256k, Opus 128k) evita qualquer perda audível, com arquivos maiores.' },
       { q: 'A qualidade vale para todos os formatos?', a: 'Vale para MP3, M4B e Opus. FLAC e WAV são sempre sem perda.' },
+      { q: 'Os dados do livro entram em todos os formatos?', a: 'Título, autor, narrador, gênero, ano e capa são gravados em todos. M4B, MP3, Opus e FLAC mostram tudo. No WAV, que não foi feito para isso, as tags aparecem só em alguns programas. Se algo não puder ser gravado, o app avisa ao terminar a conversão.' },
     ],
   },
   {
@@ -202,7 +204,7 @@ export const HELP_TOPICS: HelpTopic[] = [
     icon: Feather,
     intro: 'Por padrão, a conversão é adaptável: fica mais pesada ou mais leve sozinha, conforme o que o computador e o serviço de voz aguentam no momento. O modo leve é para computadores mais fracos: deixa o app mais leve na interface (menos efeitos visuais) e na conversão (menos coisas ao mesmo tempo). A conversão fica mais lenta, mas o computador e o app continuam rápidos enquanto os livros são narrados.',
     steps: [
-      { title: 'Ligue o modo leve', text: 'Em Ajustes › Interface, ative "Modo leve". Ele também pode ser escolhido na configuração inicial, em Desempenho.' },
+      { title: 'Ligue o modo leve', text: 'Em Ajustes › Sistema e sobre, ative "Modo leve". Ele também pode ser escolhido na configuração inicial, em Desempenho.' },
       { title: 'Na interface, vale na hora', text: 'O desfoque some, os fundos animados ficam parados e os cards e pop-ups ficam opacos.' },
       { title: 'Na conversão, vale na próxima', text: 'As novas conversões passam a usar o modo leve. Uma conversão que já está em andamento continua como começou.' },
       { title: 'Desligado, é adaptável', text: 'Com o modo leve desligado, a conversão volta a se ajustar sozinha: não há nada para configurar.' },
@@ -210,7 +212,7 @@ export const HELP_TOPICS: HelpTopic[] = [
     features: [
       { icon: Sparkles, title: 'Interface', text: 'Sem desfoque de fundo, fundos de cor parados (no lugar das animações) e cards e pop-ups opacos.' },
       { icon: ListOrdered, title: 'Um livro por vez', text: 'Em vez de converter todos os livros juntos, converte um e deixa os outros "Na fila".' },
-      { icon: Mic, title: 'Menos conexões de voz', text: 'A narração usa 4 conexões com o serviço de voz em vez de 10: menos rede e memória, narração mais lenta.' },
+      { icon: Mic, title: 'Menos conexões de voz', text: 'A narração usa 4 conexões fixas com o serviço de voz (o adaptável usa de 3 a 32): menos rede e memória, narração mais lenta.' },
       { icon: Zap, title: 'Adaptável (padrão)', text: 'As conexões de voz sobem enquanto o serviço aguenta e descem quando ele fica lento ou dá erro (de 3 a 32). As etapas de áudio usam todos os núcleos do processador menos um, com prioridade abaixo do normal: com o computador livre a conversão usa tudo; quando você usa outro programa, ele tem a preferência. O M4B é montado capítulo por capítulo ao mesmo tempo.' },
       { icon: Cpu, title: 'Processador livre (leve)', text: 'Uma etapa de áudio (FFmpeg) por vez, tradução de uma parte por vez e prioridade mínima: a conversão só usa o processador que estiver sobrando.' },
     ],

@@ -1,13 +1,62 @@
 // ===== Tela: settings-about =====
 import { motion } from 'motion/react';
 import { useCallback, useEffect, useState } from 'react';
-import { Info, Cpu, RefreshCw } from 'lucide-react';
+import { Info, Cpu, RefreshCw, Download, RotateCw, Sparkles, Loader2, ExternalLink, Feather } from 'lucide-react';
 import { transicaoConteudo } from '../navigation/transitions';
 import { APP_VERSION } from '../app/screens';
 import { useApp } from '../app/AppContext';
+import { SettingToggle } from '../components/cards/SettingToggle';
+import { useSystemInfo } from '../lib/systemInfo';
+
+// Novidades da versão (texto do GitHub Releases) em lista simples: títulos, itens e parágrafos
+function Novidades({ texto }: { texto: string }) {
+  const corte = texto.search(/^##\s*⚙️/m);
+  const linhas = (corte >= 0 ? texto.slice(0, corte) : texto).split(/\r?\n/)
+    .filter(l => l.trim() && !/^#\s/.test(l.trim()) && !/^-{3,}$/.test(l.trim()));
+  const limpar = (s: string) => s.replace(/\*\*|`/g, '').replace(/\[([^\]]+)\]\([^)]+\)/g, '$1').trim();
+  return (
+    <div className="text-sm text-[var(--text-main)] space-y-1.5">
+      {linhas.map((l, i) => {
+        const t = l.trim();
+        if (/^#{2,}\s/.test(t)) return <p key={i} className="pt-2 first:pt-0 text-xs font-bold uppercase tracking-wide text-[var(--text-muted)]">{limpar(t.replace(/^#+\s*/, ''))}</p>;
+        if (/^[-*]\s/.test(t)) return <p key={i} className={`flex gap-2 ${/^\s{2,}/.test(l) ? 'pl-4' : ''}`}><span className="text-winblue shrink-0">•</span><span>{limpar(t.slice(2))}</span></p>;
+        return <p key={i} className="text-[var(--text-muted)]">{limpar(t)}</p>;
+      })}
+    </div>
+  );
+}
 
 export function SettingsAboutScreen() {
-  const { navigateTo, showToast } = useApp();
+  const computador = useSystemInfo();
+  const { navigateTo, showToast, liteMode, setLiteMode, autoUpdate, setAutoUpdate, updateInfo, updateStatus, updateError, checkForUpdates, installUpdate, restartToUpdate } = useApp();
+
+  // Atualizações: texto e botão conforme a etapa
+  const etapa = updateStatus.stage;
+  const pct = `${Math.round((updateStatus.progress || 0) * 100)}%`;
+  const ocupado = etapa === 'checking' || etapa === 'downloading' || etapa === 'installing' || etapa === 'deps' || etapa === 'restarting';
+  let updateDetail = updateInfo ? `Você está na versão mais recente (${updateInfo.current})` : 'Procure uma versão nova no GitHub';
+  if (updateError) updateDetail = updateError;
+  if (updateInfo?.available) {
+    updateDetail = `Nova versão ${updateInfo.latest} disponível (você tem a ${updateInfo.current})`;
+    if (updateInfo.devFolder && !updateInfo.simulated) updateDetail += ' · pasta de desenvolvimento: atualize com git pull';
+  }
+  if (etapa === 'checking') updateDetail = 'Procurando atualizações…';
+  if (etapa === 'downloading') updateDetail = `Baixando a versão ${updateStatus.version || ''}… ${pct}`;
+  if (etapa === 'installing') updateDetail = `Instalando a versão ${updateStatus.version || ''}… ${pct}`;
+  if (etapa === 'deps') updateDetail = 'Instalando os componentes novos…';
+  if (etapa === 'ready') updateDetail = `Versão ${updateStatus.version || ''} instalada: reinicie para usar`;
+  if (etapa === 'restarting') updateDetail = 'Reiniciando…';
+  if (etapa === 'error') updateDetail = `A atualização falhou: ${updateStatus.message || 'erro desconhecido'}`;
+  const updateButton = etapa === 'ready'
+    ? { label: 'Reiniciar', icon: <RotateCw size={13} />, onClick: restartToUpdate, tone: 'bg-emerald-500/15 border-emerald-500/30 text-emerald-500' }
+    : updateInfo?.available && (etapa === 'idle' || etapa === 'error')
+      ? { label: 'Baixar e instalar', icon: <Download size={13} />, onClick: installUpdate, tone: 'bg-winblue/15 border-winblue/30 text-winblue' }
+      : {
+          label: ocupado ? (etapa === 'checking' ? 'Procurando' : etapa === 'restarting' ? 'Reiniciando' : pct) : 'Procurar',
+          icon: ocupado ? <Loader2 size={13} className="animate-spin" /> : <RefreshCw size={13} />,
+          onClick: () => { if (!ocupado) checkForUpdates(true); },
+          tone: 'bg-card/75 border-[var(--text-main)]/10 text-[var(--text-main)]',
+        };
 
   // Estado do motor de conversão
   type Health = { python: string | null; edgeTts: boolean; ffmpeg: boolean; whisper: boolean };
@@ -74,6 +123,90 @@ export function SettingsAboutScreen() {
           <div className="h-8 px-4 rounded-full bg-winblue/15 text-winblue text-xs font-bold flex items-center justify-center">
             v{APP_VERSION}
           </div>
+        </div>
+
+        {/* Atualizar automaticamente */}
+        <div className="settings-list-row py-3 sm:py-3.5 px-4 sm:px-5 rounded-[32px] bg-card/60 backdrop-blur-xl border border-[var(--text-main)]/10 transition-colors flex items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <div className="w-10 h-10 rounded-full bg-winblue/10 text-winblue flex items-center justify-center shrink-0">
+              <Download size={20} />
+            </div>
+            <div className="flex flex-col">
+              <span className="font-semibold text-base text-[var(--text-main)]">Atualizar automaticamente</span>
+              <span className="text-xs sm:text-sm text-[var(--text-muted)] mt-0.5">Baixa e instala as versões novas do GitHub sozinho; você só reinicia o app</span>
+            </div>
+          </div>
+          <SettingToggle
+            checked={autoUpdate}
+            onChange={(v) => { setAutoUpdate(v); showToast(v ? 'Atualizações automáticas ligadas' : 'Atualizações automáticas desligadas'); }}
+            enabledLabel="Ligado"
+            disabledLabel="Desligado"
+          />
+        </div>
+
+        {/* Atualizações: procurar, baixar e instalar, reiniciar */}
+        <div className="settings-list-row py-3 sm:py-3.5 px-4 sm:px-5 rounded-[32px] bg-card/60 backdrop-blur-xl border border-[var(--text-main)]/10 transition-colors">
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-4 min-w-0">
+              <div className="w-10 h-10 rounded-full bg-winblue/10 text-winblue flex items-center justify-center shrink-0">
+                <RefreshCw size={20} />
+              </div>
+              <div className="flex flex-col min-w-0">
+                <span className="font-semibold text-base text-[var(--text-main)]">Atualizações</span>
+                <span className="text-xs sm:text-sm text-[var(--text-muted)] mt-0.5 select-text">{updateDetail}</span>
+              </div>
+            </div>
+            <motion.button
+              type="button"
+              whileHover={{ scale: 1.06 }}
+              whileTap={{ scale: 0.94 }}
+              onClick={updateButton.onClick}
+              className={`h-8 px-4 rounded-full text-xs font-bold flex items-center gap-1.5 shrink-0 cursor-pointer border transition-[background-color,box-shadow] ${updateButton.tone}`}
+            >
+              {updateButton.icon}
+              <span>{updateButton.label}</span>
+            </motion.button>
+          </div>
+          {(etapa === 'downloading' || etapa === 'installing') && (
+            <div className="mt-3 ml-14 h-1.5 rounded-full bg-[var(--text-main)]/10 overflow-hidden">
+              <div className="h-full bg-winblue rounded-full transition-[width] duration-300" style={{ width: pct }} />
+            </div>
+          )}
+          {updateInfo?.available && updateInfo.notes && (
+            <div className="mt-3 ml-14 p-4 rounded-[24px] bg-[var(--text-main)]/[0.04] border border-[var(--text-main)]/10 max-h-72 overflow-y-auto select-text">
+              <div className="flex items-center justify-between gap-3 mb-2">
+                <span className="flex items-center gap-1.5 text-sm font-semibold text-[var(--text-main)]"><Sparkles size={15} className="text-winblue" /> Novidades da versão {updateInfo.latest}</span>
+                {updateInfo.url && (
+                  <a href={updateInfo.url} target="_blank" rel="noreferrer" className="flex items-center gap-1 text-xs font-semibold text-winblue hover:underline shrink-0">
+                    GitHub <ExternalLink size={12} />
+                  </a>
+                )}
+              </div>
+              <Novidades texto={updateInfo.notes} />
+            </div>
+          )}
+        </div>
+
+        {/* Modo leve */}
+        <div className="settings-list-row py-3 sm:py-3.5 px-4 sm:px-5 rounded-[32px] bg-card/60 backdrop-blur-xl border border-[var(--text-main)]/10 transition-colors flex items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <div className="w-10 h-10 rounded-full bg-winblue/10 text-winblue flex items-center justify-center shrink-0">
+              <Feather size={20} />
+            </div>
+            <div className="flex flex-col">
+              <div className="flex items-center gap-2">
+                <span className="font-semibold text-base text-[var(--text-main)]">Modo leve</span>
+                {computador?.weak && <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-500 border border-emerald-500/20">Recomendado para este computador</span>}
+              </div>
+              {computador && (
+                <span className="text-xs sm:text-sm text-[var(--text-main)]/80 mt-0.5">
+                  Este computador: {computador.summary}{computador.weak ? ` (${computador.reasons.join(', ')})` : ''}
+                </span>
+              )}
+              <span className="text-xs sm:text-sm text-[var(--text-muted)] mt-0.5">Para computadores mais fracos. Na interface: sem desfoque, fundos parados e pop-ups opacos. Na conversão: um livro por vez, menos conexões de voz e prioridade mínima (mais lenta, mas o computador fica livre). Desligado, a conversão se adapta sozinha ao computador e à internet</span>
+            </div>
+          </div>
+          <SettingToggle checked={liteMode} onChange={setLiteMode} enabledLabel="Ligado" disabledLabel="Desligado" />
         </div>
 
         {/* Motor de conversão: verificado de verdade (Python, voz, FFmpeg e alinhamento) */}
