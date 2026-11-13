@@ -15,6 +15,7 @@ import { useAppState } from './app/useAppState';
 import { DevCrashScreen } from './app/DevCrashScreen';
 import { Overlays } from './app/Overlays';
 import { AppGlyph, AiStarsIcon } from './components/AppGlyph';
+import { WhatsNewScreen } from './components/WhatsNewScreen';
 
 // Telas carregadas só quando abertas (o app abre mais rápido); enquanto carregam, só um ícone girando
 const Onboarding = lazy(() => import('./app/Onboarding').then(m => ({ default: m.Onboarding })));
@@ -553,6 +554,7 @@ export default function App() {
 
       {/* Pop-ups, folhas, confirmações e aviso */}
       <Overlays />
+      <WhatsNewScreen />
     </div>
     </AppContext.Provider>
   );

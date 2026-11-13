@@ -37,6 +37,8 @@ function pressScale(el: HTMLElement): number {
 // menos). Cards e linhas largas não crescem; itens dentro de pop-ups também não
 function hoverScale(el: HTMLElement, r: DOMRect): number {
   if (r.width === 0) return 1;
+  // Ajustes: como no Audiobook Player, os botões das linhas não crescem (a linha inteira responde ao toque)
+  if (el.closest('.settings-list-row')) return 1;
   // Dentro de pop-ups: só os botões de ação (com sombra, ou marcados como voltar, salvar, cancelar e excluir);
   // as opções das listas nunca crescem
   if (el.closest('[data-popup-content]')) {

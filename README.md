@@ -14,8 +14,10 @@
 
 ---
 
-## What's new in 1.6.2
+## What's new in 1.6.3
 
+- **What's new screen** after each update, and start screens and the drop area in your accent color.
+- Settings buttons with the Audiobook Player's highlight and shadow.
 - **New icon and the Audiobook Player's look:** iOS blue accent, pure black dark mode, the Player's glass and shadows, and the same press and hover feel on every button. The sidebar shows the app symbol with "Generator".
 - **Faster metadata:** title, author and cover appear in about 0.2 s, with "Loading e-book metadata…" on the card until then (Convert waits for it).
 - Easier to see in light and dark mode, font size like the Player (Standard and Large), and a cleaner initial setup that scrolls under its buttons.

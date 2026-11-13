@@ -1267,8 +1267,8 @@ html.app-paused *::after {
 /* Botões que crescem com o mouse (abrem pop-up ou marcados com data-hover-grow) sempre têm sombra. Fica na
    camada base para que uma sombra própria do botão (shadow-sm, shadow-md…) continue valendo */
 @layer base {
-  button[data-popup-trigger]:not([data-popup-option]),
-  button[data-hover-grow] {
+  button[data-popup-trigger]:not([data-popup-option], .settings-list-row *),
+  button[data-hover-grow]:not(.settings-list-row *) {
     box-shadow: 0 0 16px var(--shadow-mid);
   }
 }
@@ -1429,15 +1429,15 @@ html.dark :is(button, [role="button"]) {
 
 /* Botões com fundo: contorno bem discreto na cor do fundo do botão. A cor do ícone só aparece no destaque, ao passar o
    mouse e ao clicar. O foco por teclado tem prioridade */
-:is(button, [role="button"]):is([class*="bg-card/"], [class*="bg-winblue"], [class*="bg-[var(--button"], [class*="bg-red-"], [class*="bg-yellow-"], [class*="bg-amber-"]):not([data-popup-option], [data-popup-content] button.group.w-full, .fullscreen-transcript *, .settings-list-row *) {
+:is(button, [role="button"]):is([class*="bg-card/"], [class*="bg-winblue"], [class*="bg-[var(--button"], [class*="bg-red-"], [class*="bg-yellow-"], [class*="bg-amber-"]):not([data-popup-option], [data-popup-content] button.group.w-full, .fullscreen-transcript *) {
   outline: 0.5px solid var(--button-outline);
   outline-offset: -0.5px;
 }
-:is(button, [role="button"]):is([class*="bg-card/"], [class*="bg-winblue"], [class*="bg-[var(--button"], [class*="bg-red-"], [class*="bg-yellow-"], [class*="bg-amber-"]):not([data-popup-option], [data-popup-content] button.group.w-full, .fullscreen-transcript *, .settings-list-row *):active {
+:is(button, [role="button"]):is([class*="bg-card/"], [class*="bg-winblue"], [class*="bg-[var(--button"], [class*="bg-red-"], [class*="bg-yellow-"], [class*="bg-amber-"]):not([data-popup-option], [data-popup-content] button.group.w-full, .fullscreen-transcript *):active {
   outline-color: color-mix(in srgb, currentColor 20%, transparent);
 }
 @media (hover: hover) and (pointer: fine) {
-  :is(button, [role="button"]):is([class*="bg-card/"], [class*="bg-winblue"], [class*="bg-[var(--button"], [class*="bg-red-"], [class*="bg-yellow-"], [class*="bg-amber-"]):not([data-popup-option], [data-popup-content] button.group.w-full, .fullscreen-transcript *, .settings-list-row *):hover {
+  :is(button, [role="button"]):is([class*="bg-card/"], [class*="bg-winblue"], [class*="bg-[var(--button"], [class*="bg-red-"], [class*="bg-yellow-"], [class*="bg-amber-"]):not([data-popup-option], [data-popup-content] button.group.w-full, .fullscreen-transcript *):hover {
     outline-color: color-mix(in srgb, currentColor 14%, transparent);
   }
 }
@@ -1461,14 +1461,7 @@ html.dark :is([data-popup-content], [data-mobile-sheet]) {
   backdrop-filter: none !important;
 }
 
-/* Ajustes: o valor ao lado da seta é só texto */
-.settings-list-row button.pl-3\.5 {
-  background-color: transparent !important;
-  box-shadow: none !important;
-  outline: none;
-  -webkit-backdrop-filter: none !important;
-  backdrop-filter: none !important;
-}
+/* Ajustes: botões que abrem pop-ups ou executam ações têm destaque e sombra, no computador e no celular */
 
 /* Miniplayer, menu lateral, barra de navegação e pop-ups: o mesmo contorno discreto dos botões */
 [data-ui-outline],

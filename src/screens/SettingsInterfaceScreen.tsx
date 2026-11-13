@@ -54,10 +54,10 @@ export function SettingsInterfaceScreen() {
                 onSelect: (val) => setThemeMode(val)
               });
             }}
-            className="h-8 pl-3.5 pr-2.5 rounded-full bg-card/75 backdrop-blur-3xl shadow-sm text-[var(--text-main)] hover:bg-[var(--hover-fill)] flex items-center gap-1.5 text-xs font-semibold transition-all shrink-0 cursor-pointer [&_svg]:text-inherit"
+            className="h-8 pl-3.5 pr-2.5 rounded-full bg-card/75 backdrop-blur-3xl shadow-sm text-[var(--text-main)] hover:bg-[var(--hover-fill)] flex items-center gap-1.5 text-xs font-semibold transition-all shrink-0 cursor-pointer"
           >
             <span>{themeMode === 'system' ? 'Modo do sistema' : themeMode === 'light' ? 'Claro' : 'Escuro'}</span>
-            <ChevronDown size={14} className="-mr-0.5 text-inherit" />
+            <ChevronDown size={14} className="-mr-0.5 text-[var(--text-muted)]" />
           </motion.button>
         </div>
 
@@ -92,11 +92,11 @@ export function SettingsInterfaceScreen() {
                 onSelect: (val) => setAccentColor(val)
               });
             }}
-            className="h-8 pl-3 pr-2.5 rounded-full bg-card/75 backdrop-blur-3xl shadow-sm text-[var(--text-main)] hover:bg-[var(--hover-fill)] flex items-center gap-1.5 text-xs font-semibold transition-all shrink-0 cursor-pointer [&_svg]:text-inherit"
+            className="h-8 pl-3 pr-2.5 rounded-full bg-card/75 backdrop-blur-3xl shadow-sm text-[var(--text-main)] hover:bg-[var(--hover-fill)] flex items-center gap-1.5 text-xs font-semibold transition-all shrink-0 cursor-pointer"
           >
             <div className="w-3.5 h-3.5 rounded-full border border-black/10 dark:border-white/20 shrink-0" style={{ backgroundColor: accentPalette[accentColor]?.hex || '#0066CC' }} />
             <span>{accentPalette[accentColor]?.name || 'Azul'}</span>
-            <ChevronDown size={14} className="-mr-0.5 text-inherit" />
+            <ChevronDown size={14} className="-mr-0.5 text-[var(--text-muted)]" />
           </motion.button>
         </div>
 
@@ -131,10 +131,10 @@ export function SettingsInterfaceScreen() {
                 onSelect: (val) => setUiFontSize(val)
               });
             }}
-            className="h-8 pl-3.5 pr-2.5 rounded-full bg-card/75 backdrop-blur-3xl shadow-sm text-[var(--text-main)] hover:bg-[var(--hover-fill)] flex items-center gap-1.5 text-xs font-semibold transition-all shrink-0 cursor-pointer [&_svg]:text-inherit"
+            className="h-8 pl-3.5 pr-2.5 rounded-full bg-card/75 backdrop-blur-3xl shadow-sm text-[var(--text-main)] hover:bg-[var(--hover-fill)] flex items-center gap-1.5 text-xs font-semibold transition-all shrink-0 cursor-pointer"
           >
             <span>{uiFontSize === 'large' ? 'Grande' : 'Padrão'}</span>
-            <ChevronDown size={14} className="-mr-0.5 text-inherit" />
+            <ChevronDown size={14} className="-mr-0.5 text-[var(--text-muted)]" />
           </motion.button>
         </div>
 
@@ -174,12 +174,12 @@ export function SettingsInterfaceScreen() {
                 onSelect: (val) => setInterfaceLang(val)
               });
             }}
-            className="h-8 pl-3.5 pr-2.5 rounded-full bg-card/75 backdrop-blur-3xl shadow-sm text-[var(--text-main)] hover:bg-[var(--hover-fill)] flex items-center gap-1.5 text-xs font-semibold transition-all shrink-0 cursor-pointer [&_svg]:text-inherit"
+            className="h-8 pl-3.5 pr-2.5 rounded-full bg-card/75 backdrop-blur-3xl shadow-sm text-[var(--text-main)] hover:bg-[var(--hover-fill)] flex items-center gap-1.5 text-xs font-semibold transition-all shrink-0 cursor-pointer"
           >
             <span>
               {interfaceLang === 'pt-BR' ? 'Idioma do sistema (Português)' : interfaceLang === 'en-US' ? 'English (US)' : interfaceLang === 'es-ES' ? 'Español (ES)' : interfaceLang === 'ru-RU' ? 'Русский' : 'العربية (SA)'}
             </span>
-            <ChevronDown size={14} className="-mr-0.5 text-inherit" />
+            <ChevronDown size={14} className="-mr-0.5 text-[var(--text-muted)]" />
           </motion.button>
         </div>
       </div>

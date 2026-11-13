@@ -69,10 +69,10 @@ export function SettingsConversionScreen() {
                 onSelect: (val) => setFileTypeOption(val)
               });
             }}
-            className="h-8 pl-3.5 pr-2.5 rounded-full bg-card/75 backdrop-blur-3xl shadow-sm text-[var(--text-main)] hover:bg-[var(--hover-fill)] flex items-center gap-1.5 text-xs font-semibold transition-all shrink-0 cursor-pointer [&_svg]:text-inherit"
+            className="h-8 pl-3.5 pr-2.5 rounded-full bg-card/75 backdrop-blur-3xl shadow-sm text-[var(--text-main)] hover:bg-[var(--hover-fill)] flex items-center gap-1.5 text-xs font-semibold transition-all shrink-0 cursor-pointer"
           >
             <span>{audioFormatInfo(fileTypeOption === 'ask' ? 'm4b' : fileTypeOption).label}</span>
-            <ChevronDown size={14} className="-mr-0.5 text-inherit" />
+            <ChevronDown size={14} className="-mr-0.5 text-[var(--text-muted)]" />
           </motion.button>
         </div>
 
@@ -103,10 +103,10 @@ export function SettingsConversionScreen() {
                 onSelect: (val) => setDefaultVoice(val)
               });
             }}
-            className="h-8 pl-3.5 pr-2.5 rounded-full bg-card/75 backdrop-blur-3xl shadow-sm text-[var(--text-main)] hover:bg-[var(--hover-fill)] flex items-center gap-1.5 text-xs font-semibold transition-all shrink-0 cursor-pointer [&_svg]:text-inherit"
+            className="h-8 pl-3.5 pr-2.5 rounded-full bg-card/75 backdrop-blur-3xl shadow-sm text-[var(--text-main)] hover:bg-[var(--hover-fill)] flex items-center gap-1.5 text-xs font-semibold transition-all shrink-0 cursor-pointer"
           >
             <span>{(() => { const v = VOICES.find(x => x.code === defaultVoice); return v ? `${v.flag} ${v.label.split(' - ')[1] || v.label}` : defaultVoice; })()}</span>
-            <ChevronDown size={14} className="-mr-0.5 text-inherit" />
+            <ChevronDown size={14} className="-mr-0.5 text-[var(--text-muted)]" />
           </motion.button>
         </div>
 
@@ -138,10 +138,10 @@ export function SettingsConversionScreen() {
                 onSelect: (val) => setAudioQuality(val as AudioQuality)
               });
             }}
-            className="h-8 pl-3.5 pr-2.5 rounded-full bg-card/75 backdrop-blur-3xl shadow-sm text-[var(--text-main)] hover:bg-[var(--hover-fill)] flex items-center gap-1.5 text-xs font-semibold transition-all shrink-0 cursor-pointer [&_svg]:text-inherit"
+            className="h-8 pl-3.5 pr-2.5 rounded-full bg-card/75 backdrop-blur-3xl shadow-sm text-[var(--text-main)] hover:bg-[var(--hover-fill)] flex items-center gap-1.5 text-xs font-semibold transition-all shrink-0 cursor-pointer"
           >
             <span>{audioQualityLabel(audioQuality)}</span>
-            <ChevronDown size={14} className="-mr-0.5 text-inherit" />
+            <ChevronDown size={14} className="-mr-0.5 text-[var(--text-muted)]" />
           </motion.button>
         </div>
 
@@ -212,10 +212,10 @@ export function SettingsConversionScreen() {
                 }
               });
             }}
-            className="h-8 pl-3.5 pr-2.5 rounded-full bg-card/75 backdrop-blur-3xl shadow-sm text-[var(--text-main)] hover:bg-[var(--hover-fill)] flex items-center gap-1.5 text-xs font-semibold transition-all shrink-0 cursor-pointer [&_svg]:text-inherit"
+            className="h-8 pl-3.5 pr-2.5 rounded-full bg-card/75 backdrop-blur-3xl shadow-sm text-[var(--text-main)] hover:bg-[var(--hover-fill)] flex items-center gap-1.5 text-xs font-semibold transition-all shrink-0 cursor-pointer"
           >
             <span>{DESTINATION_LABELS[syncTextDestination]}</span>
-            <ChevronDown size={14} className="-mr-0.5 text-inherit" />
+            <ChevronDown size={14} className="-mr-0.5 text-[var(--text-muted)]" />
           </motion.button>
         </div>
 
@@ -255,10 +255,10 @@ export function SettingsConversionScreen() {
                 }
               });
             }}
-            className="h-8 pl-3.5 pr-2.5 rounded-full bg-card/75 backdrop-blur-3xl shadow-sm text-[var(--text-main)] hover:bg-[var(--hover-fill)] flex items-center gap-1.5 text-xs font-semibold transition-all shrink-0 cursor-pointer [&_svg]:text-inherit"
+            className="h-8 pl-3.5 pr-2.5 rounded-full bg-card/75 backdrop-blur-3xl shadow-sm text-[var(--text-main)] hover:bg-[var(--hover-fill)] flex items-center gap-1.5 text-xs font-semibold transition-all shrink-0 cursor-pointer"
           >
             <span>{GRANULARITY_LABELS[syncTextGranularity]}</span>
-            <ChevronDown size={14} className="-mr-0.5 text-inherit" />
+            <ChevronDown size={14} className="-mr-0.5 text-[var(--text-muted)]" />
           </motion.button>
         </div>
       </div>

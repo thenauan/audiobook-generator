@@ -6,6 +6,15 @@ All notable changes to **Audiobook Generator** — the free ebook to audiobook c
 
 ---
 
+## [1.6.3] — 2026-11-13
+
+### Added
+- **What's new screen** after every update, like the Audiobook Player's, over the moving background.
+
+### Changed
+- **Start screens, the what's new screen and the drop area use your accent color** (blue by default) in the moving background, instead of fixed blue, red and green.
+- **Settings buttons that open pop-ups or run actions** have the Player's highlight and shadow.
+
 ## [1.6.2] — 2026-11-13
 
 ### Changed
