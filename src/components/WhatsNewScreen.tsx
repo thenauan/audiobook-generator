@@ -76,10 +76,10 @@ export function WhatsNewScreen() {
               data-press="true"
               data-hover-grow
               onClick={close}
-              className="mt-8 h-12 px-6 rounded-full bg-winblue text-white shadow-lg font-semibold text-sm flex items-center justify-center gap-2.5 transition-all cursor-pointer"
+              className="mt-8 h-12 px-6 rounded-full bg-winblue/20 backdrop-blur-3xl text-winblue shadow-lg font-semibold text-sm flex items-center justify-center gap-2.5 transition-all cursor-pointer"
             >
               <span>{lang === 'pt' ? 'Ir para o app' : 'Go to the app'}</span>
-              <ArrowRight size={18} className="shrink-0 rtl:rotate-180" />
+              <ArrowRight size={18} className="shrink-0 text-[color-mix(in_oklch,var(--winblue)_65%,white)] rtl:rotate-180" />
             </motion.button>
           </motion.div>
         </motion.div>
