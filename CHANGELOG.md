@@ -6,6 +6,12 @@ All notable changes to **Audiobook Generator** — the free ebook to audiobook c
 
 ---
 
+## [1.6.2] — 2026-11-13
+
+### Changed
+- **Settings rows, cards, buttons and pop-ups look exactly like the Audiobook Player** in light and dark mode: settings rows use the iOS gray fill (stronger on hover), and the glass, shadows, outlines, focus and sidebar match the Player.
+- Light-mode accent blue is the Player's #0066CC.
+
 ## [1.6.1] — 2026-11-13
 
 ### Changed

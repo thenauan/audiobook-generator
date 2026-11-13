@@ -10,15 +10,16 @@
 - 🖥️ **Interface in 5 languages**: Português, English, Español, العربية, Русский
 - ⚡ **Adaptive conversion** that tunes itself to your computer and the voice service, and 🪶 **Lite mode** for slower computers
 
-**[⬇️ Download the latest version](https://github.com/thenauan/audiobook-generator/releases/latest)** · [What's new](#whats-new-in-161) · [Installation](#installation) · [How to use](#how-to-use) · [Supported languages](#supported-languages) · [FAQ](#faq)
+**[⬇️ Download the latest version](https://github.com/thenauan/audiobook-generator/releases/latest)** · [What's new](#whats-new-in-162) · [Installation](#installation) · [How to use](#how-to-use) · [Supported languages](#supported-languages) · [FAQ](#faq)
 
 ---
 
-## What's new in 1.6.1
+## What's new in 1.6.2
 
 - **New icon and the Audiobook Player's look:** iOS blue accent, pure black dark mode, the Player's glass and shadows, and the same press and hover feel on every button. The sidebar shows the app symbol with "Generator".
 - **Faster metadata:** title, author and cover appear in about 0.2 s, with "Loading e-book metadata…" on the card until then (Convert waits for it).
 - Easier to see in light and dark mode, font size like the Player (Standard and Large), and a cleaner initial setup that scrolls under its buttons.
+- Settings rows, cards, buttons and pop-ups look exactly like the Audiobook Player in light and dark mode.
 - Other apps shows the current Audiobook Player icon.
 - Smaller fixes: confirmation before deleting a chapter marker, synopsis up to 2,000 characters, "See all" only when needed, and release notes in your language.
 

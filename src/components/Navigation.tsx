@@ -31,8 +31,8 @@ export function SidebarItem({ icon, label, active, onClick, badge, highlight }: 
         active
           ? "bg-winblue/15 text-winblue"
           : highlight
-            ? "bg-white/15 text-[var(--text-main)]"
-            : "text-[var(--text-main)] hover:bg-[var(--hover-fill)] hover:text-white"
+            ? "bg-[var(--ios-fill)] text-[var(--text-main)]"
+            : "text-[var(--text-main)] hover:bg-[var(--hover-fill)]"
       )}
     >
       <span className="shrink-0 flex items-center justify-center text-inherit">{icon}</span>
@@ -56,7 +56,7 @@ export function Sidebar({
   onSelect: (id: string) => void;
 }) {
   return (
-    <aside className="sidebar-safe fixed left-4 rtl:left-auto rtl:right-4 top-4 bottom-4 w-64 bg-[var(--sidebar-bg)] backdrop-blur-3xl rounded-3xl p-5 pt-6 pb-6 flex flex-col justify-between z-30 shadow-2xl overflow-hidden overscroll-none select-none">
+    <aside className="sidebar-safe fixed left-4 rtl:left-auto rtl:right-4 top-4 bottom-4 w-64 bg-card/95 backdrop-blur-3xl rounded-3xl p-5 pt-6 pb-6 flex flex-col justify-between z-30 shadow-2xl overflow-hidden overscroll-none select-none">
       <div>
         {/* Centralizado: a mesma distância das bordas esquerda e direita do menu */}
         <div className="flex items-baseline justify-center text-[var(--text-main)] mb-6">{brand}</div>

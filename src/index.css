@@ -113,13 +113,13 @@ html[data-font-size="large"] .text-\[11px\] { font-size: calc(11px * var(--font-
     --bg-mica: #FFFFFF;
     --bg-card: #F2F2F7;
     --bg-sheet: #F2F2F7;
-    --bg-card-50: rgb(120 120 128 / 0.08);
-    --bg-card-60: rgb(120 120 128 / 0.10);
-    --bg-card-75: rgb(120 120 128 / 0.12);
-    --bg-card-80: rgb(120 120 128 / 0.14);
-    --bg-card-85: rgb(120 120 128 / 0.16);
-    --bg-card-90: rgb(120 120 128 / 0.18);
-    --bg-card-95: rgba(255, 255, 255, 0.78);
+    --bg-card-50: rgba(255, 255, 255, 0.14);
+    --bg-card-60: rgba(255, 255, 255, 0.18);
+    --bg-card-75: rgba(255, 255, 255, 0.24);
+    --bg-card-80: rgba(255, 255, 255, 0.28);
+    --bg-card-85: rgba(255, 255, 255, 0.32);
+    --bg-card-90: rgba(255, 255, 255, 0.36);
+    --bg-card-95: rgba(255, 255, 255, 0.42);
     --card-hover: #E9E9EE;
     --text-main: #000000;
     --text-muted: rgb(60 60 67 / 60%);
@@ -150,18 +150,18 @@ html[data-font-size="large"] .text-\[11px\] { font-size: calc(11px * var(--font-
     --shadow-soft: rgb(0 0 0 / 0.26);
     --shadow-mid: rgb(0 0 0 / 0.3);
     --shadow-strong: rgb(0 0 0 / 0.36);
-    --hover-fill: rgb(120 120 128 / 0.36);
+    --hover-fill: rgb(255 255 255 / 0.18);
     --sidebar-bg: rgb(120 120 128 / 0.26);
     --bg-mica: #000000;
     --bg-card: #2C2C2E;
     --bg-sheet: #2C2C2E;
-    --bg-card-50: rgb(120 120 128 / 0.14);
-    --bg-card-60: rgb(120 120 128 / 0.16);
-    --bg-card-75: rgb(120 120 128 / 0.2);
-    --bg-card-80: rgb(120 120 128 / 0.22);
-    --bg-card-85: rgb(120 120 128 / 0.24);
-    --bg-card-90: rgb(120 120 128 / 0.26);
-    --bg-card-95: rgb(120 120 128 / 0.3);
+    --bg-card-50: rgba(28, 28, 32, 0.22);
+    --bg-card-60: rgba(28, 28, 32, 0.26);
+    --bg-card-75: rgba(28, 28, 32, 0.32);
+    --bg-card-80: rgba(28, 28, 32, 0.36);
+    --bg-card-85: rgba(28, 28, 32, 0.4);
+    --bg-card-90: rgba(28, 28, 32, 0.44);
+    --bg-card-95: rgba(28, 28, 32, 0.5);
     --card-hover: #3A3A3C;
     --text-main: #FFFFFF;
     --text-muted: rgb(235 235 245 / 72%);
@@ -1293,3 +1293,228 @@ html.app-paused *::after {
 .onboarding-footer-blur > .apple-blur-layer:nth-child(6) { -webkit-backdrop-filter: blur(28px); backdrop-filter: blur(28px); -webkit-mask-image: linear-gradient(to bottom, transparent 72%, #000 86%); mask-image: linear-gradient(to bottom, transparent 72%, #000 86%); }
 /* Modo leve: sem desfoque */
 html.lite .onboarding-footer-blur { display: none; }
+
+/* ===== Efeitos do Audiobook Player (mesma identidade visual) ===== */
+/* ===== Destaques como no iOS: preenchimento cinza neutro (nem cor de destaque, nem brilho) ===== */
+:root {
+  --ios-fill: rgb(118 118 128 / 0.12);
+  --ios-fill-strong: rgb(120 120 128 / 0.2);
+  --ios-row: var(--ios-fill);
+  --ios-row-strong: var(--ios-fill-strong);
+}
+.dark {
+  --ios-fill: rgb(118 118 128 / 0.24);
+  --ios-fill-strong: rgb(120 120 128 / 0.36);
+  /* Listas sobre o fundo preto: tom bem próximo do fundo */
+  --ios-row: #151518;
+  --ios-row-strong: #222227;
+}
+
+/* Ajustes: itens da lista sem borda, só a diferença de cor com o fundo, como no iOS (igual ao Audiobook Player) */
+.settings-list-row {
+  border-color: transparent !important;
+  background-color: var(--ios-row) !important;
+}
+@media (hover: hover) {
+  .settings-list-row:hover {
+    background-color: var(--ios-row-strong) !important;
+  }
+}
+
+input[type="range"].apple-slider:active::-webkit-slider-runnable-track,
+[data-scrubbing] > input[type="range"].apple-slider::-webkit-slider-runnable-track {
+  height: 8px;
+}
+input[type="range"].apple-slider:active::-moz-range-track,
+[data-scrubbing] > input[type="range"].apple-slider::-moz-range-track {
+  height: 8px;
+}
+@media (pointer: coarse) {
+  input[type="range"].apple-slider {
+    height: 28px;
+  }
+}
+.group:has(input.apple-slider) > span {
+  transition: scale var(--dur-snappy) var(--spring-snappy), color var(--dur-fade-in) var(--ease-fade);
+}
+.group[data-scrubbing] > span {
+  scale: 1.18;
+  color: var(--text-main);
+}
+
+/* Toque: todo botão pequeno tem uma área invisível de 44 px, sem mudar o que se vê */
+@media (pointer: coarse) {
+  :is(button, [role="button"]):is(.w-6, .w-7, .w-8, .w-9, .w-10, .h-6, .h-7, .h-8, .h-9, .h-10, .hit-44):not(.absolute, .fixed, .sticky) {
+    position: relative;
+  }
+  :is(button, [role="button"]):is(.w-6, .w-7, .w-8, .w-9, .w-10, .h-6, .h-7, .h-8, .h-9, .h-10, .hit-44)::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: max(100%, 44px);
+    height: max(100%, 44px);
+    translate: -50% -50%;
+  }
+}
+
+/* Listas sobre fundo sólido: o desfoque não muda nada na tela, só gasta processamento */
+.settings-list-row,
+.settings-option-list {
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}
+
+/* Reduzir transparência: fundos sólidos e sem desfoque, como no modo leve */
+@media (prefers-reduced-transparency: reduce) {
+  :root, .dark {
+    --bg-card-50: var(--bg-card);
+    --bg-card-60: var(--bg-card);
+    --bg-card-75: var(--bg-card);
+    --bg-card-80: var(--bg-card);
+    --bg-card-85: var(--bg-card);
+    --bg-card-90: var(--bg-card);
+    --bg-card-95: var(--bg-card);
+  }
+  [class*="backdrop-blur"] {
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
+  }
+  .apple-header-blur > .apple-blur-layer {
+    display: none !important;
+  }
+}
+
+/* Menu lateral: mesmo vidro dos pop-ups, com sombra leve */
+aside.sidebar-safe {
+  box-shadow: 0 0 24px var(--shadow-soft);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  /* Dentro de pop-ups nada cresce: botões e opções só ganham o destaque */
+  [data-popup-content] :is(button, [role="button"]):hover {
+    scale: none !important;
+  }
+  [data-popup-content] :is(button, [role="button"]) {
+    transition-property: background-color, color, opacity;
+  }
+
+  /* Itens na cor de destaque: o hover é um tom da mesma cor, nunca cinza */
+  :is(button, [role="button"], a, div)[class~="bg-winblue"]:hover {
+    background-color: oklch(from var(--winblue) calc(l - 0.06) c h) !important;
+  }
+  html.dark :is(button, [role="button"], a, div)[class~="bg-winblue"]:hover {
+    background-color: oklch(from var(--winblue) calc(l + 0.06) c h) !important;
+  }
+  :is(button, [role="button"], a, div, label)[class*="bg-winblue/"]:hover,
+  :is(button, [role="button"]).text-winblue:hover,
+  [class*="focus-within:bg-winblue"]:focus-within:hover,
+  input[class*="focus:bg-winblue"]:focus:hover,
+  textarea[class*="focus:bg-winblue"]:focus:hover {
+    background-color: color-mix(in srgb, var(--winblue) 26%, transparent) !important;
+  }
+}
+
+/* Botões: sombra leve e discreta, em volta (pop-ups e cartões continuam com a sombra normal) */
+:is(button, [role="button"]) {
+  --shadow-soft: rgb(0 0 0 / 0.07);
+  --shadow-mid: rgb(0 0 0 / 0.08);
+  --shadow-strong: rgb(0 0 0 / 0.09);
+}
+html.dark :is(button, [role="button"]) {
+  --shadow-soft: rgb(0 0 0 / 0.24);
+  --shadow-mid: rgb(0 0 0 / 0.26);
+  --shadow-strong: rgb(0 0 0 / 0.28);
+}
+
+/* Botões com fundo: contorno bem discreto na cor do fundo do botão. A cor do ícone só aparece no destaque, ao passar o
+   mouse e ao clicar. O foco por teclado tem prioridade */
+:is(button, [role="button"]):is([class*="bg-card/"], [class*="bg-winblue"], [class*="bg-[var(--button"], [class*="bg-red-"], [class*="bg-yellow-"], [class*="bg-amber-"]):not([data-popup-option], [data-popup-content] button.group.w-full, .fullscreen-transcript *, .settings-list-row *) {
+  outline: 0.5px solid var(--button-outline);
+  outline-offset: -0.5px;
+}
+:is(button, [role="button"]):is([class*="bg-card/"], [class*="bg-winblue"], [class*="bg-[var(--button"], [class*="bg-red-"], [class*="bg-yellow-"], [class*="bg-amber-"]):not([data-popup-option], [data-popup-content] button.group.w-full, .fullscreen-transcript *, .settings-list-row *):active {
+  outline-color: color-mix(in srgb, currentColor 20%, transparent);
+}
+@media (hover: hover) and (pointer: fine) {
+  :is(button, [role="button"]):is([class*="bg-card/"], [class*="bg-winblue"], [class*="bg-[var(--button"], [class*="bg-red-"], [class*="bg-yellow-"], [class*="bg-amber-"]):not([data-popup-option], [data-popup-content] button.group.w-full, .fullscreen-transcript *, .settings-list-row *):hover {
+    outline-color: color-mix(in srgb, currentColor 14%, transparent);
+  }
+}
+:is(button, [role="button"]):focus-visible {
+  outline: 2px solid var(--winblue);
+  outline-offset: 2px;
+}
+
+/* Pop-ups e folhas flutuam sobre tudo: sombra um pouco mais presente que o resto */
+[data-popup-content], [data-mobile-sheet] {
+  --shadow-strong: rgb(0 0 0 / 0.2);
+}
+html.dark :is([data-popup-content], [data-mobile-sheet]) {
+  --shadow-strong: rgb(0 0 0 / 0.5);
+}
+
+/* Botões que só aparecem no hover: sem desfoque enquanto estão invisíveis */
+:not(:hover) > .opacity-0 [class*="backdrop-blur"],
+:not(:hover) > [class*="backdrop-blur"].opacity-0 {
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}
+
+/* Ajustes: o valor ao lado da seta é só texto */
+.settings-list-row button.pl-3\.5 {
+  background-color: transparent !important;
+  box-shadow: none !important;
+  outline: none;
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}
+
+/* Miniplayer, menu lateral, barra de navegação e pop-ups: o mesmo contorno discreto dos botões */
+[data-ui-outline],
+aside.sidebar-safe,
+[data-player-sheet],
+[data-mobile-sheet],
+:is([class*="bg-card/95"], [class*="bg-card/90"]):not(button, [role="button"], .fixed.inset-0) {
+  outline: 0.5px solid var(--surface-outline);
+  outline-offset: -0.5px;
+}
+
+/* Dentro de pop-ups os itens não têm sombra: só o próprio pop-up tem */
+:is([data-popup-content], [data-player-sheet], [data-mobile-sheet]) *:not([class*="bg-card/9"]) {
+  box-shadow: none !important;
+}
+
+/* Segurar o dedo numa opção dos pop-ups: sem seleção de texto nem o menu de copiar do iPhone (ao começar a seleção, o
+   sistema desligava o desfoque e o pop-up ficava transparente). Campos de texto continuam selecionáveis. */
+:is([data-popup-content], [data-player-sheet], [data-mobile-sheet], [data-mobile-confirm]) {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+:is([data-popup-content], [data-player-sheet], [data-mobile-sheet], [data-mobile-confirm]) :is(input, textarea, [contenteditable="true"]) {
+  -webkit-touch-callout: default;
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+/* Pesquisa dentro de pop-ups e folhas de tela cheia, parada: o cinza do destaque da barra de abas (o fundo de antes
+   ficava quase da cor da folha e a barra sumia) */
+:is([data-mobile-sheet], [data-popup-content], [data-player-sheet]) :is([data-popup-search], [data-popup-search-clear]) {
+  background-color: var(--ios-fill) !important;
+}
+/* Pesquisa dentro de pop-ups e folhas de tela cheia: ao digitar, o destaque aparece como na pesquisa do app (sobre a
+   folha quase opaca, o fundo de 15% sumia e a sombra é tirada dentro dos pop-ups) */
+:is([data-mobile-sheet], [data-popup-content], [data-player-sheet]) [data-popup-search]:focus-within {
+  background-color: color-mix(in srgb, var(--winblue) 22%, transparent) !important;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--winblue) 50%, transparent) !important;
+}
+
+/* Modo escuro com fundo preto: os botões do cabeçalho ganham um destaque um pouco mais claro para aparecerem */
+html.dark [data-app-header] :is(button, [role="button"], div)[class*="bg-card/75"]:not(:hover) {
+  background-color: rgb(120 120 128 / 0.26) !important;
+}
+/* Menu lateral (computador), modo escuro: o mesmo tom dos botões, para não sumir no fundo preto */
+html.dark aside.sidebar-safe {
+  background-color: rgb(120 120 128 / 0.26) !important;
+}
