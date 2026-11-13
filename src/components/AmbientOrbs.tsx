@@ -7,9 +7,9 @@ import { useMotionPrefs } from '../lib/motionPrefs';
 import { cn } from '../lib/cn';
 
 const ORBS = [
-  { color: 'var(--winblue)', className: '-top-[30%] -left-[15%] w-[70%] aspect-square', x: ['-6%', '22%', '-10%', '-6%'], y: ['-8%', '18%', '-12%', '-8%'], scale: [1, 1.25, 0.95, 1], duration: 18 },
-  { color: 'color-mix(in oklch, var(--winblue) 45%, rgb(150 150 165))', className: '-top-[20%] -right-[18%] w-[62%] aspect-square', x: ['10%', '-20%', '12%', '10%'], y: ['6%', '-14%', '14%', '6%'], scale: [1.1, 0.9, 1.2, 1.1], duration: 22 },
-  { color: 'color-mix(in oklch, var(--winblue) 60%, white)', className: '-bottom-[35%] left-[18%] w-[66%] aspect-square', x: ['-8%', '18%', '-16%', '-8%'], y: ['10%', '-12%', '6%', '10%'], scale: [1, 1.18, 0.92, 1], duration: 26 },
+  { color: 'var(--orb-a)', className: '-top-[30%] -left-[15%] w-[70%] aspect-square', x: ['-6%', '22%', '-10%', '-6%'], y: ['-8%', '18%', '-12%', '-8%'], scale: [1, 1.25, 0.95, 1], duration: 18 },
+  { color: 'var(--orb-b)', className: '-top-[20%] -right-[18%] w-[62%] aspect-square', x: ['10%', '-20%', '12%', '10%'], y: ['6%', '-14%', '14%', '6%'], scale: [1.1, 0.9, 1.2, 1.1], duration: 22 },
+  { color: 'var(--orb-c)', className: '-bottom-[35%] left-[18%] w-[66%] aspect-square', x: ['-8%', '18%', '-16%', '-8%'], y: ['10%', '-12%', '6%', '10%'], scale: [1, 1.18, 0.92, 1], duration: 26 },
 ];
 
 export function AmbientOrbs({ className, intensity = 1, style }: { className?: string; intensity?: number; style?: React.CSSProperties }) {

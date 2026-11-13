@@ -28,19 +28,18 @@ if (!app.requestSingleInstanceLock()) {
 
 // Tela de abertura enquanto o servidor local inicia (no lugar de uma janela branca)
 function splashHtml(message, isError = false) {
-    let icon = '';
-    try { icon = fs.readFileSync(path.join(__dirname, 'public', 'icon.svg'), 'utf8'); } catch (e) {}
+    // O título do app: símbolo e "Generator" colados e da mesma altura (como no menu lateral)
+    const icon = '<svg viewBox="258 253 812 692" style="height:0.72em;width:auto" fill="currentColor" aria-hidden="true"><path d="M261 652a35 35 0 0 1 70 0v55a35 35 0 0 1 -70 0zM365 588a35 35 0 0 1 70 0v179a35 35 0 0 1 -70 0zM478 511a35 35 0 0 1 70 0v324a35 35 0 0 1 -70 0zM592 432a35 35 0 0 1 70 0v476a35 35 0 0 1 -70 0zM707 511a35 35 0 0 1 70 0v324a35 35 0 0 1 -70 0zM820 588a35 35 0 0 1 70 0v179a35 35 0 0 1 -70 0zM923 652a35 35 0 0 1 70 0v55a35 35 0 0 1 -70 0zM898 255Q913.73 364.62 1019 381Q913.73 397.38 898 507Q882.27 397.38 777 381Q882.27 364.62 898 255zM1007 475Q1015.06 528.94 1069 537Q1015.06 545.06 1007 599Q998.94 545.06 945 537Q998.94 528.94 1007 475z"/></svg>';
     const safe = String(message).replace(/[<>&]/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c]));
     return `<!doctype html><html><head><meta charset="utf-8"><style>
-        html,body{margin:0;height:100%;background:#161616;color:#f5f5f7;font-family:"Segoe UI",-apple-system,system-ui,sans-serif;-webkit-user-select:none;user-select:none}
+        html,body{margin:0;height:100%;background:#000;color:#f5f5f7;font-family:"Segoe UI",-apple-system,system-ui,sans-serif;-webkit-user-select:none;user-select:none}
         body{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:22px}
-        .icon{width:112px;height:112px;filter:drop-shadow(0 18px 40px rgba(0,0,0,.55))}
-        .icon svg{width:100%;height:100%}
+        .icon{display:flex;align-items:baseline;gap:2px;font-size:56px;line-height:1;letter-spacing:-0.025em}
         p{margin:0;font-size:14px;color:${isError ? '#ff6b6b' : '#a1a1aa'};max-width:460px;text-align:center;line-height:1.5}
         .dots::after{content:'';animation:d 1.2s steps(4,end) infinite}
         @keyframes d{0%{content:''}25%{content:'.'}50%{content:'..'}75%{content:'...'}}
     </style></head><body>
-        <div class="icon">${icon}</div>
+        <div class="icon">${icon}<span>Generator</span></div>
         <p class="${isError ? '' : 'dots'}">${safe}</p>
     </body></html>`;
 }
@@ -167,7 +166,7 @@ app.whenReady().then(() => {
         minWidth: 1024,
         minHeight: 640,
         autoHideMenuBar: true,
-        backgroundColor: '#161616',
+        backgroundColor: '#000000',
         icon: iconeDaJanela(),
         webPreferences: {
             nodeIntegration: false,

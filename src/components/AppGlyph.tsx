@@ -18,6 +18,17 @@ export function AppGlyph({ size, className }: { size?: number | string; classNam
   );
 }
 
+// Título do app: o símbolo e "Generator" colados e da mesma altura (o símbolo tem a altura das maiúsculas),
+// como o título do Audiobook Player. `size` é o tamanho da letra
+export function AppTitle({ size, className = '' }: { size: number | string; className?: string }) {
+  return (
+    <span className={`inline-flex items-baseline gap-[2px] leading-none tracking-tight whitespace-nowrap ${className}`} style={{ fontSize: size }} aria-label="Audiobook Generator" translate="no">
+      <AppGlyph size="0.72em" className="shrink-0" />
+      <span className="font-normal" aria-hidden="true">Generator</span>
+    </span>
+  );
+}
+
 export default AppGlyph;
 
 // Só as estrelas de IA do símbolo (sem as ondas): ícone do Conversor e dos botões de converter

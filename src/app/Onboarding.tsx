@@ -12,7 +12,7 @@ import {
 } from 'lucide-react';
 import { LuBookAudio } from 'react-icons/lu';
 import { AmbientOrbs } from '../components/AmbientOrbs';
-import { AppGlyph } from '../components/AppGlyph';
+import { AppTitle } from '../components/AppGlyph';
 import { useApp } from './AppContext';
 import { toggleVoiceSample, usePlayingVoice } from '../lib/voiceSample';
 import { useSystemInfo } from '../lib/systemInfo';
@@ -234,10 +234,7 @@ export function Onboarding() {
             className="h-full w-full max-w-xl mx-auto px-8 py-10 flex flex-col items-center justify-center text-center"
           >
             {/* Símbolo sem fundo, como no menu lateral, com o nome embaixo */}
-            <AppGlyph size={96} className="text-[var(--text-main)] drop-shadow-[0_14px_30px_rgba(0,0,0,0.35)]" />
-            <div className="mt-4 text-2xl text-[var(--text-main)] whitespace-nowrap">
-              <span className="font-bold">Audiobook</span><span className="font-normal">Generator</span>
-            </div>
+            <AppTitle size={60} className="text-[var(--text-main)]" />
 
             <h1 className="mt-10 text-4xl md:text-5xl font-semibold tracking-tight text-[var(--text-main)]">Bem-vindo!</h1>
             <p className="mt-3 text-sm sm:text-base leading-relaxed text-[var(--text-muted)] max-w-md">

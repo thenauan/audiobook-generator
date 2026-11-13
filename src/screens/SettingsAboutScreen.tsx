@@ -1,5 +1,6 @@
 // ===== Tela: settings-about =====
 import { motion } from 'motion/react';
+import { AppTitle } from '../components/AppGlyph';
 import { useCallback, useEffect, useState } from 'react';
 import { Info, Cpu, RefreshCw, Download, RotateCw, Sparkles, Loader2, ExternalLink, Feather } from 'lucide-react';
 import { transicaoConteudo } from '../navigation/transitions';
@@ -124,7 +125,7 @@ export function SettingsAboutScreen() {
               <Info size={20} />
             </div>
             <div className="flex flex-col">
-              <span className="font-semibold text-base text-[var(--text-main)]">Audiobook Generator</span>
+              <AppTitle size={20} className="text-[var(--text-main)] py-0.5" />
               <span className="text-xs sm:text-sm text-[var(--text-muted)] mt-0.5">Conversor de e-books em audiobooks com vozes neurais</span>
             </div>
           </div>

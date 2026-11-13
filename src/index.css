@@ -1511,3 +1511,16 @@ html.dark [data-app-header] :is(button, [role="button"], div)[class*="bg-card/75
 html.dark aside.sidebar-safe {
   background-color: rgb(120 120 128 / 0.26) !important;
 }
+
+/* Fundo em movimento (boas-vindas, novidades, área de arrastar): tons da cor de destaque próprios de cada tema.
+   No claro, tons claros e suaves sobre o branco; no escuro, a cor viva e tons fundos sobre o preto */
+:root {
+  --orb-a: color-mix(in oklch, var(--winblue) 70%, white);
+  --orb-b: color-mix(in oklch, var(--winblue) 40%, rgb(200 200 215));
+  --orb-c: color-mix(in oklch, var(--winblue) 45%, white);
+}
+.dark {
+  --orb-a: var(--winblue);
+  --orb-b: color-mix(in oklch, var(--winblue) 50%, rgb(70 70 90));
+  --orb-c: color-mix(in oklch, var(--winblue) 65%, black);
+}

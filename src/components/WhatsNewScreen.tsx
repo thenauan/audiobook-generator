@@ -61,7 +61,7 @@ export function WhatsNewScreen() {
             <h2 className="text-xl sm:text-2xl font-semibold tracking-tight mt-1">{title}</h2>
             {/* Vidro claro, sem sombra: deixa ver o fundo em movimento */}
             <ul
-              className="w-full max-w-md mt-7 p-2 rounded-[26px] bg-white/[0.08] text-left rtl:text-right"
+              className="w-full max-w-md mt-7 p-2 rounded-[26px] bg-[var(--ios-fill)] text-left rtl:text-right"
               style={{ backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)' }}
             >
               {notes.map(note => (

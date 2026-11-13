@@ -14,6 +14,8 @@ All notable changes to **Audiobook Generator** — the free ebook to audiobook c
 ### Changed
 - **Start screens, the what's new screen and the drop area use your accent color** (blue by default) in the moving background, instead of fixed blue, red and green.
 - **Settings buttons that open pop-ups or run actions** have the Player's highlight and shadow.
+- **The new title everywhere:** the app symbol and "Generator" together, at the same height, on the welcome screen, What's new, Settings › System and the start screen.
+- The moving background and the What's new list have their own light and dark tones for each accent color.
 
 ## [1.6.2] — 2026-11-13
 
