@@ -74,6 +74,7 @@ export function WhatsNewScreen() {
             <motion.button
               type="button"
               data-press="true"
+              data-hover-grow
               onClick={close}
               className="mt-8 h-12 px-6 rounded-full bg-winblue text-white shadow-lg font-semibold text-sm flex items-center justify-center gap-2.5 transition-all cursor-pointer"
             >

@@ -263,11 +263,11 @@ export function Onboarding() {
             </div>
 
             <div className="mt-6 w-full grid grid-cols-2 gap-3">
-              <motion.button onClick={finish} className={`${secondaryBtn} justify-center`}>
+              <motion.button data-hover-grow onClick={finish} className={`${secondaryBtn} justify-center`}>
                 <ArrowRight size={16} />
                 <span>Ir para o app</span>
               </motion.button>
-              <motion.button onClick={() => goTo(1)} className={`${primaryBtn} justify-center`}>
+              <motion.button data-hover-grow onClick={() => goTo(1)} className={`${primaryBtn} justify-center`}>
                 <Settings2 size={16} />
                 <span>Configurar agora</span>
               </motion.button>
