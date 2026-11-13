@@ -12,8 +12,8 @@ using System.Reflection;
 [assembly: AssemblyCompany("Audiobook Generator")]
 [assembly: AssemblyProduct("Audiobook Generator with AI")]
 [assembly: AssemblyCopyright("Copyright © 2026")]
-[assembly: AssemblyVersion("1.6.0.0")]
-[assembly: AssemblyFileVersion("1.6.0.0")]
+[assembly: AssemblyVersion("1.6.1.0")]
+[assembly: AssemblyFileVersion("1.6.1.0")]
 
 namespace AudiobookInstaller
 {

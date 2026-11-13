@@ -6,6 +6,11 @@ All notable changes to **Audiobook Generator** — the free ebook to audiobook c
 
 ---
 
+## [1.6.1] — 2026-11-13
+
+### Changed
+- Other apps shows the current Audiobook Player icon.
+
 ## [1.6.0] — 2026-11-13
 
 ### Added

@@ -61,7 +61,7 @@ cat << 'PLIST' > "$APP_DIR/Contents/Info.plist"
   <key>CFBundleExecutable</key><string>launcher</string>
   <key>CFBundleIconFile</key><string>icon</string>
   <key>CFBundlePackageType</key><string>APPL</string>
-  <key>CFBundleShortVersionString</key><string>1.6.0</string>
+  <key>CFBundleShortVersionString</key><string>1.6.1</string>
 </dict>
 </plist>
 PLIST

@@ -17,7 +17,7 @@ export const OTHER_APPS: OtherApp[] = [
     id: 'audiobook-player',
     name: 'Audiobook Player',
     owner: 'thenauan',
-    icon: '/apps/audiobook-player.svg',
+    icon: '/apps/audiobook-player.png',
     url: 'https://github.com/thenauan/audiobook-player',
     appUrl: 'https://thenauan.github.io/audiobook-player/',
     description: 'Reprodutor de audiobooks gratuito com capítulos, texto sincronizado, marcações, fila, timer de sono e coleções.',
