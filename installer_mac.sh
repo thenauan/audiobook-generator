@@ -48,5 +48,24 @@ EOF
 
 chmod +x "$APP_DIR/Contents/MacOS/launcher"
 
+# Ícone e identificação do app (sem o Info.plist o macOS mostra o ícone genérico)
+cp "$DIR/public/icon.icns" "$APP_DIR/Contents/Resources/icon.icns"
+cat << 'PLIST' > "$APP_DIR/Contents/Info.plist"
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>CFBundleName</key><string>Audiobook Generator with AI</string>
+  <key>CFBundleDisplayName</key><string>Audiobook Generator with AI</string>
+  <key>CFBundleIdentifier</key><string>com.thenauan.audiobookgenerator</string>
+  <key>CFBundleExecutable</key><string>launcher</string>
+  <key>CFBundleIconFile</key><string>icon</string>
+  <key>CFBundlePackageType</key><string>APPL</string>
+  <key>CFBundleShortVersionString</key><string>1.6.0</string>
+</dict>
+</plist>
+PLIST
+touch "$APP_DIR"
+
 echo "Installation complete! An executable 'Audiobook Generator with AI.app' was created on your Desktop."
 

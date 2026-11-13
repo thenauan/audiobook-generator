@@ -121,7 +121,7 @@ export function Overlays() {
                         }}
                         className="space-y-3"
                       >
-                        <div className="flex items-center gap-2 rounded-2xl px-3.5 py-2.5 bg-black/5 dark:bg-white/5 border border-[var(--text-main)]/15 focus-within:border-winblue focus-within:bg-winblue/5 focus-within:shadow-[0_0_12px_rgba(var(--winblue-rgb),0.25)] transition-all">
+                        <div className="flex items-center gap-2 rounded-2xl px-3.5 py-2.5 bg-black/5 dark:bg-white/10 focus-within:bg-winblue/15 transition-all">
                           <input
                             type="text"
                             autoFocus
@@ -133,8 +133,6 @@ export function Overlays() {
                           {selectorInputValue && (
                             <motion.button
                               type="button"
-                              whileHover={{ scale: 1.15 }}
-                              whileTap={{ scale: 0.92 }}
                               onClick={() => setSelectorInputValue('')}
                               className="w-5 h-5 rounded-full bg-black/10 dark:bg-white/15 hover:bg-black/20 dark:hover:bg-white/25 text-[var(--text-muted)] hover:text-[var(--text-main)] dark:hover:text-white flex items-center justify-center shrink-0 transition-all cursor-pointer shadow-xs"
                               title="Limpar texto"
@@ -145,23 +143,19 @@ export function Overlays() {
                         </div>
 
                         <div className="flex items-center justify-end gap-2 pt-0.5">
-                          <motion.button
+                          <motion.button data-hover-grow
                             type="button"
-                            whileHover={{ scale: 1.08 }}
-                            whileTap={{ scale: 0.94 }}
                             onClick={close}
-                            className="h-7 px-3 rounded-full bg-card/75 border border-[var(--text-main)]/10 text-xs font-semibold text-[var(--text-main)] hover:bg-white/15 hover:border-white/25 hover:text-white hover:shadow-[0_0_12px_rgba(255,255,255,0.25)] transition-all cursor-pointer flex items-center justify-center gap-1.5"
+                            className="h-7 px-3 rounded-full bg-card/75 text-xs font-semibold text-[var(--text-main)] hover:bg-[var(--hover-fill)] hover:text-white transition-all cursor-pointer flex items-center justify-center gap-1.5"
                             title="Cancelar"
                           >
                             <X size={13} className="shrink-0" />
 <span>Cancelar</span>
                           </motion.button>
-                          <motion.button
+                          <motion.button data-hover-grow
                             type="submit"
-                            whileHover={{ scale: 1.08 }}
-                            whileTap={{ scale: 0.94 }}
                             disabled={!selectorInputValue.trim()}
-                            className="h-7 px-3.5 rounded-full bg-winblue/20 hover:bg-winblue/30 text-winblue border border-winblue/40 hover:border-winblue/75 hover:shadow-[0_0_14px_rgba(var(--winblue-rgb),0.4)] disabled:opacity-40 disabled:pointer-events-none text-xs font-bold transition-all cursor-pointer shadow-xs flex items-center justify-center gap-1.5"
+                            className="h-7 px-3.5 rounded-full bg-winblue/20 hover:bg-winblue/30 text-winblue disabled:opacity-40 disabled:pointer-events-none text-xs font-bold transition-all cursor-pointer shadow-xs flex items-center justify-center gap-1.5"
                             title="Salvar"
                           >
                             <Check size={13} className="shrink-0" />
@@ -174,13 +168,13 @@ export function Overlays() {
                     <div className="flex flex-col p-2">
                       {subpage ? (
                         // Segunda página: voltar (com o nome da primeira) e título centralizado
-                        <div className="px-1 pt-1 pb-1.5">
-                          <PopupBackHeader title={subpage.title} backLabel={sel.title} onBack={goBack} />
+                        <div className="px-1.5 pt-1.5 pb-2">
+                          <PopupBackHeader title={subpage.title} onBack={goBack} />
                         </div>
                       ) : !sel.hideTitle && (
                         // Título: mesmo estilo de Ordenar por (sem linhas divisórias, sem botão de X)
                         <div className="px-3 pt-2 pb-1.5">
-                          <h3 className="text-xl font-bold text-[var(--text-main)] truncate">{sel.title}</h3>
+                          <h3 className="text-sm font-bold text-[var(--text-main)] truncate">{sel.title}</h3>
                         </div>
                       )}
                       <div className="overflow-y-auto custom-scrollbar space-y-0.5 max-h-[320px]">
@@ -195,7 +189,7 @@ export function Overlays() {
                           return (
                             <React.Fragment key={idx}>
                               {showSection && (
-                                <div className={`px-3 pb-1 text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)] ${idx === 0 ? 'pt-0.5' : 'pt-2.5'}`}>
+                                <div className={`px-3 pb-1 text-xs font-semibold text-[var(--text-muted)] ${idx === 0 ? 'pt-0.5' : 'pt-2.5'}`}>
                                   {option.section}
                                 </div>
                               )}
@@ -220,21 +214,21 @@ export function Overlays() {
                                 }}
                                 className={`relative w-full flex items-center justify-between px-3 py-2 text-xs font-semibold rounded-2xl select-none transition-all duration-150 cursor-pointer group ${
                                   isSelected
-                                    ? 'hover:bg-winblue/25 hover:shadow-[0_0_12px_rgba(var(--winblue-rgb),0.3)]'
-                                    : 'hover:bg-white/15 hover:shadow-[0_0_12px_rgba(255,255,255,0.15)]'
+                                    ? 'hover:bg-winblue/25'
+                                    : 'hover:bg-[var(--hover-fill)]'
                                 }`}
                               >
                                 {isSelected && (
                                   <motion.div
                                     layoutId={sel.multi ? undefined : "setting-active-pill"}
-                                    className="absolute inset-0 bg-winblue/15 rounded-2xl shadow-[0_0_10px_rgba(var(--winblue-rgb),0.2)] pointer-events-none z-0"
+                                    className="absolute inset-0 bg-winblue/15 rounded-2xl pointer-events-none z-0"
                                     transition={{ type: "spring", stiffness: 520, damping: 36, mass: 0.55 }}
                                   />
                                 )}
                                 <div className={`relative z-10 flex items-center gap-2.5 min-w-0 transition-colors ${isSelected ? 'text-winblue font-bold' : 'text-[var(--text-main)]'}`}>
                                   {option.colorPreview ? (
                                     <div
-                                      className="w-4 h-4 rounded-full border border-black/10 dark:border-white/20 shrink-0 shadow-sm"
+                                      className="w-4 h-4 rounded-full shrink-0 shadow-sm"
                                       style={{ backgroundColor: option.colorPreview }}
                                     />
                                   ) : option.icon ? (
@@ -309,11 +303,11 @@ export function Overlays() {
               style={getButtonCoverPopupStyle(sortMenuAnchor, 256, 285, 'right')}
               data-popup-content="true"
               onClick={(e) => e.stopPropagation()}
-              className="w-64 bg-card/95 backdrop-blur-3xl border border-[var(--button-secondary-bg)] rounded-[24px] shadow-2xl z-[9999] p-2 flex flex-col text-left overflow-hidden"
+              className="w-64 bg-card/95 backdrop-blur-3xl rounded-[24px] shadow-2xl z-[9999] p-2 flex flex-col text-left overflow-hidden"
             >
               {/* Título: Ordenar por (maiúsculas e minúsculas, sem linhas divisórias) */}
               <div className="px-3 pt-2 pb-1.5">
-                <h3 className="text-xl font-bold text-[var(--text-main)]">{t.sortBy || 'Ordenar por'}</h3>
+                <h3 className="text-sm font-bold text-[var(--text-main)]">{t.sortBy || 'Ordenar por'}</h3>
               </div>
 
               <div className="space-y-0.5">
@@ -332,14 +326,14 @@ export function Overlays() {
                       onClick={() => handleSelectSort(opt.id as SortOption)}
                       className={`relative w-full flex items-center justify-between px-3 py-2 text-xs font-semibold rounded-2xl select-none transition-all duration-150 group cursor-pointer ${
                         isSelected
-                          ? 'hover:bg-winblue/25 hover:shadow-[0_0_12px_rgba(var(--winblue-rgb),0.3)]'
-                          : 'hover:bg-white/15 hover:shadow-[0_0_12px_rgba(255,255,255,0.15)]'
+                          ? 'hover:bg-winblue/25'
+                          : 'hover:bg-[var(--hover-fill)]'
                       }`}
                     >
                       {isSelected && (
                         <motion.div
                           layoutId="sort-active-pill"
-                          className="absolute inset-0 bg-winblue/15 rounded-2xl shadow-[0_0_10px_rgba(var(--winblue-rgb),0.2)] pointer-events-none z-0"
+                          className="absolute inset-0 bg-winblue/15 rounded-2xl pointer-events-none z-0"
                           transition={{ type: "spring", stiffness: 520, damping: 36, mass: 0.55 }}
                         />
                       )}
@@ -380,12 +374,12 @@ export function Overlays() {
               key={`book-menu-${activeBookMenu.item.id}`}
               activeKey={activeBookMenu.mode || 'options'}
               direction={activeBookMenu.direction ?? (activeBookMenu.mode === 'options' ? -1 : 1)}
-              targetWidth={activeBookMenu.mode === 'details' ? 380 : activeBookMenu.mode === 'generate-text' ? 320 : activeBookMenu.mode === 'confirm-delete' ? 280 : 230}
+              targetWidth={activeBookMenu.mode === 'details' ? 280 : activeBookMenu.mode === 'generate-text' ? 320 : activeBookMenu.mode === 'confirm-delete' ? 280 : 230}
               targetRadius={24}
               style={getButtonCoverPopupStyle(
                 activeBookMenu.anchorEl,
-                activeBookMenu.mode === 'details' ? 380 : activeBookMenu.mode === 'generate-text' ? 320 : activeBookMenu.mode === 'confirm-delete' ? 280 : 230,
-                activeBookMenu.mode === 'details' ? 420 : activeBookMenu.mode === 'generate-text' ? 210 : activeBookMenu.mode === 'confirm-delete' ? 210 : 280,
+                activeBookMenu.mode === 'details' ? 280 : activeBookMenu.mode === 'generate-text' ? 320 : activeBookMenu.mode === 'confirm-delete' ? 280 : 230,
+                activeBookMenu.mode === 'details' ? 300 : activeBookMenu.mode === 'generate-text' ? 210 : activeBookMenu.mode === 'confirm-delete' ? 210 : 280,
                 'right'
               )}
               className="text-[var(--text-main)]"
@@ -466,8 +460,6 @@ export function Overlays() {
                           </p>
                         </div>
                         <motion.button
-                          whileHover={{ scale: 1.05 }}
-                          whileTap={{ scale: 0.95 }}
                           onClick={(e) => {
                             e.stopPropagation();
                             const targetPath = activeBookMenu.item.path || `audiobook-generatior/audiobooks/${activeBookMenu.item.title}.m4b`;
@@ -478,7 +470,7 @@ export function Overlays() {
                             });
                             showToast("Abrindo pasta no Explorer...");
                           }}
-                          className="shrink-0 h-8 px-3.5 rounded-full bg-card/75 backdrop-blur-3xl border border-[var(--text-main)]/10 shadow-sm text-[var(--text-main)] hover:bg-white/15 hover:border-white/25 hover:shadow-[0_0_12px_rgba(255,255,255,0.2)] flex items-center justify-center text-xs font-semibold transition-all cursor-pointer gap-1.5"
+                          className="shrink-0 h-8 px-3.5 rounded-full bg-card/75 backdrop-blur-3xl shadow-sm text-[var(--text-main)] hover:bg-[var(--hover-fill)] flex items-center justify-center text-xs font-semibold transition-all cursor-pointer gap-1.5"
                           title="Ver na pasta"
                         >
                           <span>Ver na pasta</span>
@@ -524,12 +516,7 @@ export function Overlays() {
                 </div>
               ) : (
                 <div className="flex flex-col space-y-0.5 p-2">
-                  <MenuOptionItem icon={<Edit3 size={14} />} onClick={() => handleStartEditBook(activeBookMenu.item)}>
-                    Editar dados
-                  </MenuOptionItem>
-                  <MenuOptionItem icon={<Info size={14} />} onClick={() => setActiveBookMenu({ ...activeBookMenu, mode: 'details', direction: 1 })}>
-                    Mais detalhes
-                  </MenuOptionItem>
+                  {/* Ouvir trecho vem primeiro */}
                   {activeBookMenu.item.path && (
                     <MenuOptionItem
                       icon={playingSnippet?.path === activeBookMenu.item.path ? <Pause size={14} /> : <Play size={14} />}
@@ -542,6 +529,12 @@ export function Overlays() {
                       {playingSnippet?.path === activeBookMenu.item.path ? 'Parar Áudio' : 'Ouvir Trecho'}
                     </MenuOptionItem>
                   )}
+                  <MenuOptionItem icon={<Edit3 size={14} />} onClick={() => handleStartEditBook(activeBookMenu.item)}>
+                    Editar dados
+                  </MenuOptionItem>
+                  <MenuOptionItem icon={<Info size={14} />} onClick={() => setActiveBookMenu({ ...activeBookMenu, mode: 'details', direction: 1 })}>
+                    Mais detalhes
+                  </MenuOptionItem>
                   {activeBookMenu.item.path && (
                     <MenuOptionItem
                       icon={<FolderOpen size={14} />}
@@ -600,9 +593,9 @@ export function Overlays() {
               key={`text-menu-${activeTextMenu.item.id}`}
               activeKey={activeTextMenu.mode || 'options'}
               direction={activeTextMenu.direction ?? (activeTextMenu.mode === 'details' ? 1 : -1)}
-              targetWidth={activeTextMenu.mode === 'details' ? 340 : activeTextMenu.mode === 'confirm-delete' ? 280 : 230}
+              targetWidth={activeTextMenu.mode === 'details' ? 280 : activeTextMenu.mode === 'confirm-delete' ? 280 : 230}
               targetRadius={24}
-              style={getButtonCoverPopupStyle(activeTextMenu.anchorEl, activeTextMenu.mode === 'details' ? 340 : activeTextMenu.mode === 'confirm-delete' ? 280 : 230, activeTextMenu.mode === 'details' ? 260 : activeTextMenu.mode === 'confirm-delete' ? 210 : 280, 'right')}
+              style={getButtonCoverPopupStyle(activeTextMenu.anchorEl, activeTextMenu.mode === 'details' ? 280 : activeTextMenu.mode === 'confirm-delete' ? 280 : 230, activeTextMenu.mode === 'details' ? 260 : activeTextMenu.mode === 'confirm-delete' ? 210 : 280, 'right')}
               className="text-[var(--text-main)]"
             >
               {activeTextMenu.mode === 'confirm-delete' ? (
@@ -735,24 +728,22 @@ export function Overlays() {
             onClose={() => { setViewingTextModal(null); setViewingTextAnchor(null); }}
             className="p-3 max-h-[min(560px,calc(100vh-48px))]"
           >
-            <div className="relative flex items-center justify-center min-h-8 px-10">
-              <h4 className="text-xl font-bold text-[var(--text-main)] truncate text-center">{viewingTextModal.title}</h4>
+            <div className="relative flex items-center min-h-8 pl-1.5 pr-10 rtl:pl-10 rtl:pr-1.5">
+              <h4 className="text-sm font-bold text-[var(--text-main)] truncate text-left rtl:text-right">{viewingTextModal.title}</h4>
               <motion.button
                 type="button"
-                whileHover={{ scale: 1.12 }}
-                whileTap={{ scale: 0.92 }}
                 onClick={() => {
                   navigator.clipboard.writeText(viewingTextModal.content);
                   showToast("Texto copiado para a área de transferência!");
                 }}
-                className="absolute right-0 rtl:right-auto rtl:left-0 top-0 w-8 h-8 rounded-full flex items-center justify-center bg-card/75 border border-[var(--text-main)]/10 text-[var(--text-main)] hover:bg-white/15 hover:border-white/25 hover:shadow-[0_0_12px_rgba(255,255,255,0.25)] transition-[background-color,border-color,box-shadow] cursor-pointer"
+                className="absolute right-0 rtl:right-auto rtl:left-0 top-0 w-8 h-8 rounded-full flex items-center justify-center bg-card/75 text-[var(--text-main)] hover:bg-[var(--hover-fill)] transition-[background-color,border-color,box-shadow] cursor-pointer"
                 title="Copiar texto"
                 aria-label="Copiar texto"
               >
                 <Copy size={14} />
               </motion.button>
             </div>
-            <p className="text-[11px] text-[var(--text-muted)] text-center truncate mt-0.5 mb-2 px-2">
+            <p className="text-[11px] text-[var(--text-muted)] text-left rtl:text-right truncate mt-0.5 mb-2 px-1.5">
               {viewingTextModal.author ? `${viewingTextModal.author} • ` : ''}{viewingTextModal.genre} • {viewingTextModal.wordCount} palavras • {viewingTextModal.date}
             </p>
             <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar px-2 pb-1 text-sm leading-relaxed text-[var(--text-main)] whitespace-pre-wrap font-serif select-text">

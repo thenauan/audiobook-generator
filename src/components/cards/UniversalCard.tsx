@@ -67,7 +67,7 @@ export const UniversalCard: React.FC<UniversalCardProps> = ({
         />
 
         {badgeText && (
-          <div className="absolute top-2.5 left-2.5 z-10 h-6 px-2.5 rounded-full bg-black/60 backdrop-blur-md border border-white/30 flex items-center gap-1 shadow-lg text-white pointer-events-none text-[10px] font-bold">
+          <div className="absolute top-2.5 left-2.5 z-10 h-6 px-2.5 rounded-full bg-black/60 backdrop-blur-md flex items-center gap-1 shadow-lg text-white pointer-events-none text-[10px] font-bold">
             {badgeIcon}
             <span>{badgeText}</span>
           </div>
@@ -78,14 +78,12 @@ export const UniversalCard: React.FC<UniversalCardProps> = ({
         {onAction && !selectMode && (
           <div className="absolute inset-0 bg-black/30 opacity-0 group-hover/card:opacity-100 transition-opacity duration-300 flex items-center justify-center pointer-events-none">
             <motion.button
-              whileHover={{ scale: 1.15 }}
-              whileTap={{ scale: 0.9 }}
               title={actionTooltip}
               onClick={(e) => {
                 e.stopPropagation();
                 onAction();
               }}
-              className="w-13 h-13 rounded-full bg-white/20 hover:bg-white/30 backdrop-blur-2xl border border-white/30 hover:border-white/75 shadow-2xl flex items-center justify-center text-white pointer-events-auto hover:shadow-[0_0_25px_rgba(255,255,255,0.65)] cursor-pointer"
+              className="w-13 h-13 rounded-full bg-white/20 hover:bg-white/30 backdrop-blur-2xl shadow-2xl flex items-center justify-center text-white pointer-events-auto cursor-pointer"
             >
               {actionIcon || (
                 <span className="translate-x-[2px] transition-colors">
@@ -116,9 +114,7 @@ export const UniversalCard: React.FC<UniversalCardProps> = ({
 
         {onOptions && !selectMode && (
           <div className={`relative w-8 h-8 shrink-0 ${isMenuOpen ? 'opacity-100' : 'opacity-0 group-hover/card:opacity-100'} transition-opacity duration-200`}>
-            <motion.button
-              whileHover={{ scale: 1.15 }}
-              whileTap={{ scale: 0.92 }}
+            <motion.button data-popup-trigger
               animate={isMenuOpen ? { scale: 1.22, opacity: 0, pointerEvents: 'none' } : { scale: 1, opacity: 1, pointerEvents: 'auto' }}
               transition={{ type: "spring", stiffness: 500, damping: 30 }}
               onClick={(e) => {
@@ -126,7 +122,7 @@ export const UniversalCard: React.FC<UniversalCardProps> = ({
                 clearButtonCoverAnchorCache(e.currentTarget);
                 onOptions(e.currentTarget);
               }}
-              className="w-8 h-8 flex items-center justify-center rounded-full backdrop-blur-3xl border border-[var(--text-main)]/10 text-[var(--text-main)] bg-card/75 hover:bg-white/15 hover:border-white/25 hover:shadow-[0_0_12px_rgba(255,255,255,0.2)] transition-all cursor-pointer"
+              className="w-8 h-8 flex items-center justify-center rounded-full backdrop-blur-3xl text-[var(--text-main)] bg-card/75 hover:bg-[var(--hover-fill)] transition-all cursor-pointer"
             >
               <MoreHorizontal size={16} />
             </motion.button>

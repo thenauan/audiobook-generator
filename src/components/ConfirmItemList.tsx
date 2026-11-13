@@ -13,12 +13,12 @@ export function ConfirmItemList({ items }: { items: ConfirmItem[] }) {
   return (
     <div className="max-h-[220px] overflow-y-auto custom-scrollbar -mx-1 px-1 mb-4 space-y-1">
       {items.map(item => (
-        <div key={item.id} className="flex items-center gap-3 p-1.5 rounded-2xl bg-black/5 dark:bg-white/5">
+        <div key={item.id} className="flex items-center gap-3 p-1.5 rounded-2xl bg-black/5 dark:bg-white/10">
           <img
             src={item.cover}
             alt=""
             draggable={false}
-            className={`shrink-0 object-cover shadow-sm border border-white/10 ${item.shape === 'square' ? 'w-9 h-9 rounded-xl' : 'w-8 h-12 rounded-lg'}`}
+            className={`shrink-0 object-cover shadow-sm ${item.shape === 'square' ? 'w-9 h-9 rounded-xl' : 'w-8 h-12 rounded-lg'}`}
           />
           <div className="min-w-0">
             <p className="text-xs font-bold text-[var(--text-main)] truncate">{item.title}</p>

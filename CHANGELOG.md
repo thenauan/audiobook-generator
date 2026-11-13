@@ -6,6 +6,30 @@ All notable changes to **Audiobook Generator** — the free ebook to audiobook c
 
 ---
 
+## [1.6.0] — 2026-11-13
+
+### Added
+- **New app icon** in every place: window, taskbar, Dock, shortcuts, launchers and installers. Small sizes are drawn for each size, so the icon stays sharp in the taskbar and the window title.
+- **New sidebar title:** the app symbol followed by "Generator", like the Audiobook Player.
+- **"Loading e-book metadata…"** on the card while a book is being read; until title and author arrive, only Delete works and Convert waits.
+- Confirmation before deleting a chapter marker in the metadata editor, growing from the button like the other confirmations.
+
+### Changed
+- **Same look and feel as the Audiobook Player:** iOS blue as the default accent (orange stays as an option, the other colors are softer), pure black dark mode and white light mode, the Player's glass, outlines and shadows, the system font, and the Player's press and hover springs on every button. Header buttons, buttons that open pop-ups and action buttons inside pop-ups grow on hover and have a shadow.
+- **Faster metadata:** a reader is kept ready in the background, so title, author and cover show up in about 0.2 s instead of 1.5 s, and the whole book is read in about 0.5 s.
+- Surfaces stand out from the background in both themes (light gray in light mode, iOS gray fill in dark mode), including the sidebar.
+- Font size works like the Audiobook Player: Standard and Large (+20%). "Small" was the same size as Standard; it moves to Standard.
+- "Close app" is a red pill with its name and closes right away, like in the Player.
+- Pop-ups with a back button show "More options" on it and center their title. "Mais detalhes" is smaller and stays next to the button that opened it.
+- Initial setup: the content scrolls under the buttons with a progressive blur, the description sits under the title, and on a voice the icon itself becomes the play button.
+- Synopsis accepts up to 2,000 characters. In Converted, "See all" appears only with more than 6 items, and "Play snippet" is first in the audiobook options.
+- Release notes in Settings show their section names in the app language ("Added", "Fixed"…), not in capitals.
+- Launchers start the Electron installed in the app folder (faster, no terminal window), with `npx electron` as a fallback.
+
+### Fixed
+- Leftover outlines around title and author fields, the long-chapter notice and other items; group names in the genre pop-ups were all in capitals.
+- A new version could open with the old interface or icon kept in the cache for up to an hour.
+
 ## [1.5.2] — 2026-11-11
 
 ### Fixed

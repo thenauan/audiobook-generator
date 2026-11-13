@@ -164,7 +164,7 @@ export function MobileSheet({
             dragElastic={{ top: 0, bottom: 0.7 }}
             onDragEnd={onDragEnd}
             className={isDesktop
-              ? "fixed z-[9001] left-1/2 top-1/2 w-[560px] max-w-[calc(100vw-48px)] max-h-[86vh] -ml-[280px] flex flex-col rounded-[32px] bg-[var(--bg-sheet)] border border-[var(--button-secondary-bg)] shadow-2xl overflow-hidden text-[var(--text-main)]"
+              ? "fixed z-[9001] left-1/2 top-1/2 w-[560px] max-w-[calc(100vw-48px)] max-h-[86vh] -ml-[280px] flex flex-col rounded-[32px] bg-[var(--bg-sheet)] shadow-2xl overflow-hidden text-[var(--text-main)]"
               : "fixed inset-x-0 z-[9001] flex flex-col rounded-t-[38px] bg-[var(--bg-sheet)] shadow-[0_-12px_40px_-12px_rgba(0,0,0,0.45)] overflow-hidden text-[var(--text-main)]"}
             style={isDesktop ? { translate: '0 -50%' } : {
               top: 'calc(var(--safe-top) + 12px)',
@@ -183,7 +183,7 @@ export function MobileSheet({
                   onPointerDown={(e) => e.stopPropagation()}
                   onClick={onClose}
                   aria-label={closeLabel}
-                  className="mobile-press absolute left-0 rtl:left-auto rtl:right-0 w-11 h-11 rounded-full flex items-center justify-center bg-card/75 border border-[var(--text-main)]/10 shadow-xl backdrop-blur-3xl text-[var(--text-main)]"
+                  className="mobile-press absolute left-0 rtl:left-auto rtl:right-0 w-11 h-11 rounded-full flex items-center justify-center bg-card/75 shadow-xl backdrop-blur-3xl text-[var(--text-main)]"
                 >
                   <ChevronLeft size={20} className="rtl:rotate-180" />
                 </button>

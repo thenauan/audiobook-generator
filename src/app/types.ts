@@ -86,6 +86,8 @@ export interface AppFile {
   coverColorUser?: boolean;
   audioSizeEst?: string;
   metadataStatus?: 'loading' | 'loaded' | 'error';
+  /** Título, autor e capa já chegaram (o resto do livro ainda está sendo lido) */
+  metadataPartial?: boolean;
   phaseStartTime?: number;
   generatedPaths?: string[];
   generateSyncText?: boolean;

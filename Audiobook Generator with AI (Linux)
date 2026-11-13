@@ -1,7 +1,8 @@
 #!/bin/bash
-# Get the root directory of the project
+# Abre o Audiobook Generator with AI. Usa o Electron da pasta do app (mais rápido); sem ele, usa o npx
 cd "$(dirname "$0")"
-
-# Run the electron app
-npx electron electron-main.cjs
-
+unset ELECTRON_RUN_AS_NODE
+if [ -x "./node_modules/.bin/electron" ]; then
+  exec ./node_modules/.bin/electron electron-main.cjs
+fi
+exec npx electron electron-main.cjs

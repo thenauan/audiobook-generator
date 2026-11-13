@@ -1,11 +1,11 @@
 #!/bin/bash
-# Get the root directory of the project (3 levels up from Contents/MacOS)
+# Abre o Audiobook Generator with AI (pasta do app: 3 níveis acima de Contents/MacOS)
 APP_DIR="$(cd "$(dirname "$0")/../../.." && pwd)"
 cd "$APP_DIR"
-
-# Ensure common paths are available (like node/npm)
+# Caminhos comuns do Node no Mac (Homebrew em Intel e Apple Silicon)
 export PATH="/usr/local/bin:/opt/homebrew/bin:$PATH"
-
-# Run the electron app
-npx electron electron-main.cjs
-
+unset ELECTRON_RUN_AS_NODE
+if [ -x "./node_modules/.bin/electron" ]; then
+  exec ./node_modules/.bin/electron electron-main.cjs
+fi
+exec npx electron electron-main.cjs

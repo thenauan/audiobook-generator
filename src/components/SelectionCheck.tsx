@@ -21,7 +21,7 @@ export function SelectionCheck({ active, selected, onToggle, rounded = 'rounded-
           className={cn(
             'absolute inset-0 z-20 cursor-pointer transition-[background-color,box-shadow] duration-200',
             rounded,
-            selected ? 'bg-winblue/20 shadow-[0_0_18px_rgba(var(--winblue-rgb),0.45)]' : 'bg-black/25 hover:bg-black/15'
+            selected ? 'bg-winblue/20' : 'bg-black/25 hover:bg-black/15'
           )}
         >
           <motion.span
@@ -30,7 +30,7 @@ export function SelectionCheck({ active, selected, onToggle, rounded = 'rounded-
             transition={{ type: 'spring', stiffness: 520, damping: 28 }}
             className={cn(
               'absolute top-2.5 right-2.5 w-7 h-7 rounded-full border-2 flex items-center justify-center shadow-lg',
-              selected ? 'bg-winblue border-winblue text-white' : 'bg-black/35 border-white/80 text-transparent'
+              selected ? 'bg-winblue text-white' : 'bg-black/35 text-transparent'
             )}
           >
             <Check size={15} strokeWidth={3} />

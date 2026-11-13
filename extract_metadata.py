@@ -8,9 +8,7 @@ import os
 import re
 import sys
 
-import mobi
-from bs4 import BeautifulSoup
-from pypdf import PdfReader
+# mobi, bs4 e pypdf carregam só quando o formato pede (somam ~0,4 s na abertura)
 
 
 def normalize_language_name(lang_str):
@@ -147,6 +145,7 @@ def extract_metadata(file_path, original_name=None, ao_parcial=None):
             if livro["cover"]:
                 cover_data = _capa_data_url(*livro["cover"])
         elif ext == '.pdf':
+            from pypdf import PdfReader
             reader = PdfReader(file_path)
             if reader.is_encrypted:
                 try:
@@ -164,6 +163,7 @@ def extract_metadata(file_path, original_name=None, ao_parcial=None):
             except Exception:
                 pass
         elif ext in ('.mobi', '.azw', '.azw3', '.prc'):
+            import mobi
             temp_dir, arquivo = mobi.extract(file_path)
             try:
                 if arquivo.lower().endswith('.epub'):
@@ -178,6 +178,7 @@ def extract_metadata(file_path, original_name=None, ao_parcial=None):
                     cab = open(arquivo, 'rb').read(200000).decode('utf-8', 'replace')
                     m = re.search(r'<title>(.*?)</title>', cab, re.IGNORECASE | re.DOTALL)
                     if m:
+                        from bs4 import BeautifulSoup
                         title = BeautifulSoup(m.group(1), 'html.parser').get_text().strip()
             finally:
                 import shutil
@@ -265,14 +266,28 @@ if __name__ == "__main__":
     if len(sys.argv) < 2:
         print(json.dumps({"error": "No file path provided"}))
         sys.exit(1)
-    caminho = sys.argv[1]
+    nome_original = sys.argv[2] if len(sys.argv) > 2 else None
+    if sys.argv[1] == "--esperar":
+        # Processo deixado pronto pelo servidor: carrega tudo agora e espera o livro numa linha JSON
+        # [caminho, nome original]. Ao carregar um e-book, a leitura começa sem esperar o Python abrir
+        import book_structure  # noqa: F401
+        try:
+            import langdetect  # noqa: F401
+        except Exception:
+            pass
+        linha = sys.stdin.readline()
+        if not linha.strip():
+            sys.exit(0)
+        caminho, nome_original = json.loads(linha)
+    else:
+        caminho = sys.argv[1]
     if not os.path.exists(caminho):
         print(json.dumps({"error": "File not found"}))
         sys.exit(1)
     try:
         def parcial(dados):
             print(json.dumps(dados, ensure_ascii=False), flush=True)
-        print(json.dumps(extract_metadata(caminho, sys.argv[2] if len(sys.argv) > 2 else None, parcial), ensure_ascii=False), flush=True)
+        print(json.dumps(extract_metadata(caminho, nome_original, parcial), ensure_ascii=False), flush=True)
     except Exception as e:
         print(json.dumps({"error": str(e)}, ensure_ascii=False))
         sys.exit(1)

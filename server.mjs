@@ -271,6 +271,42 @@ async function startServer() {
     const proximo = metaFila.shift();
     if (proximo) proximo();
   };
+  let leitorPronto = null;
+  const prepararLeitor = () => {
+    if (leitorPronto && leitorPronto.exitCode === null && !leitorPronto.killed) return;
+    try {
+      const p = spawn(PYTHON_CMD, ["extract_metadata.py", "--esperar"], { env: PY_ENV, windowsHide: true });
+      p.on("error", () => {
+        if (leitorPronto === p) leitorPronto = null;
+      });
+      p.on("exit", () => {
+        if (leitorPronto === p) leitorPronto = null;
+      });
+      p.stdin?.on("error", () => {
+      });
+      leitorPronto = p;
+    } catch {
+      leitorPronto = null;
+    }
+  };
+  const pegarLeitorPronto = (caminho, nome) => {
+    const p = leitorPronto;
+    leitorPronto = null;
+    setTimeout(prepararLeitor, 300);
+    if (p && p.exitCode === null && !p.killed && p.stdin?.writable) {
+      p.stdin.write(JSON.stringify([caminho, nome]) + "\n");
+      p.stdin.end();
+      return p;
+    }
+    return spawn(PYTHON_CMD, ["extract_metadata.py", caminho, nome], { env: PY_ENV, windowsHide: true });
+  };
+  setTimeout(prepararLeitor, 4e3);
+  process.on("exit", () => {
+    try {
+      leitorPronto?.kill();
+    } catch {
+    }
+  });
   app.post("/api/metadata", (req, res, next) => {
     console.log("Incoming metadata request...");
     upload.single("file")(req, res, (err) => {
@@ -299,7 +335,7 @@ async function startServer() {
           metaSair();
         }
       };
-      const pythonProcess = spawn(PYTHON_CMD, ["extract_metadata.py", newPath, originalName], { env: PY_ENV, windowsHide: true });
+      const pythonProcess = pegarLeitorPronto(newPath, originalName);
       const metaTimer = setTimeout(() => {
         try {
           pythonProcess.kill();
@@ -1227,9 +1263,11 @@ ${stderrTail.trim().split("\n").slice(-25).join("\n") || "(nenhuma mensagem)"}`
     app.use(vite.middlewares);
   } else {
     const distPath = path.join(process.cwd(), "dist");
-    app.use(express.static(distPath, { index: false, maxAge: "1h" }));
+    app.use("/assets", express.static(path.join(distPath, "assets"), { index: false, maxAge: "30d", immutable: true }));
+    app.use(express.static(distPath, { index: false, maxAge: 0 }));
     app.use(express.static(path.join(process.cwd(), "public")));
     app.get("*", (req, res) => {
+      res.setHeader("Cache-Control", "no-store");
       res.sendFile(path.join(distPath, "index.html"));
     });
   }

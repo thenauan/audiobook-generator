@@ -60,7 +60,7 @@ export function SearchScreen() {
                     <Clock size={16} className="text-[var(--text-muted)] group-hover:hidden transition-colors" />
                     <div className="hidden group-hover:flex items-center justify-center relative">
                       <div className="absolute w-4 h-4 bg-white/70 blur-[6px] rounded-full pointer-events-none" />
-                      <Search size={16} className="relative z-10 text-white drop-shadow-[0_0_8px_rgba(255,255,255,0.95)]" />
+                      <Search size={16} className="relative z-10 text-white" />
                     </div>
                   </div>
                   <span className="text-sm font-semibold text-[var(--text-main)] transition-colors truncate">{term}</span>

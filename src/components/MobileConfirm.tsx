@@ -37,7 +37,7 @@ export function MobileConfirmCard({
         exit={{ y: '110%' }}
         transition={{ type: 'spring', stiffness: 440, damping: 40, mass: 0.7 }}
         onClick={(e) => e.stopPropagation()}
-        className="fixed z-[9501] rounded-[36px] bg-card/95 backdrop-blur-3xl border border-[var(--button-secondary-bg)] shadow-2xl text-[var(--text-main)] overflow-hidden"
+        className="fixed z-[9501] rounded-[36px] bg-card/95 backdrop-blur-3xl shadow-2xl text-[var(--text-main)] overflow-hidden"
         style={{
           left: 'max(12px, var(--safe-left))',
           right: 'max(12px, var(--safe-right))',

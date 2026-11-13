@@ -1,13 +1,13 @@
 // ===== Tela: settings-interface =====
 import { motion } from 'motion/react';
-import { Moon, ChevronDown, Globe, Palette, Type, Monitor, Sun, AArrowDown, AArrowUp } from 'lucide-react';
+import { Moon, ChevronDown, Globe, Palette, Type, Monitor, Sun, ALargeSmall } from 'lucide-react';
 import { SettingToggle } from '../components/cards/SettingToggle';
 import { transicaoConteudo } from '../navigation/transitions';
 import { useApp } from '../app/AppContext';
 import { AVISO_TRADUCAO_AUTOMATICA } from '../lib/autoTranslate';
 
 export function SettingsInterfaceScreen() {
-  const { accentPalette, accentColor, setAccentColor, themeMode, setThemeMode, uiFontSize, setUiFontSize, interfaceLang, setInterfaceLang, activeSettingSelector, setActiveSettingSelector } = useApp();
+  const { accentPalette, accentColor, setAccentColor, themeMode, setThemeMode, uiFontSize, setUiFontSize, interfaceLang, setInterfaceLang, activeSettingSelector, setActiveSettingSelector } = useApp();
   return (
     <motion.div
       key="screen-settings-interface"
@@ -23,7 +23,7 @@ export function SettingsInterfaceScreen() {
 
       <div className="space-y-2.5">
         {/* 1. Tema */}
-        <div className="settings-list-row py-3 sm:py-3.5 px-4 sm:px-5 rounded-[32px] bg-card/60 backdrop-blur-xl border border-[var(--text-main)]/10 transition-colors flex items-center justify-between gap-4">
+        <div className="settings-list-row py-3 sm:py-3.5 px-4 sm:px-5 rounded-[32px] bg-card/60 backdrop-blur-xl transition-colors flex items-center justify-between gap-4">
           <div className="flex items-center gap-4">
             <div className="w-10 h-10 rounded-full bg-winblue/10 text-winblue flex items-center justify-center shrink-0">
               <Moon size={20} />
@@ -33,9 +33,7 @@ export function SettingsInterfaceScreen() {
               <span className="text-xs sm:text-sm text-[var(--text-muted)] mt-0.5">Aparência clara, escura ou automática</span>
             </div>
           </div>
-          <motion.button 
-            whileHover={{ scale: 1.06 }} 
-            whileTap={{ scale: 0.94 }}
+          <motion.button data-popup-trigger
             animate={activeSettingSelector?.id === 'theme' ? { scale: 1.22, opacity: 0, pointerEvents: 'none' } : { scale: 1, opacity: 1, pointerEvents: 'auto' }}
             transition={{ type: "spring", stiffness: 500, damping: 30 }}
             onClick={(e) => {
@@ -56,7 +54,7 @@ export function SettingsInterfaceScreen() {
                 onSelect: (val) => setThemeMode(val)
               });
             }}
-            className="h-8 pl-3.5 pr-2.5 rounded-full bg-card/75 backdrop-blur-3xl border border-[var(--text-main)]/10 shadow-sm text-[var(--text-main)] hover:bg-white/15 hover:border-white/25 hover:shadow-[0_0_12px_rgba(255,255,255,0.2)] flex items-center gap-1.5 text-xs font-semibold transition-all shrink-0 cursor-pointer [&_svg]:text-inherit"
+            className="h-8 pl-3.5 pr-2.5 rounded-full bg-card/75 backdrop-blur-3xl shadow-sm text-[var(--text-main)] hover:bg-[var(--hover-fill)] flex items-center gap-1.5 text-xs font-semibold transition-all shrink-0 cursor-pointer [&_svg]:text-inherit"
           >
             <span>{themeMode === 'system' ? 'Modo do sistema' : themeMode === 'light' ? 'Claro' : 'Escuro'}</span>
             <ChevronDown size={14} className="-mr-0.5 text-inherit" />
@@ -64,7 +62,7 @@ export function SettingsInterfaceScreen() {
         </div>
 
         {/* 2. Cor de destaque */}
-        <div className="settings-list-row py-3 sm:py-3.5 px-4 sm:px-5 rounded-[32px] bg-card/60 backdrop-blur-xl border border-[var(--text-main)]/10 transition-colors flex items-center justify-between gap-4">
+        <div className="settings-list-row py-3 sm:py-3.5 px-4 sm:px-5 rounded-[32px] bg-card/60 backdrop-blur-xl transition-colors flex items-center justify-between gap-4">
           <div className="flex items-center gap-4">
             <div className="w-10 h-10 rounded-full bg-winblue/10 text-winblue flex items-center justify-center shrink-0">
               <Palette size={20} />
@@ -74,9 +72,7 @@ export function SettingsInterfaceScreen() {
               <span className="text-xs sm:text-sm text-[var(--text-muted)] mt-0.5">Cor principal dos botões e detalhes</span>
             </div>
           </div>
-          <motion.button 
-            whileHover={{ scale: 1.06 }} 
-            whileTap={{ scale: 0.94 }}
+          <motion.button data-popup-trigger
             animate={activeSettingSelector?.id === 'accent-color' ? { scale: 1.22, opacity: 0, pointerEvents: 'none' } : { scale: 1, opacity: 1, pointerEvents: 'auto' }}
             transition={{ type: "spring", stiffness: 500, damping: 30 }}
             onClick={(e) => {
@@ -96,16 +92,16 @@ export function SettingsInterfaceScreen() {
                 onSelect: (val) => setAccentColor(val)
               });
             }}
-            className="h-8 pl-3 pr-2.5 rounded-full bg-card/75 backdrop-blur-3xl border border-[var(--text-main)]/10 shadow-sm text-[var(--text-main)] hover:bg-white/15 hover:border-white/25 hover:shadow-[0_0_12px_rgba(255,255,255,0.2)] flex items-center gap-1.5 text-xs font-semibold transition-all shrink-0 cursor-pointer [&_svg]:text-inherit"
+            className="h-8 pl-3 pr-2.5 rounded-full bg-card/75 backdrop-blur-3xl shadow-sm text-[var(--text-main)] hover:bg-[var(--hover-fill)] flex items-center gap-1.5 text-xs font-semibold transition-all shrink-0 cursor-pointer [&_svg]:text-inherit"
           >
-            <div className="w-3.5 h-3.5 rounded-full border border-black/10 dark:border-white/20 shrink-0" style={{ backgroundColor: accentPalette[accentColor]?.hex || '#0086F0' }} />
+            <div className="w-3.5 h-3.5 rounded-full border border-black/10 dark:border-white/20 shrink-0" style={{ backgroundColor: accentPalette[accentColor]?.hex || '#0066CC' }} />
             <span>{accentPalette[accentColor]?.name || 'Azul'}</span>
             <ChevronDown size={14} className="-mr-0.5 text-inherit" />
           </motion.button>
         </div>
 
         {/* 3. Tamanho da fonte */}
-        <div className="settings-list-row py-3 sm:py-3.5 px-4 sm:px-5 rounded-[32px] bg-card/60 backdrop-blur-xl border border-[var(--text-main)]/10 transition-colors flex items-center justify-between gap-4">
+        <div className="settings-list-row py-3 sm:py-3.5 px-4 sm:px-5 rounded-[32px] bg-card/60 backdrop-blur-xl transition-colors flex items-center justify-between gap-4">
           <div className="flex items-center gap-4">
             <div className="w-10 h-10 rounded-full bg-winblue/10 text-winblue flex items-center justify-center shrink-0">
               <Type size={20} />
@@ -115,9 +111,7 @@ export function SettingsInterfaceScreen() {
               <span className="text-xs sm:text-sm text-[var(--text-muted)] mt-0.5">Ajuste o tamanho do texto</span>
             </div>
           </div>
-          <motion.button 
-            whileHover={{ scale: 1.06 }} 
-            whileTap={{ scale: 0.94 }}
+          <motion.button data-popup-trigger
             animate={activeSettingSelector?.id === 'font-size' ? { scale: 1.22, opacity: 0, pointerEvents: 'none' } : { scale: 1, opacity: 1, pointerEvents: 'auto' }}
             transition={{ type: "spring", stiffness: 500, damping: 30 }}
             onClick={(e) => {
@@ -131,22 +125,21 @@ export function SettingsInterfaceScreen() {
                 subtitle: 'Ajuste o tamanho do texto',
                 currentValue: uiFontSize,
                 options: [
-                  { value: 'small', label: 'Pequena', description: 'Cabe mais conteúdo na tela (85%)', icon: <AArrowDown size={14} className="shrink-0" /> },
-                  { value: 'standard', label: 'Padrão', description: 'Tamanho original do app (100%)', icon: <Type size={14} className="shrink-0" /> },
-                  { value: 'large', label: 'Grande', description: 'Textos maiores, mais fáceis de ler (118%)', icon: <AArrowUp size={14} className="shrink-0" /> },
+                  { value: 'standard', label: 'Padrão', description: 'Padrão', icon: <Type size={14} className="shrink-0" /> },
+                  { value: 'large', label: 'Grande', description: '+20%', icon: <ALargeSmall size={15} className="shrink-0" /> },
                 ],
                 onSelect: (val) => setUiFontSize(val)
               });
             }}
-            className="h-8 pl-3.5 pr-2.5 rounded-full bg-card/75 backdrop-blur-3xl border border-[var(--text-main)]/10 shadow-sm text-[var(--text-main)] hover:bg-white/15 hover:border-white/25 hover:shadow-[0_0_12px_rgba(255,255,255,0.2)] flex items-center gap-1.5 text-xs font-semibold transition-all shrink-0 cursor-pointer [&_svg]:text-inherit"
+            className="h-8 pl-3.5 pr-2.5 rounded-full bg-card/75 backdrop-blur-3xl shadow-sm text-[var(--text-main)] hover:bg-[var(--hover-fill)] flex items-center gap-1.5 text-xs font-semibold transition-all shrink-0 cursor-pointer [&_svg]:text-inherit"
           >
-            <span>{uiFontSize === 'small' ? 'Pequena' : uiFontSize === 'large' ? 'Grande' : 'Padrão'}</span>
+            <span>{uiFontSize === 'large' ? 'Grande' : 'Padrão'}</span>
             <ChevronDown size={14} className="-mr-0.5 text-inherit" />
           </motion.button>
         </div>
 
         {/* 4. Idioma */}
-        <div className="settings-list-row py-3 sm:py-3.5 px-4 sm:px-5 rounded-[32px] bg-card/60 backdrop-blur-xl border border-[var(--text-main)]/10 transition-colors flex items-center justify-between gap-4">
+        <div className="settings-list-row py-3 sm:py-3.5 px-4 sm:px-5 rounded-[32px] bg-card/60 backdrop-blur-xl transition-colors flex items-center justify-between gap-4">
           <div className="flex items-center gap-4">
             <div className="w-10 h-10 rounded-full bg-winblue/10 text-winblue flex items-center justify-center shrink-0">
               <Globe size={20} />
@@ -159,9 +152,7 @@ export function SettingsInterfaceScreen() {
               )}
             </div>
           </div>
-          <motion.button 
-            whileHover={{ scale: 1.06 }} 
-            whileTap={{ scale: 0.94 }}
+          <motion.button data-popup-trigger
             animate={activeSettingSelector?.id === 'language' ? { scale: 1.22, opacity: 0, pointerEvents: 'none' } : { scale: 1, opacity: 1, pointerEvents: 'auto' }}
             transition={{ type: "spring", stiffness: 500, damping: 30 }}
             onClick={(e) => {
@@ -183,7 +174,7 @@ export function SettingsInterfaceScreen() {
                 onSelect: (val) => setInterfaceLang(val)
               });
             }}
-            className="h-8 pl-3.5 pr-2.5 rounded-full bg-card/75 backdrop-blur-3xl border border-[var(--text-main)]/10 shadow-sm text-[var(--text-main)] hover:bg-white/15 hover:border-white/25 hover:shadow-[0_0_12px_rgba(255,255,255,0.2)] flex items-center gap-1.5 text-xs font-semibold transition-all shrink-0 cursor-pointer [&_svg]:text-inherit"
+            className="h-8 pl-3.5 pr-2.5 rounded-full bg-card/75 backdrop-blur-3xl shadow-sm text-[var(--text-main)] hover:bg-[var(--hover-fill)] flex items-center gap-1.5 text-xs font-semibold transition-all shrink-0 cursor-pointer [&_svg]:text-inherit"
           >
             <span>
               {interfaceLang === 'pt-BR' ? 'Idioma do sistema (Português)' : interfaceLang === 'en-US' ? 'English (US)' : interfaceLang === 'es-ES' ? 'Español (ES)' : interfaceLang === 'ru-RU' ? 'Русский' : 'العربية (SA)'}

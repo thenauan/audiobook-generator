@@ -3,7 +3,7 @@ import { AUDIO_FORMATS, audioFormatInfo, type AudioFormat } from '../../app/audi
 import { audioFormatIcon } from '../../app/audioFormatIcons';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'motion/react';
-import { FileText, X, CheckCircle2, Headphones, BookOpen, Check, Info, Sparkles, Globe, Lightbulb, Bookmark, Layers, Cpu, Edit3, Camera, Tag, User, Mic, Calendar, Heart, Flame, Zap, Brain, TrendingUp, Landmark, Compass, Trash2, RotateCcw, Clock, HardDrive } from 'lucide-react';
+import { FileText, X, CheckCircle2, Headphones, BookOpen, Check, Info, Sparkles, Globe, Lightbulb, Bookmark, Layers, Cpu, Edit3, Camera, Tag, User, Mic, Calendar, Heart, Flame, Zap, Brain, TrendingUp, Landmark, Compass, Trash2, RotateCcw, Clock, HardDrive, Loader2, FileX } from 'lucide-react';
 import { LuFileAudio } from 'react-icons/lu';
 import { getButtonCoverPopupStyle, clearButtonCoverAnchorCache } from '../Popovers';
 import { ActiveSettingSelector, AppFile } from '../../app/types';
@@ -54,8 +54,10 @@ export const EbookCardItem: React.FC<EbookCardItemProps> = ({
   showToast,
   enterDelay = 0
 }) => {
-  const isTitleMissing = !file.title || !file.title.trim();
-  const isAuthorMissing = !file.author || !file.author.trim();
+  // Lendo o e-book: ainda sem título e autor (chegam primeiro, antes dos capítulos)
+  const lendoDados = file.metadataStatus === 'loading' && !file.metadataPartial;
+  const isTitleMissing = !lendoDados && (!file.title || !file.title.trim());
+  const isAuthorMissing = !lendoDados && (!file.author || !file.author.trim());
   const isError = isTitleMissing || isAuthorMissing;
   const coverUrl = file.customCover || file.cover || getGenericBookCover(file.title || 'Desconhecido', file.author || 'Desconhecido', file.coverColor);
   const ambientStyle = getCoverAmbientStyle(accentColor, resolvedTheme === 'dark', isError);
@@ -120,8 +122,15 @@ export const EbookCardItem: React.FC<EbookCardItemProps> = ({
   // Estados de seleção das tags (por padrão ou pelo usuário)
   const isVoiceSelected = true;
   const isFileTypeSelected = true;
-  const isGenreSelected = Boolean(file.genre && file.genre.trim());
-  const isSubgenreSelected = Boolean(file.subgenre && file.subgenre.trim());
+  // Com o pop-up de gênero ou subgênero aberto, o card mostra o valor de antes: as tags só se reorganizam ao fechar
+  const generoAberto = activeSettingSelector?.id === `genre-${file.id}`;
+  const subgeneroAberto = activeSettingSelector?.id === `subgenre-${file.id}`;
+  const [generoVisivel, setGeneroVisivel] = useState(file.genre);
+  const [subgeneroVisivel, setSubgeneroVisivel] = useState(file.subgenre);
+  useEffect(() => { if (!generoAberto) setGeneroVisivel(file.genre); }, [generoAberto, file.genre]);
+  useEffect(() => { if (!subgeneroAberto) setSubgeneroVisivel(file.subgenre); }, [subgeneroAberto, file.subgenre]);
+  const isGenreSelected = Boolean(generoVisivel && generoVisivel.trim());
+  const isSubgenreSelected = Boolean(subgeneroVisivel && subgeneroVisivel.trim());
   const isLanguageSelected = Boolean(file.language && file.language.trim());
   const isNarratorSelected = Boolean(file.narrator && file.narrator.trim());
   const isSyncTextSelected = true;
@@ -161,7 +170,7 @@ export const EbookCardItem: React.FC<EbookCardItemProps> = ({
       exit={CARD_EXIT}
       transition={cardTransition(enterDelay)}
       style={{ borderColor: ambientStyle.borderColor }}
-      className={`p-5 sm:p-6 rounded-3xl backdrop-blur-3xl border ${isError ? 'border-red-500/50' : ''} relative isolate overflow-hidden group transition-[border-color,box-shadow,background-color] w-full`}
+      className={`p-5 sm:p-6 rounded-3xl backdrop-blur-3xl ${isError ? 'border border-red-500/50' : ''} relative isolate overflow-hidden group transition-[border-color,box-shadow,background-color] w-full`}
     >
       {/* Fundo animado com os tons da capa (efeito do player em tela cheia) */}
       <CoverAmbientBackground color={accentColor} cover={coverUrl} isDark={resolvedTheme === 'dark'} />
@@ -189,11 +198,11 @@ export const EbookCardItem: React.FC<EbookCardItemProps> = ({
                 }}
                 style={getButtonCoverPopupStyle(expectationsAnchor, 320, 205, 'right')}
                 onClick={(e) => e.stopPropagation()}
-                className="w-80 bg-card/95 backdrop-blur-3xl border border-[var(--button-secondary-bg)] rounded-[24px] shadow-2xl p-2 z-[9999] flex flex-col text-left overflow-hidden text-[var(--text-main)] select-none"
+                className="w-80 bg-card/95 backdrop-blur-3xl rounded-[24px] shadow-2xl p-2 z-[9999] flex flex-col text-left overflow-hidden text-[var(--text-main)] select-none"
               >
                 {/* Título: mesmo estilo de Ordenar por (maiúsculas e minúsculas, sem linhas divisórias, sem botão de X) */}
                 <div className="px-3 pt-2 pb-1.5">
-                  <h3 className="text-xl font-bold text-[var(--text-main)]">Informações de conversão</h3>
+                  <h3 className="text-sm font-bold text-[var(--text-main)]">Informações de conversão</h3>
                 </div>
 
                 <div className="space-y-0.5">
@@ -222,17 +231,17 @@ export const EbookCardItem: React.FC<EbookCardItemProps> = ({
       {/* Conteúdo Principal do Card */}
       <div className="flex flex-col lg:flex-row items-stretch gap-7 sm:gap-8 w-full">
         {/* Capa */}
-        <div className="relative w-36 h-52 sm:w-40 sm:h-56 lg:w-[145px] lg:h-auto lg:self-stretch rounded-2xl overflow-hidden shrink-0 shadow-lg border border-white/10 group/cover self-center lg:self-auto bg-black/10 dark:bg-white/5 flex flex-col">
+        <div className="relative w-36 h-52 sm:w-40 sm:h-56 lg:w-[145px] lg:h-auto lg:self-stretch rounded-2xl overflow-hidden shrink-0 shadow-lg group/cover self-center lg:self-auto bg-black/10 dark:bg-white/10 flex flex-col">
           <img 
             src={coverUrl} 
             alt={file.title} 
-            className="w-full h-full object-cover transition-transform duration-300 group-hover/cover:scale-105" 
+            className={`w-full h-full object-cover transition-transform duration-300 ${lendoDados ? "" : "group-hover/cover:scale-105"}`} 
           />
-          <div className="absolute inset-0 bg-black/60 opacity-0 group-hover/cover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-1.5 p-1 text-center backdrop-blur-xs">
+          <div className={`absolute inset-0 bg-black/60 opacity-0 group-hover/cover:opacity-100 transition-opacity ${lendoDados ? 'hidden' : 'flex'} flex-col items-center justify-center gap-1.5 p-1 text-center backdrop-blur-xs`}>
             <button
               type="button"
               onClick={onEditCover}
-              className="px-2.5 py-1 rounded-full bg-white/20 hover:bg-white/35 backdrop-blur-md text-white text-[10px] font-bold border border-white/30 flex items-center gap-1 shadow-md transition-all cursor-pointer"
+              className="px-2.5 py-1 rounded-full bg-white/20 hover:bg-white/35 backdrop-blur-md text-white text-[10px] font-bold flex items-center gap-1 shadow-md transition-all cursor-pointer"
               title="Trocar Capa"
             >
               <Camera size={11} />
@@ -245,7 +254,7 @@ export const EbookCardItem: React.FC<EbookCardItemProps> = ({
                   onUpdateFile({ customCover: undefined, cover: undefined });
                   showToast("Capa alterada para genérica.");
                 }}
-                className="px-2 py-0.5 rounded-full bg-black/40 border border-white/20 hover:border-white/40 hover:bg-black/60 text-white/90 text-[9px] font-medium transition-all cursor-pointer inline-flex items-center gap-1.5"
+                className="px-2 py-0.5 rounded-full bg-black/40 hover:bg-black/60 text-white/90 text-[9px] font-medium transition-all cursor-pointer inline-flex items-center gap-1.5"
                 title="Usar Capa Genérica"
               >
                 <RotateCcw size={13} className="shrink-0" />
@@ -260,17 +269,16 @@ export const EbookCardItem: React.FC<EbookCardItemProps> = ({
           {/* Cabeçalho do card: ações (informações, editar e excluir) */}
           <div className="flex items-center justify-end gap-3">
             <div className="flex items-center gap-2 shrink-0">
-              <motion.button
+              <motion.button data-popup-trigger
                 type="button"
-                whileHover={{ scale: 1.12 }}
-                whileTap={{ scale: 0.92 }}
-                animate={expectationsAnchor ? { scale: 1.22, opacity: 0, pointerEvents: 'none' } : { scale: 1, opacity: 1, pointerEvents: 'auto' }}
+                animate={expectationsAnchor ? { scale: 1.22, opacity: 0, pointerEvents: 'none' } : { scale: 1, opacity: lendoDados ? 0.4 : 1, pointerEvents: 'auto' }}
                 transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                disabled={lendoDados}
                 onClick={(e) => {
                   e.stopPropagation();
                   setExpectationsAnchor(e.currentTarget);
                 }}
-                className="w-8 h-8 rounded-full flex items-center justify-center bg-card/75 border border-[var(--text-main)]/15 text-[var(--text-main)] hover:bg-white/15 hover:border-white/30 hover:shadow-[0_0_14px_rgba(255,255,255,0.3)] transition-[background-color,border-color,box-shadow] cursor-pointer shadow-sm [&_svg]:text-inherit"
+                className="w-8 h-8 rounded-full flex items-center justify-center bg-card/75 text-[var(--text-main)] hover:bg-[var(--hover-fill)] transition-[background-color,border-color,box-shadow] cursor-pointer shadow-sm [&_svg]:text-inherit disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-card/75"
                 title="Informações de conversão"
                 aria-label="Informações de conversão"
               >
@@ -278,10 +286,9 @@ export const EbookCardItem: React.FC<EbookCardItemProps> = ({
               </motion.button>
               <motion.button
                 type="button"
-                whileHover={{ scale: 1.12 }}
-                whileTap={{ scale: 0.92 }}
+                disabled={lendoDados}
                 onClick={onOpenMetadataModal}
-                className="w-8 h-8 rounded-full flex items-center justify-center bg-card/75 border border-[var(--text-main)]/15 text-[var(--text-main)] hover:bg-white/15 hover:border-white/30 hover:shadow-[0_0_14px_rgba(255,255,255,0.3)] transition-[background-color,border-color,box-shadow] cursor-pointer shadow-sm [&_svg]:text-inherit"
+                className="w-8 h-8 rounded-full flex items-center justify-center bg-card/75 text-[var(--text-main)] hover:bg-[var(--hover-fill)] transition-[background-color,border-color,box-shadow] cursor-pointer shadow-sm [&_svg]:text-inherit disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-card/75"
                 title="Editar todos os metadados"
                 aria-label="Editar todos os metadados"
               >
@@ -289,10 +296,8 @@ export const EbookCardItem: React.FC<EbookCardItemProps> = ({
               </motion.button>
               <motion.button
                 type="button"
-                whileHover={{ scale: 1.12 }}
-                whileTap={{ scale: 0.92 }}
                 onClick={onRemoveFile}
-                className="w-8 h-8 rounded-full flex items-center justify-center bg-card/75 border border-red-500/25 text-red-500 hover:bg-red-500/20 hover:border-red-500/45 hover:shadow-[0_0_14px_rgba(239,68,68,0.35)] transition-[background-color,border-color,box-shadow] cursor-pointer shadow-sm [&_svg]:text-inherit"
+                className="w-8 h-8 rounded-full flex items-center justify-center bg-card/75 text-red-500 hover:bg-red-500/20 transition-[background-color,border-color,box-shadow] cursor-pointer shadow-sm [&_svg]:text-inherit"
                 title="Excluir da lista"
                 aria-label="Excluir da lista"
               >
@@ -301,6 +306,13 @@ export const EbookCardItem: React.FC<EbookCardItemProps> = ({
             </div>
           </div>
 
+          {/* Enquanto o leitor não devolve título e autor, o card mostra só o aviso (sem campos nem tags) */}
+          {lendoDados ? (
+            <div role="status" className="w-full flex-1 min-h-[170px] flex items-center justify-center gap-2 text-xs sm:text-sm font-semibold text-[var(--text-muted)]">
+              <Loader2 size={15} className="animate-spin shrink-0" />
+              <span>Carregando metadados do e-book…</span>
+            </div>
+          ) : (<>
           {/* Título */}
           <div>
             <div className="flex items-center gap-1.5 mb-1 px-1">
@@ -322,7 +334,7 @@ export const EbookCardItem: React.FC<EbookCardItemProps> = ({
                 boxShadow: ['0 0 0px rgba(239, 68, 68, 0)', '0 0 16px rgba(239, 68, 68, 0.35)', '0 0 0px rgba(239, 68, 68, 0)']
               } : { scale: 1 }}
               transition={isTitleMissing ? { repeat: Infinity, duration: 1.5, ease: "easeInOut" } : { duration: 0.2 }}
-              className={`w-full rounded-full px-4 py-2 bg-black/5 dark:bg-white/5 border ${isTitleMissing ? 'border-red-500/80 bg-red-500/5' : 'border-[var(--text-main)]/10 hover:border-white/20 focus-within:border-winblue focus-within:bg-winblue/5 focus-within:shadow-[0_0_12px_rgba(var(--winblue-rgb),0.2)]'} transition-all flex items-center`}
+              className={`w-full rounded-full px-4 py-2 bg-black/5 dark:bg-white/10 ${isTitleMissing ? 'border border-red-500/80 bg-red-500/5' : ' focus-within:bg-winblue/15'} transition-all flex items-center`}
             >
               <input 
                 type="text" 
@@ -355,7 +367,7 @@ export const EbookCardItem: React.FC<EbookCardItemProps> = ({
                 boxShadow: ['0 0 0px rgba(239, 68, 68, 0)', '0 0 16px rgba(239, 68, 68, 0.35)', '0 0 0px rgba(239, 68, 68, 0)']
               } : { scale: 1 }}
               transition={isAuthorMissing ? { repeat: Infinity, duration: 1.5, ease: "easeInOut" } : { duration: 0.2 }}
-              className={`w-full rounded-full px-4 py-2 bg-black/5 dark:bg-white/5 border ${isAuthorMissing ? 'border-red-500/80 bg-red-500/5' : 'border-[var(--text-main)]/10 hover:border-white/20 focus-within:border-winblue focus-within:bg-winblue/5 focus-within:shadow-[0_0_12px_rgba(var(--winblue-rgb),0.2)]'} transition-all flex items-center`}
+              className={`w-full rounded-full px-4 py-2 bg-black/5 dark:bg-white/10 ${isAuthorMissing ? 'border border-red-500/80 bg-red-500/5' : ' focus-within:bg-winblue/15'} transition-all flex items-center`}
             >
               <input 
                 type="text" 
@@ -366,6 +378,7 @@ export const EbookCardItem: React.FC<EbookCardItemProps> = ({
               />
             </motion.div>
           </div>
+
 
           {/* Outros */}
           <div className="w-full min-w-0">
@@ -383,10 +396,8 @@ export const EbookCardItem: React.FC<EbookCardItemProps> = ({
                 style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
               >
                 {/* Tag Voz */}
-                <motion.button
+                <motion.button data-popup-trigger
                   type="button"
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
                   animate={activeSettingSelector?.id === `voice-${file.id}` ? { scale: 1.22, opacity: 0, pointerEvents: 'none' } : { scale: 1, opacity: 1, pointerEvents: 'auto' }}
                   transition={{ type: "spring", stiffness: 500, damping: 30 }}
                   onClick={(e) => {
@@ -403,7 +414,7 @@ export const EbookCardItem: React.FC<EbookCardItemProps> = ({
                       }
                     });
                   }}
-                  className="group/tag h-8 px-3.5 rounded-full bg-black/5 dark:bg-white/5 border border-[var(--text-main)]/10 hover:border-neutral-400 dark:hover:border-white/40 hover:bg-neutral-200/80 dark:hover:bg-white/15 hover:shadow-[0_0_12px_rgba(0,0,0,0.12)] dark:hover:shadow-[0_0_12px_rgba(255,255,255,0.25)] text-[11px] font-semibold flex items-center gap-1.5 transition-all shrink-0 cursor-pointer"
+                  className="group/tag h-8 px-3.5 rounded-full bg-black/5 dark:bg-white/10 hover:bg-neutral-200/80 dark:hover:bg-[var(--hover-fill)] text-[11px] font-semibold flex items-center gap-1.5 transition-all shrink-0 cursor-pointer"
                   title="Selecionar voz neural"
                 >
                   <Headphones size={12} className={`${getTagIconClass(isVoiceSelected)} shrink-0 transition-colors`} />
@@ -411,10 +422,8 @@ export const EbookCardItem: React.FC<EbookCardItemProps> = ({
                 </motion.button>
 
                 {/* Tag Divisão de Arquivo (ao lado da voz) */}
-                <motion.button
+                <motion.button data-popup-trigger
                   type="button"
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
                   animate={activeSettingSelector?.id === `filetype-${file.id}` ? { scale: 1.22, opacity: 0, pointerEvents: 'none' } : { scale: 1, opacity: 1, pointerEvents: 'auto' }}
                   transition={{ type: "spring", stiffness: 500, damping: 30 }}
                   onClick={(e) => {
@@ -431,7 +440,7 @@ export const EbookCardItem: React.FC<EbookCardItemProps> = ({
                       }
                     });
                   }}
-                  className="group/tag h-8 px-3.5 rounded-full bg-black/5 dark:bg-white/5 border border-[var(--text-main)]/10 hover:border-neutral-400 dark:hover:border-white/40 hover:bg-neutral-200/80 dark:hover:bg-white/15 hover:shadow-[0_0_12px_rgba(0,0,0,0.12)] dark:hover:shadow-[0_0_12px_rgba(255,255,255,0.25)] text-[11px] font-semibold flex items-center gap-1.5 transition-all shrink-0 cursor-pointer"
+                  className="group/tag h-8 px-3.5 rounded-full bg-black/5 dark:bg-white/10 hover:bg-neutral-200/80 dark:hover:bg-[var(--hover-fill)] text-[11px] font-semibold flex items-center gap-1.5 transition-all shrink-0 cursor-pointer"
                   title="Escolher o formato do arquivo"
                 >
                   <span className={`${getTagIconClass(isFileTypeSelected)} shrink-0 transition-colors flex`}>{audioFormatIcon(effectiveFileType, 12)}</span>
@@ -439,10 +448,8 @@ export const EbookCardItem: React.FC<EbookCardItemProps> = ({
                 </motion.button>
 
                 {/* Tag Gênero */}
-                <motion.button
+                <motion.button data-popup-trigger
                   type="button"
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
                   animate={activeSettingSelector?.id === `genre-${file.id}` ? { scale: 1.22, opacity: 0, pointerEvents: 'none' } : { scale: 1, opacity: 1, pointerEvents: 'auto' }}
                   transition={{ type: "spring", stiffness: 500, damping: 30 }}
                   onClick={(e) => {
@@ -458,18 +465,16 @@ export const EbookCardItem: React.FC<EbookCardItemProps> = ({
                       onSelect: (val) => onUpdateFile({ genre: joinGenres(splitGenres(val)) })
                     });
                   }}
-                  className="group/tag h-8 px-3.5 rounded-full bg-black/5 dark:bg-white/5 border border-[var(--text-main)]/10 hover:border-neutral-400 dark:hover:border-white/40 hover:bg-neutral-200/80 dark:hover:bg-white/15 hover:shadow-[0_0_12px_rgba(0,0,0,0.12)] dark:hover:shadow-[0_0_12px_rgba(255,255,255,0.25)] text-[11px] font-semibold flex items-center gap-1.5 transition-all shrink-0 cursor-pointer"
+                  className="group/tag h-8 px-3.5 rounded-full bg-black/5 dark:bg-white/10 hover:bg-neutral-200/80 dark:hover:bg-[var(--hover-fill)] text-[11px] font-semibold flex items-center gap-1.5 transition-all shrink-0 cursor-pointer"
                   title="Definir gênero"
                 >
                   <Tag size={12} className={`${getTagIconClass(isGenreSelected)} shrink-0 transition-colors`} />
-                  <span className={`${getTagTextClass(isGenreSelected)} max-w-[220px] truncate`} title={file.genre}>{isGenreSelected ? file.genre : '+ Gênero'}</span>
+                  <span className={`${getTagTextClass(isGenreSelected)} max-w-[220px] truncate`} title={generoVisivel}>{isGenreSelected ? generoVisivel : '+ Gênero'}</span>
                 </motion.button>
 
                 {/* Tag Subgênero */}
-                <motion.button
+                <motion.button data-popup-trigger
                   type="button"
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
                   animate={activeSettingSelector?.id === `subgenre-${file.id}` ? { scale: 1.22, opacity: 0, pointerEvents: 'none' } : { scale: 1, opacity: 1, pointerEvents: 'auto' }}
                   transition={{ type: "spring", stiffness: 500, damping: 30 }}
                   onClick={(e) => {
@@ -485,19 +490,17 @@ export const EbookCardItem: React.FC<EbookCardItemProps> = ({
                       onSelect: (val) => onUpdateFile({ subgenre: joinGenres(splitGenres(val)) })
                     });
                   }}
-                  className="group/tag h-8 px-3.5 rounded-full bg-black/5 dark:bg-white/5 border border-[var(--text-main)]/10 hover:border-neutral-400 dark:hover:border-white/40 hover:bg-neutral-200/80 dark:hover:bg-white/15 hover:shadow-[0_0_12px_rgba(0,0,0,0.12)] dark:hover:shadow-[0_0_12px_rgba(255,255,255,0.25)] text-[11px] font-semibold flex items-center gap-1.5 transition-all shrink-0 cursor-pointer"
+                  className="group/tag h-8 px-3.5 rounded-full bg-black/5 dark:bg-white/10 hover:bg-neutral-200/80 dark:hover:bg-[var(--hover-fill)] text-[11px] font-semibold flex items-center gap-1.5 transition-all shrink-0 cursor-pointer"
                   title="Definir subgênero"
                 >
                   <Layers size={12} className={`${getTagIconClass(isSubgenreSelected)} shrink-0 transition-colors`} />
-                  <span className={`${getTagTextClass(isSubgenreSelected)} max-w-[220px] truncate`} title={file.subgenre}>{isSubgenreSelected ? file.subgenre : '+ Subgênero'}</span>
+                  <span className={`${getTagTextClass(isSubgenreSelected)} max-w-[220px] truncate`} title={subgeneroVisivel}>{isSubgenreSelected ? subgeneroVisivel : '+ Subgênero'}</span>
                 </motion.button>
 
                 {/* Tag Idioma */}
-                <motion.button
+                <motion.button data-popup-trigger
                   data-lang-tag={file.id}
                   type="button"
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
                   animate={activeSettingSelector?.id === `lang-${file.id}` ? { scale: 1.22, opacity: 0, pointerEvents: 'none' } : { scale: 1, opacity: 1, pointerEvents: 'auto' }}
                   transition={{ type: "spring", stiffness: 500, damping: 30 }}
                   onClick={(e) => {
@@ -555,7 +558,7 @@ export const EbookCardItem: React.FC<EbookCardItemProps> = ({
                       onSelect: () => onUpdateFile({ requiresTranslation: false, translateTo: undefined, isLanguageSelected: true }),
                     });
                   }}
-                  className="group/tag h-8 px-3.5 rounded-full bg-black/5 dark:bg-white/5 border border-[var(--text-main)]/10 hover:border-neutral-400 dark:hover:border-white/40 hover:bg-neutral-200/80 dark:hover:bg-white/15 hover:shadow-[0_0_12px_rgba(0,0,0,0.12)] dark:hover:shadow-[0_0_12px_rgba(255,255,255,0.25)] text-[11px] font-semibold flex items-center gap-1.5 transition-all shrink-0 cursor-pointer"
+                  className="group/tag h-8 px-3.5 rounded-full bg-black/5 dark:bg-white/10 hover:bg-neutral-200/80 dark:hover:bg-[var(--hover-fill)] text-[11px] font-semibold flex items-center gap-1.5 transition-all shrink-0 cursor-pointer"
                   title="Idioma do livro e tradução"
                 >
                   {file.requiresTranslation && file.translateTo && file.translateTo !== languageCode(normalizeLanguageName(file.language)) ? (
@@ -572,10 +575,8 @@ export const EbookCardItem: React.FC<EbookCardItemProps> = ({
                 </motion.button>
 
                 {/* Tag Narrador */}
-                <motion.button
+                <motion.button data-popup-trigger
                   type="button"
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
                   animate={activeSettingSelector?.id === `narrator-${file.id}` ? { scale: 1.22, opacity: 0, pointerEvents: 'none' } : { scale: 1, opacity: 1, pointerEvents: 'auto' }}
                   transition={{ type: "spring", stiffness: 500, damping: 30 }}
                   onClick={(e) => {
@@ -599,7 +600,7 @@ export const EbookCardItem: React.FC<EbookCardItemProps> = ({
                       onSelect: (val) => onUpdateFile({ narrator: val })
                     });
                   }}
-                  className="group/tag h-8 px-3.5 rounded-full bg-black/5 dark:bg-white/5 border border-[var(--text-main)]/10 hover:border-neutral-400 dark:hover:border-white/40 hover:bg-neutral-200/80 dark:hover:bg-white/15 hover:shadow-[0_0_12px_rgba(0,0,0,0.12)] dark:hover:shadow-[0_0_12px_rgba(255,255,255,0.25)] text-[11px] font-semibold flex items-center gap-1.5 transition-all shrink-0 cursor-pointer"
+                  className="group/tag h-8 px-3.5 rounded-full bg-black/5 dark:bg-white/10 hover:bg-neutral-200/80 dark:hover:bg-[var(--hover-fill)] text-[11px] font-semibold flex items-center gap-1.5 transition-all shrink-0 cursor-pointer"
                   title="Definir narrador"
                 >
                   <Mic size={12} className={`${getTagIconClass(isNarratorSelected)} shrink-0 transition-colors`} />
@@ -607,10 +608,8 @@ export const EbookCardItem: React.FC<EbookCardItemProps> = ({
                 </motion.button>
 
                 {/* Tag Texto Sincronizado */}
-                <motion.button
+                <motion.button data-popup-trigger
                   type="button"
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
                   animate={activeSettingSelector?.id === `synctext-${file.id}` ? { scale: 1.22, opacity: 0, pointerEvents: 'none' } : { scale: 1, opacity: 1, pointerEvents: 'auto' }}
                   transition={{ type: "spring", stiffness: 500, damping: 30 }}
                   onClick={(e) => {
@@ -624,29 +623,29 @@ export const EbookCardItem: React.FC<EbookCardItemProps> = ({
                         { 
                           value: true, 
                           label: 'Sim (Gerar texto sincronizado)', 
-                          icon: <Check size={14} className="shrink-0" />
+                          icon: <FileText size={14} className="shrink-0" />
                         },
                         { 
                           value: false, 
                           label: 'Não (Apenas áudio)', 
-                          icon: <X size={14} className="shrink-0" />
+                          icon: <FileX size={14} className="shrink-0" />
                         },
                       ],
                       onSelect: (val) => onUpdateFile({ generateSyncText: val, isSyncTextSelected: true })
                     });
                   }}
-                  className="group/tag h-8 px-3.5 rounded-full bg-black/5 dark:bg-white/5 border border-[var(--text-main)]/10 hover:border-neutral-400 dark:hover:border-white/40 hover:bg-neutral-200/80 dark:hover:bg-white/15 hover:shadow-[0_0_12px_rgba(0,0,0,0.12)] dark:hover:shadow-[0_0_12px_rgba(255,255,255,0.25)] text-[11px] font-semibold flex items-center gap-1.5 transition-all shrink-0 cursor-pointer"
+                  className="group/tag h-8 px-3.5 rounded-full bg-black/5 dark:bg-white/10 hover:bg-neutral-200/80 dark:hover:bg-[var(--hover-fill)] text-[11px] font-semibold flex items-center gap-1.5 transition-all shrink-0 cursor-pointer"
                   title="Alternar geração de texto sincronizado"
                 >
-                  <FileText size={12} className={`${getTagIconClass(isSyncTextSelected)} shrink-0 transition-colors`} />
+                  {file.generateSyncText !== false
+                    ? <FileText size={12} className={`${getTagIconClass(isSyncTextSelected)} shrink-0 transition-colors`} />
+                    : <FileX size={12} className={`${getTagIconClass(isSyncTextSelected)} shrink-0 transition-colors`} />}
                   <span className={getTagTextClass(isSyncTextSelected)}>{file.generateSyncText !== false ? 'Texto Sinc: Sim' : 'Texto Sinc: Não'}</span>
                 </motion.button>
 
                 {/* Tag Ano */}
-                <motion.button
+                <motion.button data-popup-trigger
                   type="button"
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
                   animate={activeSettingSelector?.id === `year-${file.id}` ? { scale: 1.22, opacity: 0, pointerEvents: 'none' } : { scale: 1, opacity: 1, pointerEvents: 'auto' }}
                   transition={{ type: "spring", stiffness: 500, damping: 30 }}
                   onClick={(e) => {
@@ -675,7 +674,7 @@ export const EbookCardItem: React.FC<EbookCardItemProps> = ({
                       onSelect: (val) => onUpdateFile({ year: val })
                     });
                   }}
-                  className="group/tag h-8 px-3.5 rounded-full bg-black/5 dark:bg-white/5 border border-[var(--text-main)]/10 hover:border-neutral-400 dark:hover:border-white/40 hover:bg-neutral-200/80 dark:hover:bg-white/15 hover:shadow-[0_0_12px_rgba(0,0,0,0.12)] dark:hover:shadow-[0_0_12px_rgba(255,255,255,0.25)] text-[11px] font-semibold flex items-center gap-1.5 transition-all shrink-0 cursor-pointer"
+                  className="group/tag h-8 px-3.5 rounded-full bg-black/5 dark:bg-white/10 hover:bg-neutral-200/80 dark:hover:bg-[var(--hover-fill)] text-[11px] font-semibold flex items-center gap-1.5 transition-all shrink-0 cursor-pointer"
                   title="Definir ano de publicação"
                 >
                   <Calendar size={12} className={`${getTagIconClass(isYearSelected)} shrink-0 transition-colors`} />
@@ -684,6 +683,7 @@ export const EbookCardItem: React.FC<EbookCardItemProps> = ({
               </div>
             </div>
           </div>
+          </>)}
         </div>
       </div>
     </motion.div>

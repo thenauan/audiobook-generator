@@ -7,14 +7,14 @@ import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   ArrowRight, Check, ChevronDown, ChevronLeft, ChevronRight, FolderOpen, Globe, Monitor, Moon, Sun, Mic, FileText,
-  FolderTree, Palette, Type, AArrowDown, AArrowUp, FileAudio2, CopyCheck, ExternalLink, X, Info,
+  FolderTree, Palette, Type, ALargeSmall, FileAudio2, CopyCheck, ExternalLink, X, Info,
   Sparkles, Settings2, HardDrive, Volume2, Play, Pause, Feather, AlignLeft, WholeWord, Rows3,
 } from 'lucide-react';
 import { LuBookAudio } from 'react-icons/lu';
 import { AmbientOrbs } from '../components/AmbientOrbs';
 import { AppGlyph } from '../components/AppGlyph';
 import { useApp } from './AppContext';
-import { VoiceSampleButton } from '../lib/voiceSample';
+import { toggleVoiceSample, usePlayingVoice } from '../lib/voiceSample';
 import { useSystemInfo } from '../lib/systemInfo';
 import { VOICES, voicesFor, hasSample, languageNamePt } from '../data/voices';
 import { AUDIO_FORMATS, AUDIO_QUALITIES, type AudioQuality } from './audioFormats';
@@ -34,9 +34,8 @@ const THEMES = [
   { value: 'dark', label: 'Escuro', description: 'Fundo escuro o tempo todo', icon: <Moon size={16} /> },
 ];
 const FONT_SIZES = [
-  { value: 'small', label: 'Pequena', description: 'Textos compactos, a 85%', icon: <AArrowDown size={16} /> },
-  { value: 'standard', label: 'Padrão', description: 'Tamanho normal do app', icon: <Type size={16} /> },
-  { value: 'large', label: 'Grande', description: 'Textos ampliados, a 118%', icon: <AArrowUp size={16} /> },
+  { value: 'standard', label: 'Padrão', description: 'Padrão', icon: <Type size={16} /> },
+  { value: 'large', label: 'Grande', description: '+20%', icon: <ALargeSmall size={17} /> },
 ];
 const DESTINATIONS: { value: SyncTextDestination; label: string; description: string; icon: React.ReactNode }[] = [
   { value: 'metadata', label: 'Metadados do audiobook', description: 'Grava o texto dentro do arquivo de áudio', icon: <FileAudio2 size={16} /> },
@@ -65,19 +64,20 @@ const PAGE_MOTION = {
   exit: (dir: number) => ({ opacity: 0, x: dir * -28, transition: { duration: 0.14 } }),
 };
 
-const pill = "h-8 pl-3.5 pr-2.5 rounded-full bg-card/75 backdrop-blur-3xl border border-[var(--text-main)]/10 shadow-sm text-[var(--text-main)] hover:bg-white/15 hover:border-white/25 hover:shadow-[0_0_12px_rgba(255,255,255,0.2)] flex items-center gap-1.5 text-xs font-semibold transition-all shrink-0 cursor-pointer [&_svg]:text-inherit";
-const secondaryBtn = "h-11 px-5 rounded-full bg-card/75 backdrop-blur-3xl border border-[var(--text-main)]/10 text-[var(--text-main)] hover:bg-white/15 hover:border-white/25 hover:shadow-[0_0_15px_rgba(255,255,255,0.25)] text-sm font-semibold flex items-center gap-2 transition-all cursor-pointer [&_svg]:text-inherit";
-const primaryBtn = "h-11 px-5 rounded-full bg-winblue/20 border border-winblue/45 text-winblue hover:bg-winblue/30 hover:border-winblue/75 hover:shadow-[0_0_20px_rgba(var(--winblue-rgb),0.4)] text-sm font-semibold flex items-center gap-2 transition-all cursor-pointer [&_svg]:text-inherit";
+const pill = "h-8 pl-3.5 pr-2.5 rounded-full bg-card/75 backdrop-blur-3xl shadow-sm text-[var(--text-main)] hover:bg-[var(--hover-fill)] flex items-center gap-1.5 text-xs font-semibold transition-all shrink-0 cursor-pointer [&_svg]:text-inherit";
+const secondaryBtn = "h-11 px-5 rounded-full shadow-md bg-card/75 backdrop-blur-3xl text-[var(--text-main)] hover:bg-[var(--hover-fill)] text-sm font-semibold flex items-center gap-2 transition-all cursor-pointer [&_svg]:text-inherit";
+const primaryBtn = "h-11 px-5 rounded-full shadow-md bg-winblue/20 text-winblue hover:bg-winblue/30 text-sm font-semibold flex items-center gap-2 transition-all cursor-pointer [&_svg]:text-inherit";
 
 // Grupo de opções: subtítulo e descrição curta acima de um card com as opções em lista
 function OptionGroup({ title, description, children, footer, grow }: { title: string; description: string; children: React.ReactNode; footer?: React.ReactNode; grow?: boolean }) {
   return (
-    <section className={`flex flex-col gap-2.5 [@media(max-height:780px)]:gap-1.5 min-w-0 ${grow ? 'flex-1 min-h-0' : 'shrink-0'}`}>
+    // grow: o card tem a altura das opções, mas não passa da coluna (com muitas opções, a lista rola dentro dele)
+    <section className={`flex flex-col gap-2.5 [@media(max-height:780px)]:gap-1.5 min-w-0 ${grow ? 'min-h-0' : 'shrink-0'}`}>
       <div className="px-1 shrink-0">
         <h2 className="text-xl font-bold text-[var(--text-main)]">{title}</h2>
         <p className="text-xs text-[var(--text-muted)] mt-0.5 [@media(max-height:780px)]:hidden">{description}</p>
       </div>
-      <div className={`rounded-[24px] bg-card/60 backdrop-blur-xl border border-[var(--text-main)]/10 p-1 flex flex-col gap-0.5 ${grow ? 'flex-1 min-h-0' : ''}`}>
+      <div className={`rounded-[24px] bg-card/60 backdrop-blur-xl p-1 flex flex-col gap-0.5 ${grow ? 'min-h-0' : ''}`}>
         {children}
         {footer}
       </div>
@@ -87,26 +87,41 @@ function OptionGroup({ title, description, children, footer, grow }: { title: st
 
 // Uma opção: ícone em círculo, nome, descrição e a marca de selecionado
 function OptionRow({ icon, label, description, selected, onClick, sampleCode, badge }: { icon: React.ReactNode; label: string; description?: string; selected: boolean; onClick: () => void; sampleCode?: string; badge?: string }) {
+  // Vozes: com o mouse em cima, o próprio ícone vira o botão de ouvir a amostra (e de parar, tocando)
+  const tocando = usePlayingVoice() === sampleCode && Boolean(sampleCode);
   return (
-    <motion.button
+    <motion.button data-popup-trigger
       type="button"
       onClick={onClick}
-      whileTap={{ scale: 0.985 }}
       aria-pressed={selected}
       className={`group w-full shrink-0 flex items-center gap-3 px-3 py-2 [@media(max-height:780px)]:py-1.5 rounded-[20px] text-left transition-colors cursor-pointer ${selected ? 'bg-winblue/12' : 'hover:bg-[var(--text-main)]/[0.05]'}`}
     >
-      <span className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 transition-colors [&_svg]:shrink-0 ${selected ? 'bg-winblue/20 text-winblue' : 'bg-[var(--text-main)]/[0.07] text-[var(--text-main)]/75'}`}>
-        {icon}
+      <span
+        {...(sampleCode ? {
+          role: 'button',
+          title: tocando ? 'Parar amostra' : 'Ouvir amostra',
+          'aria-label': tocando ? 'Parar amostra' : 'Ouvir amostra',
+          onClick: (e: React.MouseEvent) => toggleVoiceSample(e, sampleCode),
+        } : {})}
+        className={`relative w-8 h-8 rounded-full flex items-center justify-center shrink-0 transition-colors [&_svg]:shrink-0 ${selected ? 'bg-winblue/20 text-winblue' : 'bg-[var(--text-main)]/[0.07] text-[var(--text-main)]/75'}`}
+      >
+        {sampleCode ? (
+          <>
+            <span className={`transition-opacity ${tocando ? 'opacity-0' : 'group-hover:opacity-0'}`}>{icon}</span>
+            <span className={`absolute inset-0 flex items-center justify-center transition-opacity ${tocando ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
+              {tocando ? <Pause size={13} fill="currentColor" /> : <Play size={13} fill="currentColor" className="ml-px" />}
+            </span>
+          </>
+        ) : icon}
       </span>
       <span className="flex flex-col min-w-0 flex-1">
         <span className="flex items-center gap-2 min-w-0">
           <span className={`text-sm font-semibold truncate ${selected ? 'text-winblue' : 'text-[var(--text-main)]'}`}>{label}</span>
-          {badge && <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-500 border border-emerald-500/20 shrink-0">{badge}</span>}
+          {badge && <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-500 shrink-0">{badge}</span>}
         </span>
         {description && <span className="text-xs text-[var(--text-muted)] truncate [@media(max-height:780px)]:hidden">{description}</span>}
       </span>
-      {sampleCode && <VoiceSampleButton code={sampleCode} size="md" />}
-      <span className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 transition-all ${selected ? 'bg-winblue text-white scale-100' : 'border border-[var(--text-main)]/20 scale-90'}`}>
+      <span className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 transition-all ${selected ? 'bg-winblue text-white scale-100' : ' scale-90'}`}>
         {selected && <Check size={12} strokeWidth={3} />}
       </span>
     </motion.button>
@@ -198,7 +213,7 @@ export function Onboarding() {
               initial={{ opacity: 0, y: -10, scale: 0.92 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: -8, scale: 0.92 }}
-              className="h-9 max-w-[480px] px-4 rounded-full bg-card/90 backdrop-blur-3xl border border-[var(--button-secondary-bg)] shadow-xl text-xs font-semibold text-[var(--text-main)] flex items-center gap-2"
+              className="h-9 max-w-[480px] px-4 rounded-full bg-card/90 backdrop-blur-3xl shadow-xl text-xs font-semibold text-[var(--text-main)] flex items-center gap-2"
             >
               <Check size={15} className="shrink-0" />
               <span className="truncate">{toastMessage}</span>
@@ -229,7 +244,7 @@ export function Onboarding() {
               Transforme e-books e textos em audiobooks narrados por vozes neurais, com capítulos, tradução e texto sincronizado.
             </p>
 
-            <div className="mt-9 w-full settings-list-row py-3 px-4 rounded-[32px] bg-card/60 backdrop-blur-xl border border-[var(--text-main)]/10 flex items-center justify-between gap-4 text-left">
+            <div className="mt-9 w-full settings-list-row py-3 px-4 rounded-[32px] bg-card/60 backdrop-blur-xl flex items-center justify-between gap-4 text-left">
               <div className="flex items-center gap-3.5 min-w-0">
                 <div className="w-10 h-10 rounded-full bg-winblue/10 text-winblue flex items-center justify-center shrink-0"><Globe size={20} /></div>
                 <div className="flex flex-col min-w-0">
@@ -238,8 +253,6 @@ export function Onboarding() {
                 </div>
               </div>
               <motion.button
-                whileHover={{ scale: 1.06 }}
-                whileTap={{ scale: 0.94 }}
                 animate={activeSettingSelector?.id === 'ob-lang' ? { scale: 1.22, opacity: 0, pointerEvents: 'none' } : { scale: 1, opacity: 1, pointerEvents: 'auto' }}
                 onClick={languageSelector}
                 className={pill}
@@ -250,11 +263,11 @@ export function Onboarding() {
             </div>
 
             <div className="mt-6 w-full grid grid-cols-2 gap-3">
-              <motion.button whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }} onClick={finish} className={`${secondaryBtn} justify-center`}>
+              <motion.button onClick={finish} className={`${secondaryBtn} justify-center`}>
                 <ArrowRight size={16} />
                 <span>Ir para o app</span>
               </motion.button>
-              <motion.button whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }} onClick={() => goTo(1)} className={`${primaryBtn} justify-center`}>
+              <motion.button onClick={() => goTo(1)} className={`${primaryBtn} justify-center`}>
                 <Settings2 size={16} />
                 <span>Configurar agora</span>
               </motion.button>
@@ -273,23 +286,25 @@ export function Onboarding() {
             initial="initial"
             animate="animate"
             exit="exit"
-            className="h-full w-full max-w-4xl mx-auto px-8 pt-10 [@media(max-height:780px)]:pt-6 pb-6 flex flex-col"
+            className="relative h-full w-full max-w-4xl mx-auto px-8 pt-10 [@media(max-height:780px)]:pt-6 flex flex-col"
           >
-            <div className="flex items-center gap-4 mb-1.5 shrink-0">
+            {/* Ícone e título na mesma linha; a descrição embaixo do título (alinhada a ele, não ao ícone) */}
+            <div className="grid grid-cols-[auto_1fr] items-center gap-x-4 gap-y-1.5 mb-7 [@media(max-height:780px)]:mb-4 shrink-0">
               <div className="w-12 h-12 rounded-full bg-winblue/12 text-winblue flex items-center justify-center shrink-0">{current.icon}</div>
-              <h1 className="text-4xl md:text-5xl font-semibold tracking-tight text-[var(--text-main)]">{current.title}</h1>
+              <h1 className="text-4xl md:text-5xl font-semibold tracking-tight leading-none pb-[0.12em] text-[var(--text-main)]">{current.title}</h1>
+              <p className="col-start-2 text-sm text-[var(--text-muted)] max-w-2xl">{current.subtitle}</p>
             </div>
-            <p className="text-sm text-[var(--text-muted)] mb-7 [@media(max-height:780px)]:mb-4 max-w-2xl shrink-0">{current.subtitle}</p>
-            <div className="flex-1 min-h-0">
+            {/* O conteúdo rola por baixo do rodapé (com desfoque); a folga embaixo deixa o fim da lista acima dos botões */}
+            <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar -mx-3 px-3 pb-24">
 
             {current.id === 'interface' && (
-              <div className="h-full grid grid-cols-2 gap-x-5 gap-y-5 [@media(max-height:780px)]:gap-y-3 content-start">
+              <div className="min-h-full grid grid-cols-2 gap-x-5 gap-y-5 [@media(max-height:780px)]:gap-y-3 content-start">
                 <OptionGroup title="Tema" description="Aparência clara, escura ou igual à do computador.">
                   {THEMES.map(o => (
                     <OptionRow key={o.value} icon={o.icon} label={o.label} description={o.description} selected={themeMode === o.value} onClick={() => setThemeMode(o.value as any)} />
                   ))}
                 </OptionGroup>
-                <OptionGroup title="Tamanho da fonte" description="Tamanho dos textos em todo o app.">
+                <OptionGroup title="Tamanho da fonte" description="Ajuste o tamanho do texto">
                   {FONT_SIZES.map(o => (
                     <OptionRow key={o.value} icon={o.icon} label={o.label} description={o.description} selected={uiFontSize === o.value} onClick={() => setUiFontSize(o.value as any)} />
                   ))}
@@ -321,8 +336,8 @@ export function Onboarding() {
             )}
 
             {current.id === 'conversion' && (
-              <div className="h-full grid grid-cols-2 gap-x-5 gap-y-5 [@media(max-height:780px)]:gap-y-3 content-start">
-                <div className="flex flex-col gap-5 min-w-0 min-h-0 h-full">
+              <div className="min-h-full grid grid-cols-2 gap-x-5 gap-y-5 [@media(max-height:780px)]:gap-y-3 content-start">
+                <div className="flex flex-col gap-5 min-w-0 h-0 min-h-full">
                   <OptionGroup
                     grow
                     title="Voz padrão"
@@ -337,7 +352,7 @@ export function Onboarding() {
                       </button>
                     )}
                   >
-                    <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar flex flex-col gap-0.5">
+                    <div className="min-h-0 overflow-y-auto custom-scrollbar flex flex-col gap-0.5">
                       {shownVoices.map((v, i) => {
                         const [lang, rest] = v.label.split(' - ');
                         // Todas as vozes: um título por idioma
@@ -384,7 +399,7 @@ export function Onboarding() {
             )}
 
             {current.id === 'text' && (
-              <div className="h-full grid grid-cols-2 gap-x-5 gap-y-5 [@media(max-height:780px)]:gap-y-3 content-start">
+              <div className="min-h-full grid grid-cols-2 gap-x-5 gap-y-5 [@media(max-height:780px)]:gap-y-3 content-start">
                 <OptionGroup title="Texto sincronizado" description="Texto que acompanha o áudio, frase a frase, no player.">
                   <OptionRow icon={<Check size={16} />} label="Sim" description="Gera o texto junto com o áudio" selected={generateSyncTextDefault} onClick={() => setGenerateSyncTextDefault(true)} />
                   <OptionRow icon={<X size={16} />} label="Não" description="Gera só o audiobook" selected={!generateSyncTextDefault} onClick={() => setGenerateSyncTextDefault(false)} />
@@ -421,12 +436,12 @@ export function Onboarding() {
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
                       {outputFolder && (
-                        <motion.button whileHover={{ scale: 1.06 }} whileTap={{ scale: 0.94 }} onClick={openOutputFolder} className={pill} title="Abrir a pasta no explorador de arquivos">
+                        <motion.button onClick={openOutputFolder} className={pill} title="Abrir a pasta no explorador de arquivos">
                           <span>Ver pasta</span>
                           <ExternalLink size={13} />
                         </motion.button>
                       )}
-                      <motion.button whileHover={{ scale: 1.06 }} whileTap={{ scale: 0.94 }} onClick={() => handleSelectOutputFolder()} className={pill}>
+                      <motion.button onClick={() => handleSelectOutputFolder()} className={pill}>
                         <span>{outputFolder ? 'Alterar pasta' : 'Escolher pasta'}</span>
                         <FolderOpen size={13} />
                       </motion.button>
@@ -445,9 +460,13 @@ export function Onboarding() {
 
             {/* Rodapé: voltar com o nome da página anterior, pontos de progresso e avançar com o nome da próxima */}
             </div>
-            <div className="shrink-0 pt-6 grid grid-cols-[1fr_auto_1fr] items-center gap-4">
+            <div aria-hidden="true" className="onboarding-footer-blur">
+              <div className="apple-blur-layer" /><div className="apple-blur-layer" /><div className="apple-blur-layer" />
+              <div className="apple-blur-layer" /><div className="apple-blur-layer" /><div className="apple-blur-layer" />
+            </div>
+            <div className="absolute inset-x-8 bottom-6 z-10 grid grid-cols-[1fr_auto_1fr] items-center gap-4">
               <div className="flex justify-start">
-                <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} onClick={() => goTo(page - 1)} className={`${secondaryBtn} pl-4`}>
+                <motion.button onClick={() => goTo(page - 1)} className={`${secondaryBtn} pl-4`}>
                   <ChevronLeft size={16} className="rtl:rotate-180" />
                   <span>{PAGES[page - 1].name}</span>
                 </motion.button>
@@ -465,12 +484,12 @@ export function Onboarding() {
               </div>
               <div className="flex justify-end">
                 {page < PAGES.length - 1 ? (
-                  <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} onClick={() => goTo(page + 1)} className={`${primaryBtn} pr-4`}>
+                  <motion.button onClick={() => goTo(page + 1)} className={`${primaryBtn} pr-4`}>
                     <span>{PAGES[page + 1].name}</span>
                     <ChevronRight size={16} className="rtl:rotate-180" />
                   </motion.button>
                 ) : (
-                  <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} onClick={finish} aria-busy={finishing} className={`${primaryBtn} pl-4`}>
+                  <motion.button onClick={finish} aria-busy={finishing} className={`${primaryBtn} pl-4`}>
                     <Check size={16} />
                     <span>Concluir</span>
                   </motion.button>

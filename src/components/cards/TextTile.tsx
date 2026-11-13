@@ -16,7 +16,7 @@ export function TextTile({ text }: { text: GeneratedTextItem }) {
   const info = `${text.author ? `${text.author} • ` : ''}${text.genre} • ${text.wordCount} palavras`;
 
   return (
-    <div
+    <div data-popup-trigger
       onClick={(e) => {
         if (selectingConverted) { toggleConvertedSelection(selectionKey); return; }
         setViewingTextAnchor(e.currentTarget);
@@ -44,9 +44,7 @@ export function TextTile({ text }: { text: GeneratedTextItem }) {
         </div>
 
         <div className={`relative w-8 h-8 shrink-0 ${selectingConverted ? 'invisible' : isMenuOpen ? 'opacity-100' : 'opacity-0 group-hover/textcard:opacity-100'} transition-opacity duration-200`}>
-          <motion.button
-            whileHover={{ scale: 1.15 }}
-            whileTap={{ scale: 0.92 }}
+          <motion.button data-popup-trigger
             animate={isMenuOpen ? { scale: 1.22, opacity: 0, pointerEvents: 'none' } : { scale: 1, opacity: 1, pointerEvents: 'auto' }}
             transition={{ type: 'spring', stiffness: 500, damping: 30 }}
             onClick={(e) => {
@@ -54,7 +52,7 @@ export function TextTile({ text }: { text: GeneratedTextItem }) {
               clearButtonCoverAnchorCache(e.currentTarget);
               setActiveTextMenu({ item: text, anchorEl: e.currentTarget });
             }}
-            className="w-8 h-8 flex items-center justify-center rounded-full backdrop-blur-3xl border border-[var(--text-main)]/10 text-[var(--text-main)] bg-card/75 hover:bg-white/15 hover:border-white/25 hover:shadow-[0_0_12px_rgba(255,255,255,0.2)] transition-all cursor-pointer"
+            className="w-8 h-8 flex items-center justify-center rounded-full backdrop-blur-3xl text-[var(--text-main)] bg-card/75 hover:bg-[var(--hover-fill)] transition-all cursor-pointer"
             title="Opções do texto"
             aria-label={`Opções de ${text.title}`}
           >

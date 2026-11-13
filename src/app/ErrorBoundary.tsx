@@ -30,7 +30,7 @@ export class ErrorBoundary extends React.Component<{ children: React.ReactNode }
 
   render() {
     if (!this.state.error) return this.props.children;
-    const btn = 'h-10 px-5 rounded-full text-sm font-semibold flex items-center gap-2 cursor-pointer transition-[background-color,border-color,box-shadow] border';
+    const btn = 'h-10 px-5 rounded-full text-sm font-semibold flex items-center gap-2 cursor-pointer transition-[background-color,border-color,box-shadow]';
     return (
       <div className="fixed inset-0 bg-[#121214] text-white flex items-center justify-center p-8 overflow-y-auto font-sans">
         <div className="max-w-[560px] w-full text-center">
@@ -40,20 +40,20 @@ export class ErrorBoundary extends React.Component<{ children: React.ReactNode }
             Suas conversões em andamento continuam no computador e os audiobooks já salvos não foram afetados.
             Tente voltar ao app; se o erro se repetir, restaure os dados locais (o histórico de Convertidos é recriado, os arquivos na pasta continuam).
           </p>
-          <pre className="text-left text-[11px] text-red-300 bg-red-500/10 border border-red-500/25 rounded-2xl p-3 max-h-32 overflow-auto whitespace-pre-wrap break-all mb-6">
+          <pre className="text-left text-[11px] text-red-300 bg-red-500/10 rounded-2xl p-3 max-h-32 overflow-auto whitespace-pre-wrap break-all mb-6">
             {this.state.error.message}
           </pre>
           <div className="flex flex-wrap justify-center gap-3">
-            <button type="button" className={`${btn} bg-white/10 border-white/20 hover:bg-white/20`} onClick={() => this.setState({ error: null, info: '' })}>
+            <button type="button" className={`${btn} bg-white/10 hover:bg-[var(--hover-fill)]`} onClick={() => this.setState({ error: null, info: '' })}>
               <RotateCcw size={15} /> Voltar ao app
             </button>
-            <button type="button" className={`${btn} bg-white/10 border-white/20 hover:bg-white/20`} onClick={() => window.location.reload()}>
+            <button type="button" className={`${btn} bg-white/10 hover:bg-[var(--hover-fill)]`} onClick={() => window.location.reload()}>
               <RefreshCw size={15} /> Recarregar
             </button>
-            <button type="button" className={`${btn} bg-white/10 border-white/20 hover:bg-white/20`} onClick={() => { try { navigator.clipboard.writeText(this.details()); } catch { /* sem área de transferência */ } }}>
+            <button type="button" className={`${btn} bg-white/10 hover:bg-[var(--hover-fill)]`} onClick={() => { try { navigator.clipboard.writeText(this.details()); } catch { /* sem área de transferência */ } }}>
               <Copy size={15} /> Copiar detalhes
             </button>
-            <button type="button" className={`${btn} bg-red-500/15 border-red-500/40 text-red-300 hover:bg-red-500/25`} onClick={() => {
+            <button type="button" className={`${btn} bg-red-500/15 text-red-300 hover:bg-red-500/25`} onClick={() => {
               for (const k of DATA_KEYS) { try { localStorage.removeItem(k); } catch { /* indisponível */ } }
               window.location.reload();
             }}>

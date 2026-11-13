@@ -9,6 +9,10 @@ import { SettingToggle } from '../components/cards/SettingToggle';
 import { useSystemInfo } from '../lib/systemInfo';
 
 // Novidades da versão (texto do GitHub Releases) em lista simples: títulos, itens e parágrafos
+const SECOES: Record<string, string> = {
+  added: 'Adicionado', changed: 'Alterado', fixed: 'Corrigido', removed: 'Removido',
+  deprecated: 'Descontinuado', security: 'Segurança', improved: 'Melhorado', performance: 'Desempenho',
+};
 function Novidades({ texto }: { texto: string }) {
   const corte = texto.search(/^##\s*⚙️/m);
   const linhas = (corte >= 0 ? texto.slice(0, corte) : texto).split(/\r?\n/)
@@ -18,7 +22,11 @@ function Novidades({ texto }: { texto: string }) {
     <div className="text-sm text-[var(--text-main)] space-y-1.5">
       {linhas.map((l, i) => {
         const t = l.trim();
-        if (/^#{2,}\s/.test(t)) return <p key={i} className="pt-2 first:pt-0 text-xs font-bold uppercase tracking-wide text-[var(--text-muted)]">{limpar(t.replace(/^#+\s*/, ''))}</p>;
+        if (/^#{2,}\s/.test(t)) {
+          const titulo = limpar(t.replace(/^#+\s*/, ''));
+          // Títulos padrão do changelog (em inglês no GitHub) no idioma do app; a camada de tradução leva aos outros
+          return <p key={i} className="pt-2 first:pt-0 text-xs font-semibold text-[var(--text-muted)]">{SECOES[titulo.toLowerCase()] || titulo}</p>;
+        }
         if (/^[-*]\s/.test(t)) return <p key={i} className={`flex gap-2 ${/^\s{2,}/.test(l) ? 'pl-4' : ''}`}><span className="text-winblue shrink-0">•</span><span>{limpar(t.slice(2))}</span></p>;
         return <p key={i} className="text-[var(--text-muted)]">{limpar(t)}</p>;
       })}
@@ -48,14 +56,14 @@ export function SettingsAboutScreen() {
   if (etapa === 'restarting') updateDetail = 'Reiniciando…';
   if (etapa === 'error') updateDetail = `A atualização falhou: ${updateStatus.message || 'erro desconhecido'}`;
   const updateButton = etapa === 'ready'
-    ? { label: 'Reiniciar', icon: <RotateCw size={13} />, onClick: restartToUpdate, tone: 'bg-emerald-500/15 border-emerald-500/30 text-emerald-500' }
+    ? { label: 'Reiniciar', icon: <RotateCw size={13} />, onClick: restartToUpdate, tone: 'bg-emerald-500/15 text-emerald-500 hover:bg-emerald-500/25' }
     : updateInfo?.available && (etapa === 'idle' || etapa === 'error')
-      ? { label: 'Baixar e instalar', icon: <Download size={13} />, onClick: installUpdate, tone: 'bg-winblue/15 border-winblue/30 text-winblue' }
+      ? { label: 'Baixar e instalar', icon: <Download size={13} />, onClick: installUpdate, tone: 'bg-winblue/15 text-winblue hover:bg-winblue/25' }
       : {
           label: ocupado ? (etapa === 'checking' ? 'Procurando' : etapa === 'restarting' ? 'Reiniciando' : pct) : 'Procurar',
           icon: ocupado ? <Loader2 size={13} className="animate-spin" /> : <RefreshCw size={13} />,
           onClick: () => { if (!ocupado) checkForUpdates(true); },
-          tone: 'bg-card/75 border-[var(--text-main)]/10 text-[var(--text-main)]',
+          tone: 'bg-card/75 text-[var(--text-main)] hover:bg-[var(--hover-fill)]',
         };
 
   // Estado do motor de conversão
@@ -74,11 +82,11 @@ export function SettingsAboutScreen() {
 
   let engineLabel = 'Verificando…';
   let engineDetail = 'Python, vozes neurais (Edge TTS) e FFmpeg';
-  let engineTone = 'bg-card/75 border-[var(--text-main)]/10 text-[var(--text-muted)]';
+  let engineTone = 'bg-card/75 text-[var(--text-muted)] hover:bg-[var(--hover-fill)]';
   if (health === 'offline') {
     engineLabel = 'Sem resposta';
     engineDetail = 'O serviço local não respondeu. Feche e abra o app.';
-    engineTone = 'bg-red-500/15 border-red-500/30 text-red-500';
+    engineTone = 'bg-red-500/15 text-red-500 hover:bg-red-500/25';
   } else if (health !== 'checking') {
     const faltando = [
       !health.python && 'Python',
@@ -88,11 +96,11 @@ export function SettingsAboutScreen() {
     if (faltando.length === 0) {
       engineLabel = 'Pronto';
       engineDetail = `Python ${health.python} · vozes neurais · FFmpeg${health.whisper ? ' · alinhamento de texto' : ''}`;
-      engineTone = 'bg-emerald-500/15 border-emerald-500/30 text-emerald-500';
+      engineTone = 'bg-emerald-500/15 text-emerald-500 hover:bg-emerald-500/25';
     } else {
       engineLabel = 'Incompleto';
       engineDetail = `Falta: ${faltando.join(', ')}. Rode o instalador de novo para corrigir.`;
-      engineTone = 'bg-amber-500/15 border-amber-500/30 text-amber-500';
+      engineTone = 'bg-amber-500/15 text-amber-500 hover:bg-amber-500/25';
     }
   }
   return (
@@ -110,7 +118,7 @@ export function SettingsAboutScreen() {
 
       <div className="space-y-2.5">
         {/* Versão */}
-        <div className="settings-list-row py-3 sm:py-3.5 px-4 sm:px-5 rounded-[32px] bg-card/60 backdrop-blur-xl border border-[var(--text-main)]/10 transition-colors flex items-center justify-between gap-4">
+        <div className="settings-list-row py-3 sm:py-3.5 px-4 sm:px-5 rounded-[32px] bg-card/60 backdrop-blur-xl transition-colors flex items-center justify-between gap-4">
           <div className="flex items-center gap-4">
             <div className="w-10 h-10 rounded-full bg-winblue/10 text-winblue flex items-center justify-center shrink-0">
               <Info size={20} />
@@ -126,7 +134,7 @@ export function SettingsAboutScreen() {
         </div>
 
         {/* Atualizar automaticamente */}
-        <div className="settings-list-row py-3 sm:py-3.5 px-4 sm:px-5 rounded-[32px] bg-card/60 backdrop-blur-xl border border-[var(--text-main)]/10 transition-colors flex items-center justify-between gap-4">
+        <div className="settings-list-row py-3 sm:py-3.5 px-4 sm:px-5 rounded-[32px] bg-card/60 backdrop-blur-xl transition-colors flex items-center justify-between gap-4">
           <div className="flex items-center gap-4">
             <div className="w-10 h-10 rounded-full bg-winblue/10 text-winblue flex items-center justify-center shrink-0">
               <Download size={20} />
@@ -145,7 +153,7 @@ export function SettingsAboutScreen() {
         </div>
 
         {/* Atualizações: procurar, baixar e instalar, reiniciar */}
-        <div className="settings-list-row py-3 sm:py-3.5 px-4 sm:px-5 rounded-[32px] bg-card/60 backdrop-blur-xl border border-[var(--text-main)]/10 transition-colors">
+        <div className="settings-list-row py-3 sm:py-3.5 px-4 sm:px-5 rounded-[32px] bg-card/60 backdrop-blur-xl transition-colors">
           <div className="flex items-center justify-between gap-4">
             <div className="flex items-center gap-4 min-w-0">
               <div className="w-10 h-10 rounded-full bg-winblue/10 text-winblue flex items-center justify-center shrink-0">
@@ -158,10 +166,8 @@ export function SettingsAboutScreen() {
             </div>
             <motion.button
               type="button"
-              whileHover={{ scale: 1.06 }}
-              whileTap={{ scale: 0.94 }}
               onClick={updateButton.onClick}
-              className={`h-8 px-4 rounded-full text-xs font-bold flex items-center gap-1.5 shrink-0 cursor-pointer border transition-[background-color,box-shadow] ${updateButton.tone}`}
+              data-hover-grow className={`h-8 px-4 rounded-full backdrop-blur-3xl shadow-sm text-xs font-bold flex items-center gap-1.5 shrink-0 cursor-pointer transition-[background-color,box-shadow] [&_svg]:text-inherit ${updateButton.tone}`}
             >
               {updateButton.icon}
               <span>{updateButton.label}</span>
@@ -173,7 +179,7 @@ export function SettingsAboutScreen() {
             </div>
           )}
           {updateInfo?.available && updateInfo.notes && (
-            <div className="mt-3 ml-14 p-4 rounded-[24px] bg-[var(--text-main)]/[0.04] border border-[var(--text-main)]/10 max-h-72 overflow-y-auto select-text">
+            <div className="mt-3 ml-14 p-4 rounded-[24px] bg-[var(--text-main)]/[0.04] max-h-72 overflow-y-auto select-text">
               <div className="flex items-center justify-between gap-3 mb-2">
                 <span className="flex items-center gap-1.5 text-sm font-semibold text-[var(--text-main)]"><Sparkles size={15} className="text-winblue" /> Novidades da versão {updateInfo.latest}</span>
                 {updateInfo.url && (
@@ -188,7 +194,7 @@ export function SettingsAboutScreen() {
         </div>
 
         {/* Modo leve */}
-        <div className="settings-list-row py-3 sm:py-3.5 px-4 sm:px-5 rounded-[32px] bg-card/60 backdrop-blur-xl border border-[var(--text-main)]/10 transition-colors flex items-center justify-between gap-4">
+        <div className="settings-list-row py-3 sm:py-3.5 px-4 sm:px-5 rounded-[32px] bg-card/60 backdrop-blur-xl transition-colors flex items-center justify-between gap-4">
           <div className="flex items-center gap-4">
             <div className="w-10 h-10 rounded-full bg-winblue/10 text-winblue flex items-center justify-center shrink-0">
               <Feather size={20} />
@@ -196,7 +202,7 @@ export function SettingsAboutScreen() {
             <div className="flex flex-col">
               <div className="flex items-center gap-2">
                 <span className="font-semibold text-base text-[var(--text-main)]">Modo leve</span>
-                {computador?.weak && <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-500 border border-emerald-500/20">Recomendado para este computador</span>}
+                {computador?.weak && <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-500">Recomendado para este computador</span>}
               </div>
               {computador && (
                 <span className="text-xs sm:text-sm text-[var(--text-main)]/80 mt-0.5">
@@ -210,7 +216,7 @@ export function SettingsAboutScreen() {
         </div>
 
         {/* Motor de conversão: verificado de verdade (Python, voz, FFmpeg e alinhamento) */}
-        <div className="settings-list-row py-3 sm:py-3.5 px-4 sm:px-5 rounded-[32px] bg-card/60 backdrop-blur-xl border border-[var(--text-main)]/10 transition-colors flex items-center justify-between gap-4">
+        <div className="settings-list-row py-3 sm:py-3.5 px-4 sm:px-5 rounded-[32px] bg-card/60 backdrop-blur-xl transition-colors flex items-center justify-between gap-4">
           <div className="flex items-center gap-4 min-w-0">
             <div className="w-10 h-10 rounded-full bg-winblue/10 text-winblue flex items-center justify-center shrink-0">
               <Cpu size={20} />
@@ -222,11 +228,9 @@ export function SettingsAboutScreen() {
           </div>
           <motion.button
             type="button"
-            whileHover={{ scale: 1.06 }}
-            whileTap={{ scale: 0.94 }}
             onClick={checkEngine}
             title="Verificar de novo"
-            className={`h-8 px-4 rounded-full text-xs font-bold flex items-center gap-1.5 shrink-0 cursor-pointer border transition-[background-color,box-shadow] ${engineTone}`}
+            data-hover-grow className={`h-8 px-4 rounded-full backdrop-blur-3xl shadow-sm text-xs font-bold flex items-center gap-1.5 shrink-0 cursor-pointer transition-[background-color,box-shadow] [&_svg]:text-inherit ${engineTone}`}
           >
             <span>{engineLabel}</span>
             <RefreshCw size={13} className={`shrink-0 ${health === 'checking' ? 'animate-spin' : ''}`} />

@@ -32,10 +32,8 @@ export function Section({ title, onSeeAll, children }: { title: string; onSeeAll
         <h2 className="text-xl font-bold text-[var(--text-main)]">{title}</h2>
         {onSeeAll && (
           <motion.button
-            whileHover={{ scale: 1.06 }}
-            whileTap={{ scale: 0.94 }}
             onClick={onSeeAll}
-            className="h-8 pl-3.5 pr-2.5 rounded-full bg-card/75 backdrop-blur-3xl border border-[var(--text-main)]/10 shadow-sm text-[var(--text-main)] hover:bg-white/15 hover:border-white/25 hover:shadow-[0_0_12px_rgba(255,255,255,0.2)] transition-all text-xs font-semibold flex items-center gap-1"
+            className="h-8 pl-3.5 pr-2.5 rounded-full bg-card/75 backdrop-blur-3xl shadow-sm text-[var(--text-main)] hover:bg-[var(--hover-fill)] transition-all text-xs font-semibold flex items-center gap-1"
           >
             <span>{t('see_all')}</span>
             <ChevronRight size={15} className="-mr-0.5 rtl:rotate-180" />
@@ -130,7 +128,7 @@ export function PlaceholderCard({
     <div className={cn('w-full h-full flex items-center justify-center', !image && `bg-gradient-to-br ${gradient}`)}>
       {image
         ? <img src={image} alt="" className="w-full h-full object-cover" />
-        : <div className="w-1/3 aspect-square rounded-[30%] bg-white/20 border border-white/25 backdrop-blur-xl" />}
+        : <div className="w-1/3 aspect-square rounded-[30%] bg-white/20 backdrop-blur-xl" />}
     </div>
   );
   const menuBody = (
@@ -144,7 +142,7 @@ export function PlaceholderCard({
   );
 
   return (
-    <motion.div
+    <motion.div data-popup-trigger
       {...(menu.length ? longPress : {})}
       style={{ WebkitTouchCallout: 'none' }}
       initial={{ opacity: 0, scale: 0.94 }}
@@ -183,8 +181,6 @@ export function PlaceholderCard({
           <div className={`relative w-8 h-8 shrink-0 transition-opacity duration-200 max-md:hidden ${showOptions ? 'opacity-100 z-50' : 'opacity-0 group-hover/card:opacity-100'}`}>
             {showOptions && !contextRect && <div className="fixed inset-0 z-40 cursor-default" {...getBackdropProps(handleClose)} />}
             <motion.button
-              whileHover={{ scale: 1.15 }}
-              whileTap={{ scale: 0.92 }}
               animate={morphTriggerAnimate(showOptions)}
               onClick={(e) => {
                 e.stopPropagation();
@@ -197,7 +193,7 @@ export function PlaceholderCard({
                   setShowOptions(true);
                 } else handleClose();
               }}
-              className="w-8 h-8 flex items-center justify-center rounded-full backdrop-blur-3xl border border-[var(--text-main)]/10 text-[var(--text-main)] bg-card/75 hover:bg-white/15 hover:border-white/25 hover:shadow-[0_0_12px_rgba(255,255,255,0.2)] transition-all cursor-pointer"
+              className="w-8 h-8 flex items-center justify-center rounded-full backdrop-blur-3xl text-[var(--text-main)] bg-card/75 hover:bg-[var(--hover-fill)] transition-all cursor-pointer"
               title={t('more_options')}
             >
               <MoreHorizontal size={16} />
@@ -270,8 +266,8 @@ export function ListRow({
       onClick={onClick}
       role={onClick ? 'button' : undefined}
       className={cn(
-        'settings-list-row py-3 sm:py-3.5 px-4 sm:px-5 rounded-[32px] bg-card/60 backdrop-blur-xl border border-[var(--text-main)]/10 transition-colors flex items-center justify-between gap-4',
-        onClick && 'hover:bg-white/10 cursor-pointer mobile-press'
+        'settings-list-row py-3 sm:py-3.5 px-4 sm:px-5 rounded-[32px] bg-card/60 backdrop-blur-xl transition-colors flex items-center justify-between gap-4',
+        onClick && 'hover:bg-[var(--hover-fill)] cursor-pointer mobile-press'
       )}
     >
       <div className="flex items-center gap-4 min-w-0">
@@ -293,7 +289,7 @@ export function ListRow({
 export function EmptyState({ icon, text }: { icon?: React.ReactNode; text: string }) {
   return (
     <div className="w-full min-h-[240px] flex flex-col items-center justify-center gap-3 text-[var(--text-muted)]">
-      {icon && <div className="w-14 h-14 rounded-full bg-card/60 border border-[var(--text-main)]/10 flex items-center justify-center">{icon}</div>}
+      {icon && <div className="w-14 h-14 rounded-full bg-card/60 flex items-center justify-center">{icon}</div>}
       <p className="text-sm">{text}</p>
     </div>
   );

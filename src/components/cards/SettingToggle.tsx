@@ -30,12 +30,12 @@ export function SettingToggle({
         role="switch"
         aria-checked={checked}
         disabled={disabled}
-        className={`relative w-[48px] h-[28px] rounded-full p-[4px] border transition-all duration-150 flex items-center ${
+        className={`relative w-[48px] h-[28px] rounded-full p-[4px] shadow-md transition-all duration-150 flex items-center ${
           disabled
-            ? 'bg-card/40 border-[var(--text-main)]/5 cursor-not-allowed'
+            ? 'bg-card/40 cursor-not-allowed'
             : checked
-              ? 'bg-winblue/20 border-winblue/40 group-hover:bg-winblue/25 group-hover:border-winblue/55 group-hover:shadow-[0_0_12px_rgba(var(--winblue-rgb),0.2)] cursor-pointer'
-              : 'bg-card/75 backdrop-blur-3xl border-[var(--text-main)]/10 group-hover:bg-white/15 group-hover:border-white/20 cursor-pointer'
+              ? 'bg-winblue/20 group-hover:bg-winblue/25 cursor-pointer'
+              : 'bg-card/75 backdrop-blur-3xl group-hover:bg-[var(--hover-fill)] cursor-pointer'
         }`}
       >
         <motion.div
@@ -44,8 +44,8 @@ export function SettingToggle({
           transition={{ type: "spring", stiffness: 950, damping: 42, mass: 0.4 }}
           className="w-[18px] h-[18px] shrink-0 flex items-center justify-center"
         >
-          <div className={`w-full h-full rounded-full transition-all duration-150 group-hover:scale-115 group-active:scale-95 shadow-sm ${
-            checked ? 'bg-winblue' : 'bg-[var(--text-muted)]/70 dark:bg-white/70 group-hover:bg-[var(--text-main)]'
+          <div className={`w-full h-full rounded-full transition-all duration-150 shadow-sm ${
+            checked ? 'bg-winblue' : 'bg-[var(--text-main)]/40 group-hover:bg-[var(--text-main)]/60'
           }`} />
         </motion.div>
       </button>

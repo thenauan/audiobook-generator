@@ -77,7 +77,7 @@ export function BottomAccessory({
     >
       <div
         aria-hidden="true"
-        className="absolute inset-0 -z-10 pointer-events-none backdrop-blur-xl border bg-card/80 border-[var(--button-secondary-bg)]"
+        className="absolute inset-0 -z-10 pointer-events-none backdrop-blur-xl bg-card/80"
         style={{ boxShadow: MOBILE_GLASS_SHADOW, borderRadius: isDesktop ? 28 : height / 2 }}
       />
       <div

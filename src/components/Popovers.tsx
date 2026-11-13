@@ -52,16 +52,15 @@ export function MenuOptionItem({
 
   const variantClasses = isDanger
     ? (clicked
-        ? "bg-red-500/20 text-red-500 shadow-[0_0_12px_rgba(239,68,68,0.25)]"
-        : "text-red-500 hover:bg-red-500/15 hover:text-red-400 hover:shadow-[0_0_12px_rgba(239,68,68,0.2)]")
+        ? "bg-red-500/20 text-red-500"
+        : "text-red-500 hover:bg-red-500/15 hover:text-red-400")
     : (clicked
-        ? "bg-slate-400/25 text-slate-900 shadow-[0_0_12px_rgba(100,116,139,0.3)] dark:bg-white/20 dark:text-white dark:shadow-[0_0_12px_rgba(255,255,255,0.2)]"
-        : "text-[var(--text-main)] hover:bg-white/15 hover:text-white hover:shadow-[0_0_12px_rgba(255,255,255,0.15)]");
+        ? "bg-slate-400/25 text-slate-900 dark:bg-white/20 dark:text-white"
+        : "text-[var(--text-main)] hover:bg-[var(--hover-fill)] hover:text-white");
 
   return (
     <motion.button
       animate={clicked ? { scale: 1.03 } : { scale: 1 }}
-      whileTap={{ scale: 0.97 }}
       transition={{ type: "spring", stiffness: 650, damping: 32, mass: 0.45 }}
       onClick={handleClick}
       className={cn(
@@ -482,9 +481,9 @@ export function PopupMorphContainer({
   }, []);
 
   const outerStyle: React.CSSProperties = {
-    '--winblue': 'var(--app-winblue, #0086F0)',
-    '--winblue-rgb': 'var(--app-winblue-rgb, 0, 134, 240)',
-    '--color-winblue': 'var(--app-winblue, #0086F0)',
+    '--winblue': 'var(--app-winblue, #0066CC)',
+    '--winblue-rgb': 'var(--app-winblue-rgb, 0, 102, 204)',
+    '--color-winblue': 'var(--app-winblue, #0066CC)',
     ...style,
   } as React.CSSProperties;
   delete outerStyle.width;
@@ -516,7 +515,7 @@ export function PopupMorphContainer({
       style={outerStyle}
       onClick={(e) => e.stopPropagation()}
       className={cn(
-        "bg-card/95 backdrop-blur-3xl border border-[var(--button-secondary-bg)] shadow-2xl flex flex-col text-left overflow-hidden",
+        "bg-card/95 backdrop-blur-3xl shadow-2xl flex flex-col text-left overflow-hidden",
         className
       )}
     >
@@ -999,7 +998,11 @@ export function getButtonCoverPopupStyle(
   };
 
   let originXStr: string;
-  if (alignSide === 'right') {
+  // Pop-up que cresceu (ex.: Opções -> Mais detalhes) e não cabe mais à esquerda do botão: em vez de empurrar a
+  // borda direita para longe do botão, passa a sair da borda esquerda do botão
+  const ladoEfetivo: 'left' | 'right' = alignSide === 'right' && anchorRight - actualWidth < minLeftBoundary
+    && anchorLeft + actualWidth <= window.innerWidth - margin ? 'left' : alignSide;
+  if (ladoEfetivo === 'right') {
     const rightEdge = Math.min(window.innerWidth - margin, Math.max(minLeftBoundary + actualWidth, anchorRight));
     styleResult.right = `${Math.round(window.innerWidth - rightEdge)}px`;
     const distFromRight = Math.max(12, Math.round(rightEdge - anchorCenterX));

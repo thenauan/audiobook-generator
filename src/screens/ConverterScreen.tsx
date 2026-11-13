@@ -260,10 +260,8 @@ export function ConverterScreen() {
                         initial={{ opacity: 0, scale: 0.85 }}
                         animate={{ opacity: 1, scale: 1 }}
                         exit={{ opacity: 0, scale: 0.85 }}
-                        whileHover={{ scale: 1.05 }}
-                        whileTap={{ scale: 0.95 }}
                         onClick={(e) => { e.stopPropagation(); handleRetryAllFailed(); }}
-                        className="h-8 px-3.5 rounded-full bg-card/75 backdrop-blur-3xl border border-[var(--text-main)]/15 text-[var(--text-main)] hover:text-white hover:bg-white/20 hover:border-white/35 hover:shadow-[0_0_14px_rgba(255,255,255,0.35)] flex items-center gap-1.5 text-xs font-semibold transition-all cursor-pointer shadow-sm [&_svg]:text-inherit"
+                        className="h-8 px-3.5 rounded-full bg-card/75 backdrop-blur-3xl text-[var(--text-main)] hover:text-white hover:bg-[var(--hover-fill)] flex items-center gap-1.5 text-xs font-semibold transition-all cursor-pointer shadow-sm [&_svg]:text-inherit"
                         title="Tentar de novo todos os que falharam"
                       >
                         <RotateCcw size={13} />
@@ -271,9 +269,7 @@ export function ConverterScreen() {
                       </motion.button>
                     )}
                   </AnimatePresence>
-                  <motion.button
-                    whileHover={{ scale: 1.06 }}
-                    whileTap={{ scale: 0.94 }}
+                  <motion.button data-popup-trigger
                     animate={cancelModalAnchor ? { scale: 1.22, opacity: 0, pointerEvents: 'none' } : { scale: 1, opacity: 1, pointerEvents: 'auto' }}
                     transition={{ type: "spring", stiffness: 500, damping: 30 }}
                     onClick={(e) => {
@@ -281,7 +277,7 @@ export function ConverterScreen() {
                       setCancelModalAnchor(e.currentTarget);
                       setShowCancelModal(true);
                     }}
-                    className="h-8 pl-3.5 pr-3 rounded-full bg-card/75 backdrop-blur-3xl border border-red-500/20 shadow-sm hover:bg-red-500/20 hover:border-red-400/40 hover:shadow-[0_0_12px_rgba(239,68,68,0.25)] text-red-500 text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 [&_svg]:text-inherit"
+                    className="h-8 pl-3.5 pr-3 rounded-full bg-card/75 backdrop-blur-3xl shadow-sm hover:bg-red-500/20 text-red-500 text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 [&_svg]:text-inherit"
                     title="Cancelar todas as conversões"
                   >
                     <span>Cancelar todos</span>
@@ -329,7 +325,7 @@ export function ConverterScreen() {
 
       {/* FASE 3: CONCLUSÃO E RESULTADOS */}
       {phase === 3 && (
-        <div className="p-8 rounded-3xl bg-card/75 backdrop-blur-3xl border border-[var(--text-main)]/10 shadow-2xl w-full space-y-6 text-center">
+        <div className="p-8 rounded-3xl bg-card/75 backdrop-blur-3xl shadow-2xl w-full space-y-6 text-center">
           <div className="w-16 h-16 rounded-full bg-emerald-500/20 text-emerald-500 mx-auto flex items-center justify-center shadow-lg">
             <CheckCircle2 size={36} />
           </div>
@@ -340,7 +336,7 @@ export function ConverterScreen() {
 
           <div className="space-y-3 text-left">
             {files.map((file) => (
-              <div key={file.id} className="p-4 rounded-2xl bg-black/5 dark:bg-white/5 flex items-center justify-between gap-3">
+              <div key={file.id} className="p-4 rounded-2xl bg-black/5 dark:bg-white/10 flex items-center justify-between gap-3">
                 <div className="flex items-center gap-3 min-w-0">
                   <div className="w-10 h-10 rounded-xl bg-winblue/15 text-winblue flex items-center justify-center shrink-0">
                     <Headphones size={20} />
@@ -355,7 +351,7 @@ export function ConverterScreen() {
                   {file.generatedPaths && file.generatedPaths.length > 0 && (
                     <button
                       onClick={() => toggleSnippet(file.generatedPaths![0])}
-                      className="h-8 px-3.5 rounded-full bg-card/75 backdrop-blur-3xl border border-[var(--text-main)]/10 text-xs font-semibold text-[var(--text-main)] hover:bg-white/15 hover:border-white/25 hover:shadow-[0_0_12px_rgba(255,255,255,0.2)] flex items-center gap-1.5 transition-all cursor-pointer"
+                      className="h-8 px-3.5 rounded-full bg-card/75 backdrop-blur-3xl text-xs font-semibold text-[var(--text-main)] hover:bg-[var(--hover-fill)] flex items-center gap-1.5 transition-all cursor-pointer"
                     >
                       {playingSnippet?.path === file.generatedPaths[0] ? (
                         <>
@@ -375,7 +371,7 @@ export function ConverterScreen() {
                       const target = file.generatedPaths && file.generatedPaths.length > 0 ? file.generatedPaths[0] : outputFolder;
                       fetch('/api/open-folder', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ path: target, isFile: true }) });
                     }}
-                    className="h-8 px-3.5 rounded-full bg-card/75 border border-winblue/40 text-winblue text-xs font-semibold hover:bg-winblue/15 hover:border-winblue/60 hover:shadow-[0_0_12px_rgba(var(--winblue-rgb),0.3)] shadow-sm flex items-center gap-1.5 transition-all cursor-pointer"
+                    className="h-8 px-3.5 rounded-full bg-card/75 text-winblue text-xs font-semibold hover:bg-winblue/15 shadow-sm flex items-center gap-1.5 transition-all cursor-pointer"
                   >
                     <FolderOpen size={13} />
                     <span>{t.openFolder}</span>
@@ -391,7 +387,7 @@ export function ConverterScreen() {
                 setFiles([]);
                 setPhase(0);
               }}
-              className="h-11 px-7 rounded-full bg-winblue/20 border border-winblue/45 shadow-xl backdrop-blur-3xl hover:bg-winblue/30 hover:border-winblue/75 hover:shadow-[0_20px_25px_-5px_rgba(0,0,0,0.25),0_0_22px_rgba(var(--winblue-rgb),0.45)] text-winblue text-xs font-bold transition-all cursor-pointer flex items-center gap-2"
+              className="h-11 px-7 rounded-full bg-winblue/20 shadow-xl backdrop-blur-3xl hover:bg-winblue/30 text-winblue text-xs font-bold transition-all cursor-pointer flex items-center gap-2"
             >
               <RotateCcw size={15} />
               <span>{t.newConversion}</span>

@@ -50,10 +50,10 @@ export function VoiceSampleButton({ code, size = 'sm', alwaysVisible = false }: 
       title={ativo ? 'Parar amostra' : 'Ouvir amostra'}
       aria-label={ativo ? 'Parar amostra' : 'Ouvir amostra'}
       onClick={(e) => toggleVoiceSample(e, code)}
-      className={`${dim} rounded-full flex items-center justify-center shrink-0 cursor-pointer border transition-[opacity,background-color,border-color] text-[var(--text-main)] ${
+      className={`${dim} rounded-full flex items-center justify-center shrink-0 cursor-pointer transition-[opacity,background-color] text-[var(--text-main)] ${
         ativo
-          ? 'opacity-100 bg-white/20 border-white/35'
-          : `${alwaysVisible ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'} bg-card/80 border-[var(--text-main)]/15 hover:bg-white/20 hover:border-white/35`
+          ? 'opacity-100 bg-white/20'
+          : `${alwaysVisible ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'} bg-card/80 hover:bg-[var(--hover-fill)]`
       }`}
     >
       {ativo ? <Pause size={icone} fill="currentColor" /> : <Play size={icone} fill="currentColor" className="ml-px" />}

@@ -54,15 +54,13 @@ export function OtherAppsScreen() {
                 <div className="absolute inset-0 bg-black/30 opacity-0 group-hover/appcard:opacity-100 transition-opacity duration-300 flex items-center justify-center pointer-events-none">
                   <motion.button
                     type="button"
-                    whileHover={{ scale: 1.15 }}
-                    whileTap={{ scale: 0.9 }}
                     onClick={(e) => {
                       e.stopPropagation();
                       openUrl(item.appUrl);
                     }}
                     title="Abrir app na web"
                     aria-label={`Abrir ${item.name} na web`}
-                    className="w-13 h-13 rounded-full bg-white/20 hover:bg-white/30 backdrop-blur-2xl border border-white/30 hover:border-white/75 shadow-2xl flex items-center justify-center text-white pointer-events-auto hover:shadow-[0_0_25px_rgba(255,255,255,0.65)] cursor-pointer"
+                    className="w-13 h-13 rounded-full bg-white/20 hover:bg-white/30 backdrop-blur-2xl shadow-2xl flex items-center justify-center text-white pointer-events-auto cursor-pointer"
                   >
                     <Globe size={24} />
                   </motion.button>
@@ -81,9 +79,7 @@ export function OtherAppsScreen() {
                 </div>
 
                 <div className={`relative w-8 h-8 shrink-0 ${isMenuOpen ? 'opacity-100' : 'opacity-0 group-hover/appcard:opacity-100'} transition-opacity duration-200`}>
-                  <motion.button
-                    whileHover={{ scale: 1.15 }}
-                    whileTap={{ scale: 0.92 }}
+                  <motion.button data-popup-trigger
                     animate={isMenuOpen ? { scale: 1.22, opacity: 0, pointerEvents: 'none' } : { scale: 1, opacity: 1, pointerEvents: 'auto' }}
                     transition={{ type: 'spring', stiffness: 500, damping: 30 }}
                     onClick={(e) => {
@@ -91,7 +87,7 @@ export function OtherAppsScreen() {
                       clearButtonCoverAnchorCache(e.currentTarget);
                       setMenu({ item, anchorEl: e.currentTarget });
                     }}
-                    className="w-8 h-8 flex items-center justify-center rounded-full backdrop-blur-3xl border border-[var(--text-main)]/10 text-[var(--text-main)] bg-card/75 hover:bg-white/15 hover:border-white/25 hover:shadow-[0_0_12px_rgba(255,255,255,0.2)] transition-all cursor-pointer"
+                    className="w-8 h-8 flex items-center justify-center rounded-full backdrop-blur-3xl text-[var(--text-main)] bg-card/75 hover:bg-[var(--hover-fill)] transition-all cursor-pointer"
                     title="Opções do app"
                     aria-label={`Opções de ${item.name}`}
                   >
@@ -114,9 +110,9 @@ export function OtherAppsScreen() {
                 key={`app-menu-${menu.item.id}`}
                 activeKey={menu.mode || 'options'}
                 direction={menu.direction ?? (menu.mode === 'details' ? 1 : -1)}
-                targetWidth={menu.mode === 'details' ? 340 : 230}
+                targetWidth={menu.mode === 'details' ? 280 : 230}
                 targetRadius={24}
-                style={getButtonCoverPopupStyle(menu.anchorEl, menu.mode === 'details' ? 340 : 230, menu.mode === 'details' ? 300 : 180, 'right')}
+                style={getButtonCoverPopupStyle(menu.anchorEl, menu.mode === 'details' ? 280 : 230, menu.mode === 'details' ? 300 : 180, 'right')}
                 className="text-[var(--text-main)]"
               >
                 {menu.mode === 'details' ? (

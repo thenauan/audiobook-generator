@@ -6,6 +6,10 @@ import './index.css';
 import App from './App.tsx';
 import { ErrorBoundary } from './app/ErrorBoundary';
 import { loadSettingsFromDisk } from './lib/settingsSync';
+import { installTapBounce } from './components/tapBounce';
+
+// Toque e mouse nos botões como no Audiobook Player: encolhe ao apertar e volta com mola
+installTapBounce();
 
 // Os ajustes salvos em disco são carregados antes de o app abrir
 loadSettingsFromDisk().finally(() => createRoot(document.getElementById('root')!).render(

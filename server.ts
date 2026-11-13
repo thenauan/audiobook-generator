@@ -310,6 +310,34 @@ async function startServer() {
     if (proximo) proximo();
   };
 
+  // Um leitor de e-books já aberto, esperando o próximo livro: o Python leva ~0,5 s para abrir e carregar as
+  // bibliotecas, e isso saía da espera de cada e-book carregado. Usado um, outro fica pronto para o seguinte
+  let leitorPronto: ReturnType<typeof spawn> | null = null;
+  const prepararLeitor = () => {
+    if (leitorPronto && leitorPronto.exitCode === null && !leitorPronto.killed) return;
+    try {
+      const p = spawn(PYTHON_CMD, ['extract_metadata.py', '--esperar'], { env: PY_ENV, windowsHide: true });
+      p.on('error', () => { if (leitorPronto === p) leitorPronto = null; });
+      p.on('exit', () => { if (leitorPronto === p) leitorPronto = null; });
+      p.stdin?.on('error', () => { /* o processo já saiu */ });
+      leitorPronto = p;
+    } catch { leitorPronto = null; }
+  };
+  const pegarLeitorPronto = (caminho: string, nome: string) => {
+    const p = leitorPronto;
+    leitorPronto = null;
+    setTimeout(prepararLeitor, 300);
+    if (p && p.exitCode === null && !p.killed && p.stdin?.writable) {
+      p.stdin.write(JSON.stringify([caminho, nome]) + '\n');
+      p.stdin.end();
+      return p;
+    }
+    return spawn(PYTHON_CMD, ['extract_metadata.py', caminho, nome], { env: PY_ENV, windowsHide: true });
+  };
+  setTimeout(prepararLeitor, 4000);
+  // Fechar o app não deixa o leitor parado para trás
+  process.on('exit', () => { try { leitorPronto?.kill(); } catch { /* já saiu */ } });
+
   app.post("/api/metadata", (req, res, next) => {
     console.log("Incoming metadata request...");
     upload.single('file')(req, res, (err) => {
@@ -336,7 +364,7 @@ async function startServer() {
       await metaEntrar();
       let saiu = false;
       const liberar = () => { if (!saiu) { saiu = true; metaSair(); } };
-      const pythonProcess = spawn(PYTHON_CMD, ['extract_metadata.py', newPath, originalName], { env: PY_ENV, windowsHide: true });
+      const pythonProcess = pegarLeitorPronto(newPath, originalName);
       // Um arquivo problemático não pode deixar o pedido pendurado para sempre
       const metaTimer = setTimeout(() => { try { pythonProcess.kill(); } catch { /* já terminou */ } }, 180000);
       console.log("Spawned python process for metadata extraction");
@@ -1288,10 +1316,15 @@ async function startServer() {
     app.use(vite.middlewares);
   } else {
     const distPath = path.join(process.cwd(), 'dist');
-    app.use(express.static(distPath, { index: false, maxAge: '1h' }));
+    // Só os arquivos com nome versionado (assets/, mudam de nome a cada build) ficam guardados. A página, os
+    // ícones e o resto são conferidos a cada abertura: antes, uma versão nova do app podia abrir com a interface
+    // ou o ícone antigos guardados por até 1 hora
+    app.use('/assets', express.static(path.join(distPath, 'assets'), { index: false, maxAge: '30d', immutable: true }));
+    app.use(express.static(distPath, { index: false, maxAge: 0 }));
     // Arquivos criados com o app rodando (trechos de audiobook em public/samples) não estão no dist
     app.use(express.static(path.join(process.cwd(), 'public')));
     app.get('*', (req, res) => {
+      res.setHeader('Cache-Control', 'no-store');
       res.sendFile(path.join(distPath, 'index.html'));
     });
   }

@@ -14,10 +14,18 @@
   /* Interface de celular até 1023px (celulares em qualquer orientação e tablets em pé);
      menu lateral a partir de 1024px (tablets deitados e computador) */
   --breakpoint-md: 64rem;
-  --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  --font-mono: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro", "Inter", "Segoe UI", Roboto, sans-serif;
+  --font-mono: -apple-system, BlinkMacSystemFont, "SF Pro", "Inter", "Segoe UI", Roboto, sans-serif;
+  --shadow-2xs: 0 0 3px var(--shadow-soft);
+  --shadow-xs: 0 0 4px var(--shadow-soft);
+  --shadow-sm: 0 0 8px var(--shadow-soft);
+  --shadow: 0 0 10px var(--shadow-soft);
+  --shadow-md: 0 0 16px var(--shadow-mid);
+  --shadow-lg: 0 0 24px var(--shadow-mid);
+  --shadow-xl: 0 0 36px var(--shadow-strong);
+  --shadow-2xl: 0 0 56px var(--shadow-strong);
 
-  --color-winblue: var(--winblue, #0086F0);
+  --color-winblue: var(--winblue, #0066CC);
   --color-success: #438E44;
   --color-error: #B83232;
   --color-warning: #FFB900;
@@ -90,25 +98,33 @@ html[data-font-size="large"] .text-\[11px\] { font-size: calc(11px * var(--font-
 
 @layer base {
   :root {
-    --app-winblue: #0086F0;
-    --app-winblue-rgb: 0, 134, 240;
-    --winblue: #0086F0;
-    --winblue-rgb: 0, 134, 240;
-    --bg-mica: #F0F2F5;
-    --bg-card: #FFFFFF;
+    --app-winblue: #0066CC;
+    --app-winblue-rgb: 0, 102, 204;
+    --winblue: #0066CC;
+    --winblue-rgb: 0, 102, 204;
+    --button-outline: rgb(0 0 0 / 0.05);
+    --surface-outline: rgb(0 0 0 / 0.03);
+    --shadow-soft: rgb(0 0 0 / 0.08);
+    --shadow-mid: rgb(0 0 0 / 0.1);
+    --shadow-strong: rgb(0 0 0 / 0.12);
+    --hover-fill: rgb(120 120 128 / 0.26);
+    /* Menu lateral: um cinza um pouco mais forte que os cards, para destacar do fundo */
+    --sidebar-bg: rgb(120 120 128 / 0.16);
+    --bg-mica: #FFFFFF;
+    --bg-card: #F2F2F7;
     --bg-sheet: #F2F2F7;
-    --bg-card-50: rgba(255, 255, 255, 0.28);
-    --bg-card-60: rgba(255, 255, 255, 0.35);
-    --bg-card-75: rgba(255, 255, 255, 0.45);
-    --bg-card-80: rgba(255, 255, 255, 0.52);
-    --bg-card-85: rgba(255, 255, 255, 0.58);
-    --bg-card-90: rgba(255, 255, 255, 0.62);
-    --bg-card-95: rgba(255, 255, 255, 0.68);
-    --card-hover: #F8F9FA;
-    --text-main: #1A1A1A;
-    --text-muted: #4B5563;
-    --button-secondary-bg: rgba(0, 0, 0, 0.06);
-    --button-secondary-hover: rgba(0, 0, 0, 0.10);
+    --bg-card-50: rgb(120 120 128 / 0.08);
+    --bg-card-60: rgb(120 120 128 / 0.10);
+    --bg-card-75: rgb(120 120 128 / 0.12);
+    --bg-card-80: rgb(120 120 128 / 0.14);
+    --bg-card-85: rgb(120 120 128 / 0.16);
+    --bg-card-90: rgb(120 120 128 / 0.18);
+    --bg-card-95: rgba(255, 255, 255, 0.78);
+    --card-hover: #E9E9EE;
+    --text-main: #000000;
+    --text-muted: rgb(60 60 67 / 60%);
+    --button-secondary-bg: rgb(120 120 128 / 0.2);
+    --button-secondary-hover: rgb(120 120 128 / 0.28);
     --dropzone-border: rgba(0, 0, 0, 0.15);
     --toggle-bg-off: #9CA3AF;
     --status-btn-bg: rgba(0, 0, 0, 0.06);
@@ -129,21 +145,28 @@ html[data-font-size="large"] .text-\[11px\] { font-size: calc(11px * var(--font-
   }
 
   .dark {
-    --bg-mica: #161616;
-    --bg-card: #242424;
-    --bg-sheet: #1C1C1E;
-    --bg-card-50: rgba(30, 30, 34, 0.25);
-    --bg-card-60: rgba(30, 30, 34, 0.32);
-    --bg-card-75: rgba(30, 30, 34, 0.42);
-    --bg-card-80: rgba(30, 30, 34, 0.50);
-    --bg-card-85: rgba(30, 30, 34, 0.56);
-    --bg-card-90: rgba(30, 30, 34, 0.62);
-    --bg-card-95: rgba(30, 30, 34, 0.68);
-    --card-hover: #2A2A2A;
-    --text-main: #F2F2F2;
-    --text-muted: #9CA3AF;
-    --button-secondary-bg: rgba(255, 255, 255, 0.06);
-    --button-secondary-hover: rgba(255, 255, 255, 0.10);
+    --button-outline: rgb(255 255 255 / 0.07);
+    --surface-outline: rgb(255 255 255 / 0.04);
+    --shadow-soft: rgb(0 0 0 / 0.26);
+    --shadow-mid: rgb(0 0 0 / 0.3);
+    --shadow-strong: rgb(0 0 0 / 0.36);
+    --hover-fill: rgb(120 120 128 / 0.36);
+    --sidebar-bg: rgb(120 120 128 / 0.26);
+    --bg-mica: #000000;
+    --bg-card: #2C2C2E;
+    --bg-sheet: #2C2C2E;
+    --bg-card-50: rgb(120 120 128 / 0.14);
+    --bg-card-60: rgb(120 120 128 / 0.16);
+    --bg-card-75: rgb(120 120 128 / 0.2);
+    --bg-card-80: rgb(120 120 128 / 0.22);
+    --bg-card-85: rgb(120 120 128 / 0.24);
+    --bg-card-90: rgb(120 120 128 / 0.26);
+    --bg-card-95: rgb(120 120 128 / 0.3);
+    --card-hover: #3A3A3C;
+    --text-main: #FFFFFF;
+    --text-muted: rgb(235 235 245 / 72%);
+    --button-secondary-bg: rgb(120 120 128 / 0.36);
+    --button-secondary-hover: rgb(120 120 128 / 0.44);
     --dropzone-border: rgba(255, 255, 255, 0.12);
     --toggle-bg-off: #4B5563;
     --status-btn-bg: rgba(255, 255, 255, 0.08);
@@ -164,20 +187,20 @@ html[data-font-size="large"] .text-\[11px\] { font-size: calc(11px * var(--font-
 
 @layer utilities {
   .backdrop-blur-3xl {
-    -webkit-backdrop-filter: blur(22px) saturate(165%);
-    backdrop-filter: blur(22px) saturate(165%);
+    -webkit-backdrop-filter: blur(22px) saturate(180%);
+    backdrop-filter: blur(22px) saturate(180%);
   }
   .backdrop-blur-2xl {
-    -webkit-backdrop-filter: blur(16px) saturate(160%);
-    backdrop-filter: blur(16px) saturate(160%);
+    -webkit-backdrop-filter: blur(16px) saturate(175%);
+    backdrop-filter: blur(16px) saturate(175%);
   }
   .backdrop-blur-xl {
-    -webkit-backdrop-filter: blur(12px) saturate(150%);
-    backdrop-filter: blur(12px) saturate(150%);
+    -webkit-backdrop-filter: blur(12px) saturate(170%);
+    backdrop-filter: blur(12px) saturate(170%);
   }
   .backdrop-blur-md {
-    -webkit-backdrop-filter: blur(8px) saturate(140%);
-    backdrop-filter: blur(8px) saturate(140%);
+    -webkit-backdrop-filter: blur(8px) saturate(160%);
+    backdrop-filter: blur(8px) saturate(160%);
   }
 
   /* Impede que .transition-all do CSS entre em conflito a cada frame com transform, width, height e filter do Framer Motion */
@@ -210,9 +233,9 @@ html[data-font-size="large"] .text-\[11px\] { font-size: calc(11px * var(--font-
 
 /* Pop-ups nunca devem ser afetados pela cor de destaque da capa nas páginas dos audiobooks */
 [data-popup-content="true"] {
-  --winblue: var(--app-winblue, #0086F0);
-  --winblue-rgb: var(--app-winblue-rgb, 0, 134, 240);
-  --color-winblue: var(--app-winblue, #0086F0);
+  --winblue: var(--app-winblue, #0066CC);
+  --winblue-rgb: var(--app-winblue-rgb, 0, 102, 204);
+  --color-winblue: var(--app-winblue, #0066CC);
 }
 
 /* Evita múltiplas camadas redundantes de backdrop-filter dentro de pop-ups e miniplayer que já possuem fundo desfocado */
@@ -396,15 +419,15 @@ html:not(.dark) [class*="hover:bg-white"]:hover {
 }
 
 html:not(.dark) [class*="hover:border-white"]:hover {
-  border-color: var(--hover-highlight-border) !important;
+  border-color: transparent !important;
 }
 
 html:not(.dark) [class*="hover:shadow-"][class*="255,255,255"]:hover {
-  box-shadow: var(--hover-highlight-shadow) !important;
+  box-shadow: none !important;
 }
 
 html:not(.dark) .group:hover [class*="group-hover:shadow-"][class*="255,255,255"] {
-  box-shadow: var(--hover-highlight-shadow) !important;
+  box-shadow: none !important;
 }
 
 html:not(.dark) [class*="hover:text-white"]:hover {
@@ -428,11 +451,11 @@ html:not(.dark) .group:hover [class*="group-hover:bg-white"] {
 }
 
 html:not(.dark) .group:hover [class*="group-hover:border-white"] {
-  border-color: var(--hover-highlight-border) !important;
+  border-color: transparent !important;
 }
 
 html:not(.dark) .group:hover [class*="group-hover:drop-shadow"] {
-  filter: drop-shadow(0 0 8px var(--hover-highlight-glow)) !important;
+  filter: none !important;
 }
 
 /* Transcrição na tela cheia (sempre sobre fundo escuro): preservar branco */
@@ -715,21 +738,15 @@ html:not(.dark) .fullscreen-transcript [class*="hover:text-white"]:hover {
   }
   /* Opção tocada (ou sob o dedo ao arrastar): o mesmo destaque do "passar o mouse" no computador */
   [data-popup-content] [data-touch-active] {
-    background-color: rgb(255 255 255 / 0.15) !important;
-    border-color: rgb(255 255 255 / 0.2) !important;
-    box-shadow: 0 0 12px rgb(255 255 255 / 0.15) !important;
-    color: #fff;
-    transform: scale(1.02);
-  }
-  html:not(.dark) [data-popup-content] [data-touch-active] {
-    background-color: rgb(100 116 139 / 0.18) !important;
-    border-color: rgb(100 116 139 / 0.25) !important;
+    background-color: var(--hover-fill) !important;
+    border-color: transparent !important;
+    box-shadow: none !important;
     color: inherit;
   }
   [data-popup-content] [data-touch-active].text-red-500 {
     background-color: rgb(239 68 68 / 0.15) !important;
-    border-color: rgb(239 68 68 / 0.3) !important;
-    box-shadow: 0 0 12px rgb(239 68 68 / 0.2) !important;
+    border-color: transparent !important;
+    box-shadow: none !important;
     color: rgb(248 113 113);
   }
   [data-popup-content] [data-touch-active] .group-hover\:text-white { color: inherit; }
@@ -1231,3 +1248,48 @@ html.app-paused *::before,
 html.app-paused *::after {
   animation-play-state: paused !important;
 }
+
+/* Botões do cabeçalho: sombra leve, mais forte com o mouse em cima (o crescimento vem de tapBounce.ts) */
+[data-app-header] button:not([data-popup-content] *) {
+  box-shadow: 0 6px 22px -6px rgba(0, 0, 0, 0.32), 0 1px 4px rgba(0, 0, 0, 0.10);
+  transition-property: background-color, color, opacity, box-shadow, scale;
+  transition-duration: 200ms;
+}
+@media (hover: hover) {
+  [data-app-header] button:not([data-popup-content] *):not(:disabled):hover {
+    box-shadow: 0 10px 28px -6px rgba(0, 0, 0, 0.42), 0 2px 6px rgba(0, 0, 0, 0.14);
+  }
+}
+.dark [data-app-header] button:not([data-popup-content] *) {
+  box-shadow: 0 6px 22px -6px rgba(0, 0, 0, 0.7), 0 1px 4px rgba(0, 0, 0, 0.4);
+}
+
+/* Botões que crescem com o mouse (abrem pop-up ou marcados com data-hover-grow) sempre têm sombra. Fica na
+   camada base para que uma sombra própria do botão (shadow-sm, shadow-md…) continue valendo */
+@layer base {
+  button[data-popup-trigger]:not([data-popup-option]),
+  button[data-hover-grow] {
+    box-shadow: 0 0 16px var(--shadow-mid);
+  }
+}
+
+/* Rodapé da configuração inicial: o mesmo desfoque progressivo do cabeçalho, de baixo para cima. O conteúdo que
+   rola por baixo dos botões fica desfocado perto deles e nítido mais acima */
+.onboarding-footer-blur {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 120px;
+  pointer-events: none;
+  z-index: 5;
+}
+.onboarding-footer-blur > .apple-blur-layer { position: absolute; inset: 0; pointer-events: none; }
+.onboarding-footer-blur > .apple-blur-layer:nth-child(1) { -webkit-backdrop-filter: blur(1px); backdrop-filter: blur(1px); -webkit-mask-image: linear-gradient(to bottom, transparent 0%, #000 14%, #000 30%, transparent 44%); mask-image: linear-gradient(to bottom, transparent 0%, #000 14%, #000 30%, transparent 44%); }
+.onboarding-footer-blur > .apple-blur-layer:nth-child(2) { -webkit-backdrop-filter: blur(2.5px); backdrop-filter: blur(2.5px); -webkit-mask-image: linear-gradient(to bottom, transparent 14%, #000 30%, #000 44%, transparent 58%); mask-image: linear-gradient(to bottom, transparent 14%, #000 30%, #000 44%, transparent 58%); }
+.onboarding-footer-blur > .apple-blur-layer:nth-child(3) { -webkit-backdrop-filter: blur(5px); backdrop-filter: blur(5px); -webkit-mask-image: linear-gradient(to bottom, transparent 30%, #000 44%, #000 58%, transparent 72%); mask-image: linear-gradient(to bottom, transparent 30%, #000 44%, #000 58%, transparent 72%); }
+.onboarding-footer-blur > .apple-blur-layer:nth-child(4) { -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); -webkit-mask-image: linear-gradient(to bottom, transparent 44%, #000 58%, #000 72%, transparent 86%); mask-image: linear-gradient(to bottom, transparent 44%, #000 58%, #000 72%, transparent 86%); }
+.onboarding-footer-blur > .apple-blur-layer:nth-child(5) { -webkit-backdrop-filter: blur(18px); backdrop-filter: blur(18px); -webkit-mask-image: linear-gradient(to bottom, transparent 58%, #000 72%, #000 86%, transparent 100%); mask-image: linear-gradient(to bottom, transparent 58%, #000 72%, #000 86%, transparent 100%); }
+.onboarding-footer-blur > .apple-blur-layer:nth-child(6) { -webkit-backdrop-filter: blur(28px); backdrop-filter: blur(28px); -webkit-mask-image: linear-gradient(to bottom, transparent 72%, #000 86%); mask-image: linear-gradient(to bottom, transparent 72%, #000 86%); }
+/* Modo leve: sem desfoque */
+html.lite .onboarding-footer-blur { display: none; }

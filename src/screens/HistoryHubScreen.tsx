@@ -28,7 +28,7 @@ export function HistoryHubScreen() {
 
         {history.length === 0 && generatedTexts.length === 0 ? (
           <div className="flex flex-col items-center justify-center min-h-[48vh] text-center px-4">
-            <div className="w-20 h-20 rounded-full bg-card/75 border border-[var(--text-main)]/10 flex items-center justify-center text-winblue shadow-xl backdrop-blur-3xl mb-5">
+            <div className="w-20 h-20 rounded-full bg-card/75 flex items-center justify-center text-winblue shadow-xl backdrop-blur-3xl mb-5">
               <RiBookOpenLine size={36} />
             </div>
             <h2 className="text-2xl sm:text-3xl font-semibold text-[var(--text-main)] tracking-tight mb-2.5">
@@ -38,10 +38,8 @@ export function HistoryHubScreen() {
               Seus audiobooks e seus textos gerados aparecerão aqui.
             </p>
             <motion.button
-              whileHover={{ scale: 1.06 }}
-              whileTap={{ scale: 0.94 }}
               onClick={() => navigateTo('converter')}
-              className="h-11 px-6 rounded-full bg-winblue/20 hover:bg-winblue/30 text-winblue border border-winblue/45 hover:border-winblue/75 shadow-xl backdrop-blur-3xl hover:shadow-[0_20px_25px_-5px_rgba(0,0,0,0.25),0_0_22px_rgba(var(--winblue-rgb),0.45)] font-semibold text-sm transition-all flex items-center gap-2.5 cursor-pointer [&_svg]:text-inherit"
+              className="h-11 px-6 rounded-full bg-winblue/20 hover:bg-winblue/30 text-winblue shadow-xl backdrop-blur-3xl font-semibold text-sm transition-all flex items-center gap-2.5 cursor-pointer [&_svg]:text-inherit"
             >
               <AiStarsIcon size={18} />
               <span>Ir para o Conversor</span>
@@ -57,20 +55,21 @@ export function HistoryHubScreen() {
                     <h3 className="text-xl font-bold text-[var(--text-main)]">{t.myAudiobooks}</h3>
                   </div>
 
-                  <motion.button 
-                    whileHover={{ scale: 1.06 }} 
-                    whileTap={{ scale: 0.94 }}
-                    onClick={() => navigateTo('history-audiobooks')}
-                    className="h-8 pl-3.5 pr-2.5 rounded-full bg-card/75 backdrop-blur-3xl border border-[var(--text-main)]/10 shadow-sm text-[var(--text-main)] hover:bg-white/15 hover:border-white/25 hover:shadow-[0_0_12px_rgba(255,255,255,0.25)] flex items-center gap-1 text-xs font-semibold transition-all cursor-pointer [&_svg]:text-inherit"
-                  >
-                    <span>{t.seeAll}</span>
-                    <ChevronRight size={15} className="-mr-0.5 rtl:rotate-180" />
-                  </motion.button>
+                  {/* "Ver todos" só quando a lista passa da fileira de 6 */}
+                  {history.length > 6 && (
+                    <motion.button
+                      onClick={() => navigateTo('history-audiobooks')}
+                      className="h-8 pl-3.5 pr-2.5 rounded-full bg-card/75 backdrop-blur-3xl shadow-sm text-[var(--text-main)] hover:bg-[var(--hover-fill)] flex items-center gap-1 text-xs font-semibold transition-all cursor-pointer [&_svg]:text-inherit"
+                    >
+                      <span>{t.seeAll}</span>
+                      <ChevronRight size={15} className="-mr-0.5 rtl:rotate-180" />
+                    </motion.button>
+                  )}
                 </div>
 
-                {/* Duas linhas de 6 audiobooks; o resto fica em "Ver todos" */}
+                {/* Uma fileira de 6 audiobooks; o resto fica em "Ver todos" */}
                 <div className="grid grid-cols-6 gap-4">
-                  {history.slice(0, 12).map((item) => (
+                  {history.slice(0, 6).map((item) => (
                     <UniversalCard
                       key={item.id}
                       id={item.id}
@@ -99,19 +98,20 @@ export function HistoryHubScreen() {
                     <h3 className="text-xl font-bold text-[var(--text-main)]">{t.myTexts}</h3>
                   </div>
 
-                  <motion.button 
-                    whileHover={{ scale: 1.06 }} 
-                    whileTap={{ scale: 0.94 }}
-                    onClick={() => navigateTo('history-texts')}
-                    className="h-8 pl-3.5 pr-2.5 rounded-full bg-card/75 backdrop-blur-3xl border border-[var(--text-main)]/10 shadow-sm text-[var(--text-main)] hover:bg-white/15 hover:border-white/25 hover:shadow-[0_0_12px_rgba(255,255,255,0.25)] flex items-center gap-1 text-xs font-semibold transition-all cursor-pointer [&_svg]:text-inherit"
-                  >
-                    <span>{t.seeAll}</span>
-                    <ChevronRight size={15} className="-mr-0.5 rtl:rotate-180" />
-                  </motion.button>
+                  {/* "Ver todos" só quando a lista passa da fileira de 6 */}
+                  {generatedTexts.length > 6 && (
+                    <motion.button
+                      onClick={() => navigateTo('history-texts')}
+                      className="h-8 pl-3.5 pr-2.5 rounded-full bg-card/75 backdrop-blur-3xl shadow-sm text-[var(--text-main)] hover:bg-[var(--hover-fill)] flex items-center gap-1 text-xs font-semibold transition-all cursor-pointer [&_svg]:text-inherit"
+                    >
+                      <span>{t.seeAll}</span>
+                      <ChevronRight size={15} className="-mr-0.5 rtl:rotate-180" />
+                    </motion.button>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-6 gap-4">
-                  {generatedTexts.map((text) => <TextTile key={text.id} text={text} />)}
+                  {generatedTexts.slice(0, 6).map((text) => <TextTile key={text.id} text={text} />)}
                 </div>
               </section>
             )}

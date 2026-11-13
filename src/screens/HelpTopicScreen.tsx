@@ -32,7 +32,7 @@ export function HelpTopicScreen() {
         <ol className="space-y-7">
           {topic.steps.map((step, i) => (
             <li key={step.title} className="flex items-start gap-5">
-              <span className="w-10 h-10 shrink-0 rounded-full bg-winblue/10 border border-winblue/30 text-winblue text-sm font-bold flex items-center justify-center">
+              <span className="w-10 h-10 shrink-0 rounded-full bg-winblue/10 text-winblue text-sm font-bold flex items-center justify-center">
                 {i + 1}
               </span>
               <div className="min-w-0 pt-0.5">
@@ -69,7 +69,7 @@ export function HelpTopicScreen() {
           <h2 className="text-xl font-bold text-[var(--text-main)] mb-6">Perguntas frequentes</h2>
           <div className="space-y-2.5">
             {topic.faq.map(item => (
-              <div key={item.q} className="py-4 px-5 rounded-[28px] bg-card/60 backdrop-blur-xl border border-[var(--text-main)]/10">
+              <div key={item.q} className="py-4 px-5 rounded-[28px] bg-card/60 backdrop-blur-xl">
                 <h3 className="text-sm font-bold text-[var(--text-main)]">{item.q}</h3>
                 <p className="text-sm text-[var(--text-muted)] leading-relaxed mt-1.5">{item.a}</p>
               </div>

@@ -29,10 +29,10 @@ export function SidebarItem({ icon, label, active, onClick, badge, highlight }: 
       className={cn(
         "w-full flex items-center gap-3 px-[15px] py-[11px] rounded-2xl text-sm font-semibold transition-all duration-150 select-none",
         active
-          ? "bg-winblue/15 text-winblue shadow-[0_0_12px_rgba(var(--winblue-rgb),0.18)]"
+          ? "bg-winblue/15 text-winblue"
           : highlight
-            ? "bg-white/15 shadow-[0_0_12px_rgba(255,255,255,0.15)] text-[var(--text-main)]"
-            : "text-[var(--text-main)] hover:bg-white/15 hover:text-white hover:shadow-[0_0_12px_rgba(255,255,255,0.15)]"
+            ? "bg-white/15 text-[var(--text-main)]"
+            : "text-[var(--text-main)] hover:bg-[var(--hover-fill)] hover:text-white"
       )}
     >
       <span className="shrink-0 flex items-center justify-center text-inherit">{icon}</span>
@@ -56,9 +56,10 @@ export function Sidebar({
   onSelect: (id: string) => void;
 }) {
   return (
-    <aside className="sidebar-safe fixed left-4 rtl:left-auto rtl:right-4 top-4 bottom-4 w-64 bg-card/75 backdrop-blur-3xl border border-[var(--button-secondary-bg)] rounded-3xl p-5 pt-6 pb-6 flex flex-col justify-between z-30 shadow-2xl overflow-hidden overscroll-none select-none">
+    <aside className="sidebar-safe fixed left-4 rtl:left-auto rtl:right-4 top-4 bottom-4 w-64 bg-[var(--sidebar-bg)] backdrop-blur-3xl rounded-3xl p-5 pt-6 pb-6 flex flex-col justify-between z-30 shadow-2xl overflow-hidden overscroll-none select-none">
       <div>
-        <div className="flex items-center gap-1.5 px-3 text-[var(--text-main)] text-xl tracking-tight mb-6">{brand}</div>
+        {/* Centralizado: a mesma distância das bordas esquerda e direita do menu */}
+        <div className="flex items-baseline justify-center text-[var(--text-main)] mb-6">{brand}</div>
         <div className="flex flex-col gap-1.5 px-1">
           {topItems.map(item => (
             <SidebarItem key={item.id} icon={item.icon} label={item.label} badge={item.badge} highlight={item.highlight} active={activeRoot === item.id} onClick={() => onSelect(item.id)} />
@@ -173,7 +174,7 @@ export function MobileBottomBar({
     tabBarStore.set(false);
     onSelect(id);
   };
-  const glass = "bg-card/80 backdrop-blur-xl border border-[var(--button-secondary-bg)]";
+  const glass = "bg-card/80 backdrop-blur-xl";
   const { size, compact } = MOBILE_BAR;
 
   // Ao reabrir a partir dos botões redondos, a pesquisa fica parada no lugar do botão até a barra

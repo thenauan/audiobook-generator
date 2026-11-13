@@ -43,7 +43,7 @@ export function AnchoredPopup({
         }}
         style={getButtonCoverPopupStyle(anchor, width, estimatedHeight, align)}
         onClick={(e) => e.stopPropagation()}
-        className={`bg-card/95 backdrop-blur-3xl border border-[var(--button-secondary-bg)] rounded-[24px] shadow-2xl z-[9999] flex flex-col text-left rtl:text-right overflow-hidden text-[var(--text-main)] ${className}`}
+        className={`bg-card/95 backdrop-blur-3xl rounded-[24px] shadow-2xl z-[9999] flex flex-col text-left rtl:text-right overflow-hidden text-[var(--text-main)] ${className}`}
       >
         {children}
       </motion.div>

@@ -73,9 +73,11 @@ export default function App() {
       {/* Menu lateral (computador) */}
       <Sidebar
         brand={
-          <button type="button" onClick={() => selectRoot('converter')} className="flex items-center text-[17px] cursor-pointer select-none">
-            <AppGlyph size={24} className="shrink-0" />
-            <span className="whitespace-nowrap"><span className="font-bold">Audiobook</span><span className="font-normal">Generator</span></span>
+          // Como o título do Audiobook Player: símbolo e palavra da mesma altura, colados. "Generator" é bem mais
+          // longa que "Player", então o tamanho é menor para caber no menu (36 px em vez de 42 px)
+          <button type="button" onClick={() => selectRoot('converter')} aria-label="Audiobook Generator" className="flex items-baseline gap-[2px] text-[36px] leading-none tracking-tight cursor-pointer select-none">
+            <AppGlyph size="0.72em" className="shrink-0" />
+            <span className="font-normal whitespace-nowrap" translate="no">Generator</span>
           </button>
         }
         topItems={[
@@ -116,11 +118,9 @@ export default function App() {
                     animate={{ opacity: 1, scale: 1 }}
                     exit={{ opacity: 0, scale: 0.92, transition: { duration: 0.08 } }}
                     transition={{ type: 'spring', stiffness: 520, damping: 36, mass: 0.55 }}
-                    whileHover={{ scale: 1.12 }}
-                    whileTap={{ scale: 0.92 }}
                     onClick={navigateBack}
                     className={cn(
-                      "h-9 flex items-center gap-1.5 px-4 rounded-full bg-card/75 border border-[var(--text-main)]/10 shadow-xl hover:bg-white/15 hover:border-white/25 hover:shadow-[0_0_15px_rgba(255,255,255,0.25)] text-[var(--text-main)] transition-all duration-200 backdrop-blur-3xl cursor-pointer",
+                      "h-9 flex items-center gap-1.5 px-4 rounded-full bg-card/75 shadow-xl hover:bg-[var(--hover-fill)] text-[var(--text-main)] transition-all duration-200 backdrop-blur-3xl cursor-pointer",
                       // Celular: com o título no cabeçalho, o voltar vira só a seta (como no iOS)
                       isMobile && isTitleScrolledPast && "w-9 px-0 justify-center"
                     )}
@@ -168,7 +168,7 @@ export default function App() {
                   exit={{ opacity: 0, y: -8, scale: 0.92, x: '-50%' }}
                   transition={{ type: 'spring', stiffness: 520, damping: 36, mass: 0.55 }}
                   onClick={toastAction ? () => { toastAction(); setToastMessage(null); } : undefined}
-                  className={`absolute left-1/2 ${currentScreen === 'search' ? 'top-[calc(var(--app-header-top)+52px)]' : 'top-[var(--app-header-top)]'} z-50 h-9 max-w-[min(520px,50%)] px-4 rounded-full bg-card/90 backdrop-blur-3xl border border-winblue/60 shadow-[0_0_16px_rgba(var(--winblue-rgb),0.25)] text-xs font-semibold text-winblue ${toastAction ? 'pointer-events-auto cursor-pointer hover:bg-winblue/15' : 'pointer-events-none'} flex items-center gap-2`}
+                  className={`absolute left-1/2 ${currentScreen === 'search' ? 'top-[calc(var(--app-header-top)+52px)]' : 'top-[var(--app-header-top)]'} z-50 h-9 max-w-[min(520px,50%)] px-4 rounded-full bg-card/90 backdrop-blur-3xl text-xs font-semibold text-winblue ${toastAction ? 'pointer-events-auto cursor-pointer hover:bg-winblue/15' : 'pointer-events-none'} flex items-center gap-2`}
                 >
                   <CheckCircle2 size={15} className="text-winblue shrink-0" />
                   <span className="truncate">{toastMessage}</span>
@@ -194,7 +194,7 @@ export default function App() {
                       className="relative flex items-center gap-2.5"
                     >
                       <div className="relative group/searchbar flex-1 min-w-0">
-                        <div className="h-9 w-full md:w-[460px] flex items-center gap-2.5 px-4 rounded-full bg-card/75 border border-[var(--text-main)]/10 shadow-xl hover:bg-white/15 hover:border-white/25 hover:shadow-[0_0_15px_rgba(255,255,255,0.25)] focus-within:bg-white/15 focus-within:border-winblue/40 focus-within:shadow-[0_0_20px_rgba(var(--winblue-rgb),0.3)] text-[var(--text-main)] transition-all backdrop-blur-3xl">
+                        <div className="h-9 w-full md:w-[460px] flex items-center gap-2.5 px-4 rounded-full bg-card/75 shadow-xl hover:bg-[var(--hover-fill)] focus-within:bg-white/15 focus-within:bg-winblue/15 text-[var(--text-main)] transition-all backdrop-blur-3xl">
                           <Search size={16} className="text-[var(--text-muted)] group-focus-within/searchbar:text-winblue transition-colors shrink-0" />
                           <input
                             ref={searchInputRef}
@@ -239,7 +239,7 @@ export default function App() {
                                 exit={{ opacity: 0, y: 8, scale: 0.98 }}
                                 transition={{ type: "spring", stiffness: 520, damping: 36, mass: 0.55 }}
                                 onClick={(e) => e.stopPropagation()}
-                                className="absolute top-full max-md:left-0 md:left-1/2 md:-translate-x-1/2 mt-3 w-full md:min-w-[520px] max-h-[calc(100vh-220px)] bg-card/95 backdrop-blur-3xl border border-[var(--button-secondary-bg)] rounded-[22px] shadow-2xl z-[100] flex flex-col overflow-hidden"
+                                className="absolute top-full max-md:left-0 md:left-1/2 md:-translate-x-1/2 mt-3 w-full md:min-w-[520px] max-h-[calc(100vh-220px)] bg-card/95 backdrop-blur-3xl rounded-[22px] shadow-2xl z-[100] flex flex-col overflow-hidden"
                               >
                                 {searchQuery.trim().toLowerCase() === '//dev' ? (
                                   <>
@@ -323,21 +323,17 @@ export default function App() {
                                                 <div className={`flex items-center gap-1 shrink-0 transition-opacity duration-200 ${isPlaying || activeBookMenu?.item.id === book.id ? 'opacity-100' : 'opacity-0 group-hover/searchitem:opacity-100 focus-within:opacity-100'}`}>
                                                   {book.path && (
                                                     <motion.button
-                                                      whileHover={{ scale: 1.12 }}
-                                                      whileTap={{ scale: 0.92 }}
                                                       onClick={(e) => {
                                                         e.stopPropagation();
                                                         toggleSnippet(book.path!);
                                                       }}
-                                                      className="w-8 h-8 rounded-full bg-card/75 border border-[var(--text-main)]/10 text-[var(--text-main)] hover:bg-white/15 hover:border-white/25 flex items-center justify-center transition-all cursor-pointer"
+                                                      className="w-8 h-8 rounded-full bg-card/75 text-[var(--text-main)] hover:bg-[var(--hover-fill)] flex items-center justify-center transition-all cursor-pointer"
                                                       title={isPlaying ? "Parar trecho" : "Ouvir trecho"}
                                                     >
                                                       {isPlaying ? <Pause size={14} /> : <Play size={14} className="translate-x-[1px]" />}
                                                     </motion.button>
                                                   )}
-                                                  <motion.button
-                                                    whileHover={{ scale: 1.12 }}
-                                                    whileTap={{ scale: 0.92 }}
+                                                  <motion.button data-popup-trigger
                                                     animate={activeBookMenu?.item.id === book.id ? { scale: 1.22, opacity: 0, pointerEvents: 'none' } : { scale: 1, opacity: 1, pointerEvents: 'auto' }}
                                                     transition={{ type: "spring", stiffness: 500, damping: 30 }}
                                                     onClick={(e) => {
@@ -345,7 +341,7 @@ export default function App() {
                                                       clearButtonCoverAnchorCache(e.currentTarget);
                                                       setActiveBookMenu({ item: book, anchorEl: e.currentTarget });
                                                     }}
-                                                    className="w-8 h-8 rounded-full bg-card/75 border border-[var(--text-main)]/10 text-[var(--text-main)] hover:bg-white/15 hover:border-white/25 flex items-center justify-center transition-all cursor-pointer"
+                                                    className="w-8 h-8 rounded-full bg-card/75 text-[var(--text-main)] hover:bg-[var(--hover-fill)] flex items-center justify-center transition-all cursor-pointer"
                                                     title="Opções"
                                                   >
                                                     <MoreVertical size={14} />
@@ -359,7 +355,7 @@ export default function App() {
                                             const coverUrl = text.cover || getGenericTextCover(text.title, text.author, text.coverColor);
 
                                             return (
-                                              <div
+                                              <div data-popup-trigger
                                                 key={text.id}
                                                 onClick={(e) => {
                                                   addToSearchHistory(searchQuery);
@@ -383,9 +379,7 @@ export default function App() {
                                                 </div>
 
                                                 <div className={`flex items-center gap-1 shrink-0 transition-opacity duration-200 ${activeTextMenu?.item.id === text.id ? 'opacity-100' : 'opacity-0 group-hover/searchitem:opacity-100 focus-within:opacity-100'}`}>
-                                                  <motion.button
-                                                    whileHover={{ scale: 1.12 }}
-                                                    whileTap={{ scale: 0.92 }}
+                                                  <motion.button data-popup-trigger
                                                     animate={activeTextMenu?.item.id === text.id ? { scale: 1.22, opacity: 0, pointerEvents: 'none' } : { scale: 1, opacity: 1, pointerEvents: 'auto' }}
                                                     transition={{ type: "spring", stiffness: 500, damping: 30 }}
                                                     onClick={(e) => {
@@ -393,7 +387,7 @@ export default function App() {
                                                       clearButtonCoverAnchorCache(e.currentTarget);
                                                       setActiveTextMenu({ item: text, anchorEl: e.currentTarget });
                                                     }}
-                                                    className="w-8 h-8 rounded-full bg-card/75 border border-[var(--text-main)]/10 text-[var(--text-main)] hover:bg-white/15 hover:border-white/25 flex items-center justify-center transition-all cursor-pointer"
+                                                    className="w-8 h-8 rounded-full bg-card/75 text-[var(--text-main)] hover:bg-[var(--hover-fill)] flex items-center justify-center transition-all cursor-pointer"
                                                     title="Opções"
                                                   >
                                                     <MoreVertical size={14} />
@@ -424,13 +418,11 @@ export default function App() {
                             animate={{ opacity: 1, scale: 1, x: 0 }}
                             exit={{ opacity: 0, scale: 0.55, x: interfaceLang === 'ar-SA' ? 18 : -18 }}
                             transition={{ type: "spring", stiffness: 480, damping: 34, mass: 0.55 }}
-                            whileHover={{ scale: 1.12 }}
-                            whileTap={{ scale: 0.92 }}
                             onClick={() => {
                               setSearchQuery('');
                               searchInputRef.current?.focus();
                             }}
-                            className="relative z-[110] pointer-events-auto w-9 h-9 flex items-center justify-center rounded-full bg-card/75 border border-[var(--text-main)]/10 shadow-xl hover:bg-white/15 hover:border-white/25 hover:shadow-[0_0_15px_rgba(255,255,255,0.25)] text-[var(--text-main)] transition-all backdrop-blur-3xl shrink-0 cursor-pointer"
+                            className="relative z-[110] pointer-events-auto w-9 h-9 flex items-center justify-center rounded-full bg-card/75 shadow-xl hover:bg-[var(--hover-fill)] text-[var(--text-main)] transition-all backdrop-blur-3xl shrink-0 cursor-pointer"
                             title="Limpar pesquisa"
                             aria-label="Limpar pesquisa"
                           >

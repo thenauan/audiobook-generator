@@ -28,7 +28,7 @@ export function DevCrashScreen() {
           Recursos como o <strong className="text-white font-bold">Conversor de Áudio</strong>, a <strong className="text-white font-bold">Fila de Processamento</strong> e a <strong className="text-white font-bold">Geração de Texto por IA</strong> estão temporariamente suspensos.
         </p>
 
-        <div className="text-xs text-red-300 bg-red-500/10 border border-red-500/25 p-4 rounded-3xl text-left font-mono break-all leading-relaxed mb-4">
+        <div className="text-xs text-red-300 bg-red-500/10 p-4 rounded-3xl text-left font-mono break-all leading-relaxed mb-4">
           Simulação de erro crítico do sistema iniciada pelo Modo de Desenvolvedor (//dev).
         </div>
 
@@ -36,13 +36,11 @@ export function DevCrashScreen() {
           <div className="relative inline-flex">
             <motion.button
               type="button"
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
               onClick={(e) => {
                 e.stopPropagation();
                 setDevShowStack(!devShowStack);
               }}
-              className="h-9 px-4 rounded-full bg-white/10 hover:bg-white/20 border border-white/25 text-white text-xs font-semibold flex items-center gap-2 transition-all shadow-md cursor-pointer"
+              className="h-9 px-4 rounded-full bg-white/10 hover:bg-[var(--hover-fill)] text-white text-xs font-semibold flex items-center gap-2 transition-all shadow-md cursor-pointer"
             >
               <Eye size={13} />
               <span>{devShowStack ? "Ocultar detalhes" : "Ver rastreamento da pilha"}</span>
@@ -54,7 +52,7 @@ export function DevCrashScreen() {
               navigator.clipboard.writeText("Error: Simulação de erro crítico do sistema iniciada pelo Modo de Desenvolvedor (//dev).\nStack: at App.tsx (DevMode Simulation)\nComponent: App");
               showToast("Detalhes do erro copiados!");
             }}
-            className="h-9 px-4 rounded-full bg-white/10 hover:bg-white/20 border border-white/25 text-white text-xs font-semibold flex items-center gap-2 transition-all shadow-md cursor-pointer"
+            className="h-9 px-4 rounded-full bg-white/10 hover:bg-[var(--hover-fill)] text-white text-xs font-semibold flex items-center gap-2 transition-all shadow-md cursor-pointer"
           >
             <Copy size={13} />
             <span>Copiar detalhes</span>
@@ -67,7 +65,7 @@ export function DevCrashScreen() {
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: 'auto' }}
               exit={{ opacity: 0, height: 0 }}
-              className="mb-8 p-4 rounded-2xl bg-black/60 border border-white/15 text-left text-xs font-mono text-neutral-300 max-h-48 overflow-y-auto custom-scrollbar whitespace-pre-wrap select-text"
+              className="mb-8 p-4 rounded-2xl bg-black/60 text-left text-xs font-mono text-neutral-300 max-h-48 overflow-y-auto custom-scrollbar whitespace-pre-wrap select-text"
             >
               Error: Simulação de erro crítico do sistema iniciada pelo Modo de Desenvolvedor (//dev).{"\n"}
               {"    "}at handleSimulateFullScreenError (src/App.tsx:2880:12){"\n"}
@@ -93,7 +91,7 @@ export function DevCrashScreen() {
               handleExitDevMode();
               showToast("Modo Dev encerrado e aplicativo restaurado!");
             }}
-            className="h-11 px-6 rounded-full bg-white/10 hover:bg-white/20 border border-white/20 text-white font-semibold text-sm flex items-center gap-2 transition-all cursor-pointer"
+            className="h-11 px-6 rounded-full bg-white/10 hover:bg-[var(--hover-fill)] text-white font-semibold text-sm flex items-center gap-2 transition-all cursor-pointer"
           >
             <Database size={16} />
             <span>Restaurar e sair do Modo Dev</span>

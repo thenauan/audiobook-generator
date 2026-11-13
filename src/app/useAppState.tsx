@@ -17,6 +17,7 @@ import { installTouchMenus } from '../components/touchMenu';
 import { installScrollFades } from '../components/scrollFade';
 import { setUiLanguage } from '../i18n';
 import { applyInterfaceLanguage, AVISO_TRADUCAO_AUTOMATICA } from '../lib/autoTranslate';
+import { ACCENT_COLORS, DEFAULT_ACCENT } from '../lib/accentColors';
 import { HELP_TOPICS } from '../data/helpTopics';
 import { isAudioFormat, audioFormatFromPath, type AudioFormat, type AudioQuality } from './audioFormats';
 import { clearButtonCoverAnchorCache } from '../components/Popovers';
@@ -80,27 +81,16 @@ export function useAppState() {
 
 
   // Cores de Acento do Fluent Design
-  const accentPalette: Record<string, { hex: string; rgb: string; name: string }> = {
-    blue: { hex: '#0086F0', rgb: '0, 134, 240', name: 'Azul' },
-    purple: { hex: '#8764B8', rgb: '135, 100, 184', name: 'Roxo' },
-    emerald: { hex: '#107C41', rgb: '16, 124, 65', name: 'Esmeralda' },
-    orange: { hex: '#CA5010', rgb: '202, 80, 16', name: 'Laranja' },
-    pink: { hex: '#E3008C', rgb: '227, 0, 140', name: 'Rosa' },
-    cyan: { hex: '#038387', rgb: '3, 131, 135', name: 'Ciano' },
-  };
+  const accentPalette = ACCENT_COLORS;
 
   const [accentColor, setAccentColor] = useState<string>(() => {
-    if (typeof window === 'undefined') return 'blue';
-    return safeGet('app_accent_color') || 'blue';
+    if (typeof window === 'undefined') return DEFAULT_ACCENT;
+    const salvo = safeGet('app_accent_color') || DEFAULT_ACCENT;
+    // Cores que saíram: esmeralda vira verde; ciano volta ao azul
+    const antigo: Record<string, string> = { emerald: 'green', cyan: 'blue' };
+    const cor = antigo[salvo] || salvo;
+    return ACCENT_COLORS[cor] ? cor : DEFAULT_ACCENT;
   });
-
-  useEffect(() => {
-    safeSet('app_accent_color', accentColor);
-    const active = accentPalette[accentColor] || accentPalette.blue;
-    document.documentElement.style.setProperty('--winblue', active.hex);
-    document.documentElement.style.setProperty('--winblue-rgb', active.rgb);
-    document.documentElement.style.setProperty('--color-winblue', active.hex);
-  }, [accentColor]);
 
   // Tema Claro / Escuro / Sistema
   const [themeMode, setThemeMode] = useState<'light' | 'dark' | 'system'>(() => {
@@ -109,6 +99,27 @@ export function useAppState() {
   });
 
   const [resolvedTheme, setResolvedTheme] = useState<'light' | 'dark'>('dark');
+
+  // Cor de destaque no tom do tema (e a versão de "Aumentar contraste" do sistema), como no Audiobook Player
+  const [moreContrast, setMoreContrast] = useState(() => typeof window !== 'undefined' && !!window.matchMedia?.('(prefers-contrast: more)').matches);
+  useEffect(() => {
+    const query = window.matchMedia?.('(prefers-contrast: more)');
+    if (!query) return;
+    const update = () => setMoreContrast(query.matches);
+    query.addEventListener('change', update);
+    return () => query.removeEventListener('change', update);
+  }, []);
+  useEffect(() => {
+    safeSet('app_accent_color', accentColor);
+    const cor = ACCENT_COLORS[accentColor] || ACCENT_COLORS[DEFAULT_ACCENT];
+    const escuro = resolvedTheme === 'dark';
+    const hex = moreContrast ? (escuro ? cor.soberDark : cor.soberLight) : (escuro ? cor.dark : cor.hex);
+    const rgb = [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16)).join(', ');
+    const raiz = document.documentElement.style;
+    for (const nome of ['--app-winblue', '--winblue', '--color-winblue']) raiz.setProperty(nome, hex);
+    raiz.setProperty('--app-winblue-rgb', rgb);
+    raiz.setProperty('--winblue-rgb', rgb);
+  }, [accentColor, resolvedTheme, moreContrast]);
 
   useEffect(() => {
     safeSet('app_theme_mode', themeMode);
@@ -166,7 +177,9 @@ export function useAppState() {
 
   const [uiFontSize, setUiFontSize] = useState<'standard' | 'small' | 'large'>(() => {
     if (typeof window === 'undefined') return 'standard';
-    return (safeGet('app_font_size') as any) || 'standard';
+    // Como no Audiobook Player: só Padrão e Grande ("Pequena" tinha o mesmo tamanho do Padrão)
+    const salvo = safeGet('app_font_size');
+    return salvo === 'large' ? 'large' : 'standard';
   });
 
   // A densidade da interface saiu dos Ajustes: limpa o que tiver ficado salvo
@@ -2013,6 +2026,7 @@ export function useAppState() {
             year: f.year || data.year || undefined,
             language: data.language ? normalizeLanguageName(data.language) : f.language,
             cover: data.cover || f.cover,
+            metadataPartial: true,
           };
         }));
       };
@@ -2112,6 +2126,10 @@ export function useAppState() {
       : files;
 
     if (targetFiles.length === 0) return;
+    if (targetFiles.some(f => f.metadataStatus === 'loading')) {
+      showToast('Espere terminar de carregar os metadados dos e-books para converter.');
+      return;
+    }
 
     // Validar campos obrigatórios: Título e Autor
     const invalidFile = targetFiles.find(f => !f.title || !f.title.trim() || !f.author || !f.author.trim());
@@ -2846,20 +2864,15 @@ export function useAppState() {
         },
       });
       actions.push({
-        id: 'close-app', icon: <Power size={16} />, label: t.closeApp, danger: true,
-        confirm: {
-          title: 'Fechar o Aplicativo?',
-          description: 'Todas as suas conversões e histórico estão salvos com segurança no seu disco local.',
-          confirmLabel: t.closeApp,
-          icon: <Power size={13} />,
-          onConfirm: () => {
-            if ((window as any).electron) {
-              (window as any).electron.closeApp();
-            } else {
-              window.close();
-              showToast("Você pode fechar esta aba no seu navegador.");
-            }
-          },
+        // Como no Audiobook Player: pílula vermelha com o nome, fecha direto (tudo já fica salvo no disco)
+        id: 'close-app', icon: <Power size={13} />, text: t.closeApp, label: t.closeApp, danger: true,
+        onClick: () => {
+          if ((window as any).electron) {
+            (window as any).electron.closeApp();
+          } else {
+            window.close();
+            showToast("Você pode fechar esta aba no seu navegador.");
+          }
         },
       });
     } else if (currentScreen === 'history' || currentScreen === 'history-audiobooks' || currentScreen === 'history-texts') {
@@ -2897,6 +2910,7 @@ export function useAppState() {
     } else if (currentScreen === 'converter') {
       // Pendentes: os carregados que ainda não foram convertidos
       const pendingFiles = phase === 2 ? files.filter(f => f.status === 'idle') : files;
+      const lendoMetadados = pendingFiles.some(f => f.metadataStatus === 'loading');
       if (files.length > 0) {
         actions.push({ id: 'add-files', icon: <Upload size={16} />, label: t.addFiles || 'Adicionar arquivos', onClick: () => fileInputRef.current?.click() });
       }
@@ -2904,8 +2918,10 @@ export function useAppState() {
       if (pendingFiles.length > 0) {
         actions.push({
           id: 'convert', icon: <AiStarsIcon size={15} />, text: 'Converter',
-          label: pendingFiles.length > 1 ? `Converter ${pendingFiles.length} e-books` : 'Converter e-book',
+          label: lendoMetadados ? 'Carregando metadados do e-book…' : pendingFiles.length > 1 ? `Converter ${pendingFiles.length} e-books` : 'Converter e-book',
           tone: 'accent',
+          // Enquanto algum e-book ainda está sendo lido, não dá para converter
+          disabled: lendoMetadados,
           onClick: () => handleStartConversion(),
         });
       }
@@ -2935,7 +2951,7 @@ export function useAppState() {
           className="relative flex items-center shrink-0 ml-auto"
           title={`Adicionado a Convertidos: ${historyNotificationBadge.title}`}
         >
-          <div className="relative w-6 h-8 rounded-[5px] overflow-hidden shadow-[0_4px_12px_rgba(0,0,0,0.3)] border border-white/15 bg-black/20 shrink-0">
+          <div className="relative w-6 h-8 rounded-[5px] overflow-hidden shadow-[0_4px_12px_rgba(0,0,0,0.3)] bg-black/20 shrink-0">
             <img src={historyNotificationBadge.coverUrl} alt={historyNotificationBadge.title} className="w-full h-full object-cover" />
           </div>
         </motion.div>

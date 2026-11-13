@@ -1,27 +1,19 @@
-// Símbolo do app (ondas sonoras + estrelas de IA), o mesmo desenho do ícone, sem o fundo redondo.
-// Usa a cor do texto (currentColor), então acompanha o tema claro/escuro.
-export function AppGlyph({ size = 24, className }: { size?: number; className?: string }) {
+// Símbolo do app sem fundo e numa cor só (a do texto, então acompanha o tema): as 7 barras de som e as duas
+// estrelas do ícone. `size` é a altura; a largura acompanha a proporção do desenho
+const VIEWBOX = '258 253 812 692';
+const PATH = 'M261 652a35 35 0 0 1 70 0v55a35 35 0 0 1 -70 0zM365 588a35 35 0 0 1 70 0v179a35 35 0 0 1 -70 0zM478 511a35 35 0 0 1 70 0v324a35 35 0 0 1 -70 0zM592 432a35 35 0 0 1 70 0v476a35 35 0 0 1 -70 0zM707 511a35 35 0 0 1 70 0v324a35 35 0 0 1 -70 0zM820 588a35 35 0 0 1 70 0v179a35 35 0 0 1 -70 0zM923 652a35 35 0 0 1 70 0v55a35 35 0 0 1 -70 0zM898 255Q913.73 364.62 1019 381Q913.73 397.38 898 507Q882.27 397.38 777 381Q882.27 364.62 898 255zM1007 475Q1015.06 528.94 1069 537Q1015.06 545.06 1007 599Q998.94 545.06 945 537Q998.94 528.94 1007 475z';
+
+export function AppGlyph({ size, className }: { size?: number | string; className?: string }) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"
-      viewBox="1.2 -0.5 24 24"
-      width={size}
-      height={size}
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={1.85}
-      strokeLinecap="round"
-      strokeLinejoin="round"
+      viewBox={VIEWBOX}
+      style={{ height: size ?? 24, width: 'auto' }}
+      fill="currentColor"
       className={className}
       aria-hidden="true"
     >
-      <path d="M3.2 11.4v4.4" />
-      <path d="M6.6 8.8v9.6" />
-      <path d="M10 6v15.2" />
-      <path d="M13.4 8.8v9.6" />
-      <path d="M16.8 11.4v4.4" />
-      <path d="M19.2 1.6Q19.744 4.456 22.6 5Q19.744 5.544 19.2 8.4Q18.656 5.544 15.8 5Q18.656 4.456 19.2 1.6Z" fill="currentColor" strokeWidth={1.1} />
-      <path d="M22 8.95Q22.232 10.168 23.45 10.4Q22.232 10.632 22 11.85Q21.768 10.632 20.55 10.4Q21.768 10.168 22 8.95Z" fill="currentColor" strokeWidth={0.9} />
+      <path d={PATH} />
     </svg>
   );
 }

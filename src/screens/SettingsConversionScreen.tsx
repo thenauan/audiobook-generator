@@ -40,7 +40,7 @@ export function SettingsConversionScreen() {
 
       <div className="space-y-2.5">
         {/* Formato de Arquivos */}
-        <div className="settings-list-row py-3 sm:py-3.5 px-4 sm:px-5 rounded-[32px] bg-card/60 backdrop-blur-xl border border-[var(--text-main)]/10 transition-colors flex items-center justify-between gap-4">
+        <div className="settings-list-row py-3 sm:py-3.5 px-4 sm:px-5 rounded-[32px] bg-card/60 backdrop-blur-xl transition-colors flex items-center justify-between gap-4">
           <div className="flex items-center gap-4">
             <div className="w-10 h-10 rounded-full bg-winblue/10 text-winblue flex items-center justify-center shrink-0">
               <LuBookAudio size={20} />
@@ -50,9 +50,7 @@ export function SettingsConversionScreen() {
               <span className="text-xs sm:text-sm text-[var(--text-muted)] mt-0.5">M4B, MP3, Opus, FLAC, WAV ou um arquivo por capítulo</span>
             </div>
           </div>
-          <motion.button 
-            whileHover={{ scale: 1.06 }} 
-            whileTap={{ scale: 0.94 }}
+          <motion.button data-popup-trigger
             animate={activeSettingSelector?.id === 'file-type' ? { scale: 1.22, opacity: 0, pointerEvents: 'none' } : { scale: 1, opacity: 1, pointerEvents: 'auto' }}
             transition={{ type: "spring", stiffness: 500, damping: 30 }}
             onClick={(e) => {
@@ -71,7 +69,7 @@ export function SettingsConversionScreen() {
                 onSelect: (val) => setFileTypeOption(val)
               });
             }}
-            className="h-8 pl-3.5 pr-2.5 rounded-full bg-card/75 backdrop-blur-3xl border border-[var(--text-main)]/10 shadow-sm text-[var(--text-main)] hover:bg-white/15 hover:border-white/25 hover:shadow-[0_0_12px_rgba(255,255,255,0.2)] flex items-center gap-1.5 text-xs font-semibold transition-all shrink-0 cursor-pointer [&_svg]:text-inherit"
+            className="h-8 pl-3.5 pr-2.5 rounded-full bg-card/75 backdrop-blur-3xl shadow-sm text-[var(--text-main)] hover:bg-[var(--hover-fill)] flex items-center gap-1.5 text-xs font-semibold transition-all shrink-0 cursor-pointer [&_svg]:text-inherit"
           >
             <span>{audioFormatInfo(fileTypeOption === 'ask' ? 'm4b' : fileTypeOption).label}</span>
             <ChevronDown size={14} className="-mr-0.5 text-inherit" />
@@ -79,7 +77,7 @@ export function SettingsConversionScreen() {
         </div>
 
         {/* Voz Padrão */}
-        <div className="settings-list-row py-3 sm:py-3.5 px-4 sm:px-5 rounded-[32px] bg-card/60 backdrop-blur-xl border border-[var(--text-main)]/10 transition-colors flex items-center justify-between gap-4">
+        <div className="settings-list-row py-3 sm:py-3.5 px-4 sm:px-5 rounded-[32px] bg-card/60 backdrop-blur-xl transition-colors flex items-center justify-between gap-4">
           <div className="flex items-center gap-4">
             <div className="w-10 h-10 rounded-full bg-winblue/10 text-winblue flex items-center justify-center shrink-0">
               <Headphones size={20} />
@@ -89,9 +87,7 @@ export function SettingsConversionScreen() {
               <span className="text-xs sm:text-sm text-[var(--text-muted)] mt-0.5">Voz utilizada para narrar conteúdos em português</span>
             </div>
           </div>
-          <motion.button 
-            whileHover={{ scale: 1.06 }} 
-            whileTap={{ scale: 0.94 }}
+          <motion.button data-popup-trigger
             animate={activeSettingSelector?.id === 'voice' ? { scale: 1.22, opacity: 0, pointerEvents: 'none' } : { scale: 1, opacity: 1, pointerEvents: 'auto' }}
             transition={{ type: "spring", stiffness: 500, damping: 30 }}
             onClick={(e) => {
@@ -107,7 +103,7 @@ export function SettingsConversionScreen() {
                 onSelect: (val) => setDefaultVoice(val)
               });
             }}
-            className="h-8 pl-3.5 pr-2.5 rounded-full bg-card/75 backdrop-blur-3xl border border-[var(--text-main)]/10 shadow-sm text-[var(--text-main)] hover:bg-white/15 hover:border-white/25 hover:shadow-[0_0_12px_rgba(255,255,255,0.2)] flex items-center gap-1.5 text-xs font-semibold transition-all shrink-0 cursor-pointer [&_svg]:text-inherit"
+            className="h-8 pl-3.5 pr-2.5 rounded-full bg-card/75 backdrop-blur-3xl shadow-sm text-[var(--text-main)] hover:bg-[var(--hover-fill)] flex items-center gap-1.5 text-xs font-semibold transition-all shrink-0 cursor-pointer [&_svg]:text-inherit"
           >
             <span>{(() => { const v = VOICES.find(x => x.code === defaultVoice); return v ? `${v.flag} ${v.label.split(' - ')[1] || v.label}` : defaultVoice; })()}</span>
             <ChevronDown size={14} className="-mr-0.5 text-inherit" />
@@ -115,7 +111,7 @@ export function SettingsConversionScreen() {
         </div>
 
         {/* Taxa de Amostragem */}
-        <div className="settings-list-row py-3 sm:py-3.5 px-4 sm:px-5 rounded-[32px] bg-card/60 backdrop-blur-xl border border-[var(--text-main)]/10 transition-colors flex items-center justify-between gap-4">
+        <div className="settings-list-row py-3 sm:py-3.5 px-4 sm:px-5 rounded-[32px] bg-card/60 backdrop-blur-xl transition-colors flex items-center justify-between gap-4">
           <div className="flex items-center gap-4">
             <div className="w-10 h-10 rounded-full bg-winblue/10 text-winblue flex items-center justify-center shrink-0">
               <Volume2 size={20} />
@@ -125,9 +121,7 @@ export function SettingsConversionScreen() {
               <span className="text-xs sm:text-sm text-[var(--text-muted)] mt-0.5">A voz chega em 24 kHz: a qualidade Voz guarda todo o som dela em arquivos menores</span>
             </div>
           </div>
-          <motion.button
-            whileHover={{ scale: 1.06 }}
-            whileTap={{ scale: 0.94 }}
+          <motion.button data-popup-trigger
             animate={activeSettingSelector?.id === 'audio-quality' ? { scale: 1.22, opacity: 0, pointerEvents: 'none' } : { scale: 1, opacity: 1, pointerEvents: 'auto' }}
             transition={{ type: "spring", stiffness: 500, damping: 30 }}
             onClick={(e) => {
@@ -144,7 +138,7 @@ export function SettingsConversionScreen() {
                 onSelect: (val) => setAudioQuality(val as AudioQuality)
               });
             }}
-            className="h-8 pl-3.5 pr-2.5 rounded-full bg-card/75 backdrop-blur-3xl border border-[var(--text-main)]/10 shadow-sm text-[var(--text-main)] hover:bg-white/15 hover:border-white/25 hover:shadow-[0_0_12px_rgba(255,255,255,0.2)] flex items-center gap-1.5 text-xs font-semibold transition-all shrink-0 cursor-pointer [&_svg]:text-inherit"
+            className="h-8 pl-3.5 pr-2.5 rounded-full bg-card/75 backdrop-blur-3xl shadow-sm text-[var(--text-main)] hover:bg-[var(--hover-fill)] flex items-center gap-1.5 text-xs font-semibold transition-all shrink-0 cursor-pointer [&_svg]:text-inherit"
           >
             <span>{audioQualityLabel(audioQuality)}</span>
             <ChevronDown size={14} className="-mr-0.5 text-inherit" />
@@ -152,7 +146,7 @@ export function SettingsConversionScreen() {
         </div>
 
         {/* Texto Sincronizado por Padrão */}
-        <div className="settings-list-row py-3 sm:py-3.5 px-4 sm:px-5 rounded-[32px] bg-card/60 backdrop-blur-xl border border-[var(--text-main)]/10 transition-colors flex items-center justify-between gap-4">
+        <div className="settings-list-row py-3 sm:py-3.5 px-4 sm:px-5 rounded-[32px] bg-card/60 backdrop-blur-xl transition-colors flex items-center justify-between gap-4">
           <div className="flex items-center gap-4">
             <div className="w-10 h-10 rounded-full bg-winblue/10 text-winblue flex items-center justify-center shrink-0">
               <FileText size={20} />
@@ -160,7 +154,7 @@ export function SettingsConversionScreen() {
             <div className="flex flex-col">
               <div className="flex items-center gap-2">
                 <span className="font-semibold text-base text-[var(--text-main)]">Texto sincronizado por padrão</span>
-                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-500 border border-emerald-500/20">Recomendado</span>
+                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-500">Recomendado</span>
               </div>
               <span className="text-xs sm:text-sm text-[var(--text-muted)] mt-0.5">
                 Gerar o texto sincronizado com o livro ao converter (pode mudar em cada e-book)
@@ -180,7 +174,7 @@ export function SettingsConversionScreen() {
         </div>
 
         {/* Onde guardar o texto sincronizado (na conversão e no menu de opções do audiobook) */}
-        <div className="settings-list-row py-3 sm:py-3.5 px-4 sm:px-5 rounded-[32px] bg-card/60 backdrop-blur-xl border border-[var(--text-main)]/10 transition-colors flex items-center justify-between gap-4">
+        <div className="settings-list-row py-3 sm:py-3.5 px-4 sm:px-5 rounded-[32px] bg-card/60 backdrop-blur-xl transition-colors flex items-center justify-between gap-4">
           <div className="flex items-center gap-4">
             <div className="w-10 h-10 rounded-full bg-winblue/10 text-winblue flex items-center justify-center shrink-0">
               <FolderTree size={20} />
@@ -194,9 +188,7 @@ export function SettingsConversionScreen() {
               </span>
             </div>
           </div>
-          <motion.button
-            whileHover={{ scale: 1.06 }}
-            whileTap={{ scale: 0.94 }}
+          <motion.button data-popup-trigger
             animate={activeSettingSelector?.id === 'sync-destination' ? { scale: 1.22, opacity: 0, pointerEvents: 'none' } : { scale: 1, opacity: 1, pointerEvents: 'auto' }}
             transition={{ type: "spring", stiffness: 500, damping: 30 }}
             onClick={(e) => {
@@ -220,7 +212,7 @@ export function SettingsConversionScreen() {
                 }
               });
             }}
-            className="h-8 pl-3.5 pr-2.5 rounded-full bg-card/75 backdrop-blur-3xl border border-[var(--text-main)]/10 shadow-sm text-[var(--text-main)] hover:bg-white/15 hover:border-white/25 hover:shadow-[0_0_12px_rgba(255,255,255,0.2)] flex items-center gap-1.5 text-xs font-semibold transition-all shrink-0 cursor-pointer [&_svg]:text-inherit"
+            className="h-8 pl-3.5 pr-2.5 rounded-full bg-card/75 backdrop-blur-3xl shadow-sm text-[var(--text-main)] hover:bg-[var(--hover-fill)] flex items-center gap-1.5 text-xs font-semibold transition-all shrink-0 cursor-pointer [&_svg]:text-inherit"
           >
             <span>{DESTINATION_LABELS[syncTextDestination]}</span>
             <ChevronDown size={14} className="-mr-0.5 text-inherit" />
@@ -228,7 +220,7 @@ export function SettingsConversionScreen() {
         </div>
 
         {/* Separação do texto sincronizado: frases, palavras ou as duas */}
-        <div className="settings-list-row py-3 sm:py-3.5 px-4 sm:px-5 rounded-[32px] bg-card/60 backdrop-blur-xl border border-[var(--text-main)]/10 transition-colors flex items-center justify-between gap-4">
+        <div className="settings-list-row py-3 sm:py-3.5 px-4 sm:px-5 rounded-[32px] bg-card/60 backdrop-blur-xl transition-colors flex items-center justify-between gap-4">
           <div className="flex items-center gap-4">
             <div className="w-10 h-10 rounded-full bg-winblue/10 text-winblue flex items-center justify-center shrink-0">
               <Rows3 size={20} />
@@ -240,9 +232,7 @@ export function SettingsConversionScreen() {
               </span>
             </div>
           </div>
-          <motion.button
-            whileHover={{ scale: 1.06 }}
-            whileTap={{ scale: 0.94 }}
+          <motion.button data-popup-trigger
             animate={activeSettingSelector?.id === 'sync-granularity' ? { scale: 1.22, opacity: 0, pointerEvents: 'none' } : { scale: 1, opacity: 1, pointerEvents: 'auto' }}
             transition={{ type: "spring", stiffness: 500, damping: 30 }}
             onClick={(e) => {
@@ -265,7 +255,7 @@ export function SettingsConversionScreen() {
                 }
               });
             }}
-            className="h-8 pl-3.5 pr-2.5 rounded-full bg-card/75 backdrop-blur-3xl border border-[var(--text-main)]/10 shadow-sm text-[var(--text-main)] hover:bg-white/15 hover:border-white/25 hover:shadow-[0_0_12px_rgba(255,255,255,0.2)] flex items-center gap-1.5 text-xs font-semibold transition-all shrink-0 cursor-pointer [&_svg]:text-inherit"
+            className="h-8 pl-3.5 pr-2.5 rounded-full bg-card/75 backdrop-blur-3xl shadow-sm text-[var(--text-main)] hover:bg-[var(--hover-fill)] flex items-center gap-1.5 text-xs font-semibold transition-all shrink-0 cursor-pointer [&_svg]:text-inherit"
           >
             <span>{GRANULARITY_LABELS[syncTextGranularity]}</span>
             <ChevronDown size={14} className="-mr-0.5 text-inherit" />

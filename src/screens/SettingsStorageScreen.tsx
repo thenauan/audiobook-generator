@@ -21,7 +21,7 @@ export function SettingsStorageScreen() {
 
       <div className="space-y-2.5">
         {/* Pasta de Salvamento / Destino */}
-        <div className="settings-list-row py-3 sm:py-3.5 px-4 sm:px-5 rounded-[32px] bg-card/60 backdrop-blur-xl border border-[var(--text-main)]/10 transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="settings-list-row py-3 sm:py-3.5 px-4 sm:px-5 rounded-[32px] bg-card/60 backdrop-blur-xl transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-center gap-4">
             <div className="w-10 h-10 rounded-full bg-winblue/10 text-winblue flex items-center justify-center shrink-0">
               <FolderOpen size={20} />
@@ -34,25 +34,21 @@ export function SettingsStorageScreen() {
           <div className="flex items-center gap-3 shrink-0 self-start sm:self-center">
             <div 
               title={outputFolder || "Nenhuma pasta selecionada"}
-              className="h-8 px-3.5 rounded-full bg-card/75 backdrop-blur-3xl border border-[var(--text-main)]/10 shadow-sm text-xs text-winblue flex items-center max-w-[200px] md:max-w-xs truncate select-all"
+              className="h-8 px-3.5 rounded-full bg-card/75 backdrop-blur-3xl shadow-sm text-xs text-winblue flex items-center max-w-[200px] md:max-w-xs truncate select-all"
             >
               <span className="truncate">{outputFolder || 'Nenhuma pasta selecionada'}</span>
             </div>
             <motion.button
-              whileHover={{ scale: 1.06 }}
-              whileTap={{ scale: 0.94 }}
               onClick={openOutputFolder}
-              className="h-8 px-4 rounded-full bg-card/75 backdrop-blur-3xl border border-[var(--text-main)]/10 shadow-sm text-[var(--text-main)] hover:bg-white/15 hover:border-white/25 hover:shadow-[0_0_12px_rgba(255,255,255,0.2)] font-semibold text-xs transition-all flex items-center justify-center shrink-0 cursor-pointer gap-1.5 [&_svg]:text-inherit"
+              className="h-8 px-4 rounded-full bg-card/75 backdrop-blur-3xl shadow-sm text-[var(--text-main)] hover:bg-[var(--hover-fill)] font-semibold text-xs transition-all flex items-center justify-center shrink-0 cursor-pointer gap-1.5 [&_svg]:text-inherit"
               title="Abrir a pasta no explorador de arquivos"
             >
               <span>Ver pasta</span>
               <ExternalLink size={13} className="shrink-0" />
             </motion.button>
             <motion.button
-              whileHover={{ scale: 1.06 }}
-              whileTap={{ scale: 0.94 }}
               onClick={handleSelectOutputFolder}
-              className="h-8 px-4 rounded-full bg-card/75 backdrop-blur-3xl border border-[var(--text-main)]/10 shadow-sm text-[var(--text-main)] hover:bg-white/15 hover:border-white/25 hover:shadow-[0_0_12px_rgba(255,255,255,0.2)] font-semibold text-xs transition-all flex items-center justify-center shrink-0 cursor-pointer gap-1.5"
+              className="h-8 px-4 rounded-full bg-card/75 backdrop-blur-3xl shadow-sm text-[var(--text-main)] hover:bg-[var(--hover-fill)] font-semibold text-xs transition-all flex items-center justify-center shrink-0 cursor-pointer gap-1.5"
               title="Selecionar pasta"
             >
               <span>Alterar pasta</span>
@@ -62,7 +58,7 @@ export function SettingsStorageScreen() {
         </div>
 
         {/* Limpar cache */}
-        <div className="settings-list-row py-3 sm:py-3.5 px-4 sm:px-5 rounded-[32px] bg-card/60 backdrop-blur-xl border border-[var(--text-main)]/10 transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="settings-list-row py-3 sm:py-3.5 px-4 sm:px-5 rounded-[32px] bg-card/60 backdrop-blur-xl transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-start gap-4">
             <div className="w-10 h-10 rounded-full bg-winblue/10 text-winblue flex items-center justify-center shrink-0 mt-0.5">
               <Trash2 size={20} />
@@ -73,10 +69,8 @@ export function SettingsStorageScreen() {
             </div>
           </div>
           <motion.button
-            whileHover={{ scale: 1.06 }}
-            whileTap={{ scale: 0.94 }}
             onClick={handleClearCache}
-            className="self-start sm:self-center h-8 px-4 rounded-full text-red-500 hover:text-red-600 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 font-semibold text-xs transition-all shadow-sm shrink-0 flex items-center gap-1.5 cursor-pointer"
+            className="self-start sm:self-center h-8 px-4 rounded-full text-red-500 hover:text-red-600 bg-red-500/10 hover:bg-red-500/20 font-semibold text-xs transition-all shadow-sm shrink-0 flex items-center gap-1.5 cursor-pointer"
           >
             <span>{(t as any).settings_clear_cache_btn}</span>
             <Trash2 size={14} />

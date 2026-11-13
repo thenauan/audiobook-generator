@@ -15,6 +15,8 @@ import { SettingToggle } from '../components/cards/SettingToggle';
 import { GENRES, SUBGENRES, toggleGenre, splitGenres } from '../data/genres';
 import { VoiceSampleButton } from '../lib/voiceSample';
 import { useApp } from '../app/AppContext';
+import { AnchoredPopup } from '../components/AnchoredPopup';
+import { ConfirmPanel } from '../components/ConfirmPanel';
 import { voicesFor, languageCode, voiceLang, hasSample } from '../data/voices';
 
 export function EditAudiobookScreen() {
@@ -23,6 +25,47 @@ export function EditAudiobookScreen() {
   const [todosSubgeneros, setTodosSubgeneros] = React.useState(false);
   // Editando um e-book da lista do Conversor (ainda não convertido) ou um audiobook pronto do Histórico
   const isPendingConversion = Boolean(editingFileId);
+  const [confirmRemoveChapter, setConfirmRemoveChapter] = React.useState<{ index: number; anchor: HTMLElement } | null>(null);
+  // Excluir uma marcação de capítulo: o texto dela passa para o capítulo anterior (ou o seguinte, se for o primeiro)
+  const removerMarcacao = (i: number) => {
+    if (editBookChapters.length <= 1) {
+      showToast("O livro deve conter ao menos um capítulo inicial.");
+      return;
+    }
+    setEditBookChapters(prev => {
+      if (prev.length <= 1) return prev;
+      const next = [...prev];
+      if (i > 0) {
+        const prevCap = next[i - 1];
+        const appendedContent = (next[i].content || next[i].snippet || '').trim();
+        const mergedContent = prevCap.content 
+          ? `${prevCap.content}\n\n${appendedContent}` 
+          : appendedContent;
+        const mergedSnippet = prevCap.snippet || mergedContent.slice(0, 500);
+        next[i - 1] = {
+          ...prevCap,
+          content: mergedContent,
+          snippet: mergedSnippet
+        };
+        next.splice(i, 1);
+      } else {
+        const nextCap = next[1];
+        const prependedContent = (next[0].content || next[0].snippet || '').trim();
+        const mergedContent = nextCap.content 
+          ? `${prependedContent}\n\n${nextCap.content}` 
+          : prependedContent;
+        const mergedSnippet = next[0].snippet || mergedContent.slice(0, 500);
+        next[1] = {
+          ...nextCap,
+          content: mergedContent,
+          snippet: mergedSnippet
+        };
+        next.splice(0, 1);
+      }
+      return next;
+    });
+    showToast("Marcação excluída. Conteúdo integrado ao capítulo anterior.");
+  };
   return (() => {
     const getLangFamily = (langStr: string) => {
       const s = (langStr || '').toLowerCase().trim();
@@ -79,19 +122,15 @@ export function EditAudiobookScreen() {
               {Boolean(editBookCover) && (
                 <motion.button 
                   type="button"
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
                   onClick={() => setEditBookCover(undefined)}
-                  className="px-4 py-2 rounded-full bg-card/85 backdrop-blur-3xl border border-red-500/35 text-red-400 shadow-xl flex items-center gap-2 text-xs font-semibold hover:bg-red-500/20 hover:border-red-500/60 hover:text-red-300 transition-all cursor-pointer"
+                  className="px-4 py-2 rounded-full bg-card/85 backdrop-blur-3xl text-red-400 shadow-xl flex items-center gap-2 text-xs font-semibold hover:bg-red-500/20 hover:text-red-300 transition-all cursor-pointer"
                 >
                   <Trash2 size={14} />
                   <span>Remover capa</span>
                 </motion.button>
               )}
-              <motion.label 
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                className="px-4 py-2 rounded-full bg-card/85 backdrop-blur-3xl border border-white/20 shadow-xl flex items-center gap-2 text-xs font-semibold text-white hover:bg-white/20 hover:border-white/30 transition-all cursor-pointer"
+              <motion.label
+                className="px-4 py-2 rounded-full bg-card/85 backdrop-blur-3xl shadow-xl flex items-center gap-2 text-xs font-semibold text-white hover:bg-[var(--hover-fill)] transition-all cursor-pointer"
                 title="Escolher capa do computador"
               >
                 <Upload size={14} />
@@ -125,7 +164,7 @@ export function EditAudiobookScreen() {
               <span className="text-xs font-semibold text-[var(--text-muted)]">
                 Cor da capa
               </span>
-              <div className="grid grid-cols-6 gap-x-3 gap-y-3.5 justify-items-center px-2.5 py-3 rounded-2xl bg-card/60 backdrop-blur-md border border-[var(--text-main)]/10 shadow-sm w-full">
+              <div className="grid grid-cols-6 gap-x-3 gap-y-3.5 justify-items-center px-2.5 py-3 rounded-2xl bg-card/60 backdrop-blur-md shadow-sm w-full">
                 {COVER_COLOR_PICKER.map(c => {
                   const isSelected = editCoverColor.toLowerCase() === c.hex.toLowerCase();
                   return (
@@ -137,8 +176,8 @@ export function EditAudiobookScreen() {
                       style={{ backgroundColor: c.hex }}
                       className={`w-3.5 h-3.5 rounded-full flex items-center justify-center transition-all duration-150 cursor-pointer ${
                                 isSelected 
-                                  ? 'ring-2 ring-winblue ring-offset-[1.5px] ring-offset-black/50 shadow-[0_0_10px_rgba(var(--winblue-rgb),0.5)] hover:shadow-[0_0_14px_rgba(var(--winblue-rgb),0.75)]' 
-                                  : 'opacity-85 hover:opacity-100 hover:ring-2 hover:ring-white/90 hover:ring-offset-[1.5px] hover:ring-offset-black/40 hover:shadow-[0_0_12px_rgba(255,255,255,0.75)]'
+                                  ? 'ring-2 ring-winblue ring-offset-[1.5px] ring-offset-black/50' 
+                                  : 'opacity-85 hover:opacity-100'
                               }`}
                     >
                       {isSelected && (
@@ -176,13 +215,13 @@ export function EditAudiobookScreen() {
                 boxShadow: ['0 0 0px rgba(239, 68, 68, 0)', '0 0 16px rgba(239, 68, 68, 0.35)', '0 0 0px rgba(239, 68, 68, 0)']
               } : { scale: 1 }}
               transition={!editBookTitle.trim() ? { repeat: Infinity, duration: 1.5, ease: "easeInOut" } : { duration: 0.2 }}
-              className={`w-full rounded-full border transition-all ${!editBookTitle.trim() ? 'border-red-500/80 bg-red-500/5' : 'border-[var(--text-main)]/10 bg-card/75'}`}
+              className={`w-full rounded-full transition-all ${!editBookTitle.trim() ? 'border border-red-500/80 bg-red-500/5' : ' bg-card/75'}`}
             >
               <input 
                 type="text"
                 value={editBookTitle}
                 onChange={(e) => setEditBookTitle(e.target.value)}
-                className="w-full h-11 px-5 rounded-full bg-transparent text-[var(--text-main)] text-sm font-semibold shadow-sm backdrop-blur-3xl focus:outline-none focus:border-winblue/60 focus:ring-2 focus:ring-winblue/30 focus:shadow-[0_0_15px_rgba(var(--winblue-rgb),0.35)] transition-all"
+                className="w-full h-11 px-5 rounded-full bg-transparent text-[var(--text-main)] text-sm font-semibold shadow-sm backdrop-blur-3xl focus:outline-none focus:bg-winblue/15 transition-all"
                 placeholder="Título da obra (Obrigatório)"
               />
             </motion.div>
@@ -210,13 +249,13 @@ export function EditAudiobookScreen() {
                 boxShadow: ['0 0 0px rgba(239, 68, 68, 0)', '0 0 16px rgba(239, 68, 68, 0.35)', '0 0 0px rgba(239, 68, 68, 0)']
               } : { scale: 1 }}
               transition={!editBookAuthor.trim() ? { repeat: Infinity, duration: 1.5, ease: "easeInOut" } : { duration: 0.2 }}
-              className={`w-full rounded-full border transition-all ${!editBookAuthor.trim() ? 'border-red-500/80 bg-red-500/5' : 'border-[var(--text-main)]/10 bg-card/75'}`}
+              className={`w-full rounded-full transition-all ${!editBookAuthor.trim() ? 'border border-red-500/80 bg-red-500/5' : ' bg-card/75'}`}
             >
               <input 
                 type="text"
                 value={editBookAuthor}
                 onChange={(e) => setEditBookAuthor(e.target.value)}
-                className="w-full h-11 px-5 rounded-full bg-transparent text-[var(--text-main)] text-sm font-semibold shadow-sm backdrop-blur-3xl focus:outline-none focus:border-winblue/60 focus:ring-2 focus:ring-winblue/30 focus:shadow-[0_0_15px_rgba(var(--winblue-rgb),0.35)] transition-all"
+                className="w-full h-11 px-5 rounded-full bg-transparent text-[var(--text-main)] text-sm font-semibold shadow-sm backdrop-blur-3xl focus:outline-none focus:bg-winblue/15 transition-all"
                 placeholder="Autor(a) (Obrigatório)"
               />
             </motion.div>
@@ -230,7 +269,7 @@ export function EditAudiobookScreen() {
               type="text"
               value={editBookCategory}
               onChange={(e) => setEditBookCategory(e.target.value)}
-              className="w-full h-11 px-5 rounded-full bg-card/75 border border-[var(--text-main)]/10 text-[var(--text-main)] text-sm font-semibold shadow-sm backdrop-blur-3xl focus:outline-none focus:border-winblue/60 focus:ring-2 focus:ring-winblue/30 focus:shadow-[0_0_15px_rgba(var(--winblue-rgb),0.35)] transition-all"
+              className="w-full h-11 px-5 rounded-full bg-card/75 text-[var(--text-main)] text-sm font-semibold shadow-sm backdrop-blur-3xl focus:outline-none focus:bg-winblue/15 transition-all"
               placeholder="Gêneros, separados por vírgula (ex: Romance, LGBTQIA+)"
             />
             <div className="flex flex-wrap gap-1.5 mt-2">
@@ -239,12 +278,12 @@ export function EditAudiobookScreen() {
                   key={g}
                   type="button"
                   onClick={() => setEditBookCategory(toggleGenre(editBookCategory, g))}
-                  className={`text-[10px] font-medium px-2.5 py-1 rounded-full border transition-all cursor-pointer hover:shadow-[0_0_12px_rgba(255,255,255,0.2)] ${splitGenres(editBookCategory).some(x => x.toLowerCase() === g.toLowerCase()) ? 'bg-winblue/15 border-winblue/45 text-winblue' : 'bg-card/75 border-[var(--text-main)]/10 text-[var(--text-muted)] hover:bg-white/15 hover:border-white/25 hover:text-white'}`}
+                  className={`text-[10px] font-medium px-2.5 py-1 rounded-full transition-all cursor-pointer ${splitGenres(editBookCategory).some(x => x.toLowerCase() === g.toLowerCase()) ? 'bg-winblue/15 text-winblue' : 'bg-card/75 text-[var(--text-muted)] hover:bg-[var(--hover-fill)] hover:text-white'}`}
                 >
                   {g}
                 </button>
               ))}
-              <button type="button" onClick={() => setTodosGeneros(v => !v)} className="text-[10px] font-medium px-2.5 py-1 rounded-full bg-card/75 border border-[var(--text-main)]/10 hover:bg-white/15 hover:border-white/25 hover:text-white hover:shadow-[0_0_12px_rgba(255,255,255,0.2)] text-winblue transition-all cursor-pointer">
+              <button type="button" onClick={() => setTodosGeneros(v => !v)} className="text-[10px] font-medium px-2.5 py-1 rounded-full bg-card/75 hover:bg-[var(--hover-fill)] text-winblue transition-all cursor-pointer">
                 {todosGeneros ? 'Ver menos' : `Ver todos (${GENRES.length})`}
               </button>
             </div>
@@ -259,7 +298,7 @@ export function EditAudiobookScreen() {
                 type="text"
                 value={editBookSubgenre}
                 onChange={(e) => setEditBookSubgenre(e.target.value)}
-                className="w-full h-11 px-5 rounded-full bg-card/75 border border-[var(--text-main)]/10 text-[var(--text-main)] text-sm font-semibold shadow-sm backdrop-blur-3xl focus:outline-none focus:border-winblue/60 focus:ring-2 focus:ring-winblue/30 focus:shadow-[0_0_15px_rgba(var(--winblue-rgb),0.35)] transition-all"
+                className="w-full h-11 px-5 rounded-full bg-card/75 text-[var(--text-main)] text-sm font-semibold shadow-sm backdrop-blur-3xl focus:outline-none focus:bg-winblue/15 transition-all"
                 placeholder="Subgêneros, separados por vírgula (ex: Romantasia, Ficção Queer)"
               />
               <div className="flex flex-wrap gap-1.5 mt-2">
@@ -268,12 +307,12 @@ export function EditAudiobookScreen() {
                     key={sg}
                     type="button"
                     onClick={() => setEditBookSubgenre(toggleGenre(editBookSubgenre, sg))}
-                    className={`text-[10px] font-medium px-2.5 py-1 rounded-full border transition-all cursor-pointer hover:shadow-[0_0_12px_rgba(255,255,255,0.2)] ${splitGenres(editBookSubgenre).some(x => x.toLowerCase() === sg.toLowerCase()) ? 'bg-winblue/15 border-winblue/45 text-winblue' : 'bg-card/75 border-[var(--text-main)]/10 text-[var(--text-muted)] hover:bg-white/15 hover:border-white/25 hover:text-white'}`}
+                    className={`text-[10px] font-medium px-2.5 py-1 rounded-full transition-all cursor-pointer ${splitGenres(editBookSubgenre).some(x => x.toLowerCase() === sg.toLowerCase()) ? 'bg-winblue/15 text-winblue' : 'bg-card/75 text-[var(--text-muted)] hover:bg-[var(--hover-fill)] hover:text-white'}`}
                   >
                     {sg}
                   </button>
                 ))}
-                <button type="button" onClick={() => setTodosSubgeneros(v => !v)} className="text-[10px] font-medium px-2.5 py-1 rounded-full bg-card/75 border border-[var(--text-main)]/10 hover:bg-white/15 hover:border-white/25 hover:text-white hover:shadow-[0_0_12px_rgba(255,255,255,0.2)] text-winblue transition-all cursor-pointer">
+                <button type="button" onClick={() => setTodosSubgeneros(v => !v)} className="text-[10px] font-medium px-2.5 py-1 rounded-full bg-card/75 hover:bg-[var(--hover-fill)] text-winblue transition-all cursor-pointer">
                   {todosSubgeneros ? 'Ver menos' : `Ver todos (${SUBGENRES.length})`}
                 </button>
               </div>
@@ -286,7 +325,7 @@ export function EditAudiobookScreen() {
                 type="text"
                 value={editBookYear}
                 onChange={(e) => setEditBookYear(e.target.value)}
-                className="w-full h-11 px-5 rounded-full bg-card/75 border border-[var(--text-main)]/10 text-[var(--text-main)] text-sm font-semibold shadow-sm backdrop-blur-3xl focus:outline-none focus:border-winblue/60 focus:ring-2 focus:ring-winblue/30 focus:shadow-[0_0_15px_rgba(var(--winblue-rgb),0.35)] transition-all"
+                className="w-full h-11 px-5 rounded-full bg-card/75 text-[var(--text-main)] text-sm font-semibold shadow-sm backdrop-blur-3xl focus:outline-none focus:bg-winblue/15 transition-all"
                 placeholder="Ano (ex: 1899)"
               />
               <div className="flex flex-wrap gap-1.5 mt-2">
@@ -295,7 +334,7 @@ export function EditAudiobookScreen() {
                     key={yr}
                     type="button"
                     onClick={() => setEditBookYear(yr)}
-                    className="text-[10px] font-medium px-2.5 py-1 rounded-full bg-card/75 border border-[var(--text-main)]/10 hover:bg-white/15 hover:border-white/25 hover:text-white hover:shadow-[0_0_12px_rgba(255,255,255,0.2)] text-[var(--text-muted)] transition-all cursor-pointer"
+                    className="text-[10px] font-medium px-2.5 py-1 rounded-full bg-card/75 hover:bg-[var(--hover-fill)] hover:text-white text-[var(--text-muted)] transition-all cursor-pointer"
                   >
                     {yr}
                   </button>
@@ -313,7 +352,7 @@ export function EditAudiobookScreen() {
                 type="text"
                 value={editBookNarrator}
                 onChange={(e) => setEditBookNarrator(e.target.value)}
-                className="w-full h-11 px-5 rounded-full bg-card/75 border border-[var(--text-main)]/10 text-[var(--text-main)] text-sm font-semibold shadow-sm backdrop-blur-3xl focus:outline-none focus:border-winblue/60 focus:ring-2 focus:ring-winblue/30 focus:shadow-[0_0_15px_rgba(var(--winblue-rgb),0.35)] transition-all"
+                className="w-full h-11 px-5 rounded-full bg-card/75 text-[var(--text-main)] text-sm font-semibold shadow-sm backdrop-blur-3xl focus:outline-none focus:bg-winblue/15 transition-all"
                 placeholder="Nome do(a) Narrador(a)"
               />
               <div className="flex flex-wrap gap-1.5 mt-2">
@@ -327,7 +366,7 @@ export function EditAudiobookScreen() {
                     key={nr}
                     type="button"
                     onClick={() => setEditBookNarrator(nr)}
-                    className="text-[10px] font-medium px-2.5 py-1 rounded-full bg-card/75 border border-[var(--text-main)]/10 hover:bg-white/15 hover:border-white/25 hover:text-white hover:shadow-[0_0_12px_rgba(255,255,255,0.2)] text-[var(--text-muted)] transition-all cursor-pointer"
+                    className="text-[10px] font-medium px-2.5 py-1 rounded-full bg-card/75 hover:bg-[var(--hover-fill)] hover:text-white text-[var(--text-muted)] transition-all cursor-pointer"
                   >
                     {nr}
                   </button>
@@ -342,7 +381,7 @@ export function EditAudiobookScreen() {
                 type="text"
                 value={editBookLanguage}
                 onChange={(e) => setEditBookLanguage(e.target.value)}
-                className="w-full h-11 px-5 rounded-full bg-card/75 border border-[var(--text-main)]/10 text-[var(--text-main)] text-sm font-semibold shadow-sm backdrop-blur-3xl focus:outline-none focus:border-winblue/60 focus:ring-2 focus:ring-winblue/30 focus:shadow-[0_0_15px_rgba(var(--winblue-rgb),0.35)] transition-all"
+                className="w-full h-11 px-5 rounded-full bg-card/75 text-[var(--text-main)] text-sm font-semibold shadow-sm backdrop-blur-3xl focus:outline-none focus:bg-winblue/15 transition-all"
                 placeholder="Idioma da obra"
               />
               <div className="flex flex-wrap gap-1.5 mt-2">
@@ -361,7 +400,7 @@ export function EditAudiobookScreen() {
                     key={l.val}
                     type="button"
                     onClick={() => setEditBookLanguage(l.val)}
-                    className="text-[10px] font-medium px-2.5 py-1 rounded-full bg-card/75 border border-[var(--text-main)]/10 hover:bg-white/15 hover:border-white/25 hover:text-white hover:shadow-[0_0_12px_rgba(255,255,255,0.2)] text-[var(--text-muted)] transition-all cursor-pointer"
+                    className="text-[10px] font-medium px-2.5 py-1 rounded-full bg-card/75 hover:bg-[var(--hover-fill)] hover:text-white text-[var(--text-muted)] transition-all cursor-pointer"
                   >
                     {l.label}
                   </button>
@@ -394,10 +433,10 @@ export function EditAudiobookScreen() {
                 <div
                   key={v.code}
                   onClick={() => setEditBookVoice(v.code)}
-                  className={`p-3 px-4 rounded-3xl border transition-all flex items-center justify-between cursor-pointer select-none ${
+                  className={`p-3 px-4 rounded-3xl transition-all flex items-center justify-between cursor-pointer select-none ${
                             isSelected
-                              ? 'bg-winblue/15 border-winblue text-winblue shadow-[0_0_14px_rgba(var(--winblue-rgb),0.3)]'
-                              : 'bg-card/75 border-[var(--text-main)]/10 text-[var(--text-main)] hover:bg-white/10'
+                              ? 'bg-winblue/15 text-winblue'
+                              : 'bg-card/75 text-[var(--text-main)] hover:bg-[var(--hover-fill)]'
                           }`}
                 >
                   <div className="flex items-center gap-2.5 min-w-0 pr-2">
@@ -429,13 +468,13 @@ export function EditAudiobookScreen() {
                 <div
                   key={f.value}
                   onClick={() => setEditBookFileType(f.value)}
-                  className={`p-4 rounded-3xl border transition-all cursor-pointer flex items-start gap-3.5 ${
+                  className={`p-4 rounded-3xl transition-all cursor-pointer flex items-start gap-3.5 ${
                     selected
-                      ? 'bg-winblue/15 border-winblue text-winblue shadow-[0_0_16px_rgba(var(--winblue-rgb),0.3)]'
-                      : 'bg-card/75 border-[var(--text-main)]/10 text-[var(--text-main)] hover:bg-white/10'
+                      ? 'bg-winblue/15 text-winblue'
+                      : 'bg-card/75 text-[var(--text-main)] hover:bg-[var(--hover-fill)]'
                   }`}
                 >
-                  <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${selected ? 'bg-winblue/15 text-winblue' : 'bg-black/5 dark:bg-white/5 text-[var(--text-main)]'}`}>
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${selected ? 'bg-winblue/15 text-winblue' : 'bg-black/5 dark:bg-white/10 text-[var(--text-main)]'}`}>
                     {audioFormatIcon(f.value, 18)}
                   </div>
                   <div className="flex-1">
@@ -455,7 +494,7 @@ export function EditAudiobookScreen() {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div 
             onClick={() => setEditBookGenerateSyncText(prev => !prev)}
-            className="p-4 sm:p-5 rounded-3xl bg-card/75 border border-[var(--text-main)]/10 hover:border-winblue/40 flex items-center justify-between cursor-pointer transition-all"
+            className="p-4 sm:p-5 rounded-3xl bg-card/75 flex items-center justify-between cursor-pointer transition-all"
           >
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-full bg-winblue/10 text-winblue flex items-center justify-center shrink-0">
@@ -480,14 +519,14 @@ export function EditAudiobookScreen() {
                 setEditBookRequiresTranslation(prev => !prev);
               }
             }}
-            className={`p-4 sm:p-5 rounded-3xl bg-card/75 border border-[var(--text-main)]/10 flex items-center justify-between transition-all ${
+            className={`p-4 sm:p-5 rounded-3xl bg-card/75 flex items-center justify-between transition-all ${
                       canTranslate 
-                        ? 'hover:border-winblue/40 cursor-pointer' 
+                        ? ' cursor-pointer' 
                         : 'opacity-50 cursor-not-allowed select-none'
                     }`}
           >
             <div className="flex items-center gap-3">
-              <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${canTranslate ? 'bg-amber-500/10 text-amber-500' : 'bg-black/5 dark:bg-white/5 text-[var(--text-muted)]'}`}>
+              <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${canTranslate ? 'bg-amber-500/10 text-amber-500' : 'bg-black/5 dark:bg-white/10 text-[var(--text-muted)]'}`}>
                 <RiTranslateAi2 size={18} />
               </div>
               <div>
@@ -521,7 +560,7 @@ export function EditAudiobookScreen() {
         <div className="flex flex-wrap items-center gap-3">
           <div 
             title={editBookHasTranscript ? (editBookTranscriptFileName || 'Texto nos metadados') : 'Texto não anexado'}
-            className="h-9 px-4 rounded-full bg-card/75 backdrop-blur-3xl border border-[var(--text-main)]/10 shadow-sm text-xs font-medium text-winblue flex items-center max-w-[280px] md:max-w-md truncate select-all"
+            className="h-9 px-4 rounded-full bg-card/75 backdrop-blur-3xl shadow-sm text-xs font-medium text-winblue flex items-center max-w-[280px] md:max-w-md truncate select-all"
           >
             <span className="truncate">
               {editBookHasTranscript ? (editBookTranscriptFileName || 'Texto nos metadados') : 'Nenhum texto anexado'}
@@ -548,14 +587,12 @@ export function EditAudiobookScreen() {
             <>
               <motion.button
                 type="button"
-                whileHover={{ scale: 1.06 }}
-                whileTap={{ scale: 0.94 }}
                 onClick={() => {
                   setEditBookHasTranscript(false);
                   setEditBookTranscriptFileName(undefined);
                   showToast("Texto removido");
                 }}
-                className="h-9 px-4 rounded-full bg-card/75 border border-red-500/20 shadow-sm hover:bg-red-500/20 hover:border-red-400/40 hover:shadow-[0_0_15px_rgba(239,68,68,0.25)] text-red-500 font-semibold text-xs transition-all shrink-0 flex items-center gap-1.5 cursor-pointer"
+                data-hover-grow className="h-9 px-4 rounded-full bg-card/75 shadow-sm hover:bg-red-500/20 text-red-500 font-semibold text-xs transition-all shrink-0 flex items-center gap-1.5 cursor-pointer"
               >
                 <Trash2 size={14} />
                 <span>Remover texto</span>
@@ -563,10 +600,8 @@ export function EditAudiobookScreen() {
 
               <motion.button
                 type="button"
-                whileHover={{ scale: 1.06 }}
-                whileTap={{ scale: 0.94 }}
                 onClick={() => editBookTranscriptInputRef.current?.click()}
-                className="h-9 px-4 rounded-full bg-card/75 backdrop-blur-3xl border border-[var(--text-main)]/10 shadow-sm text-[var(--text-main)] hover:bg-white/15 hover:border-white/25 hover:shadow-[0_0_12px_rgba(255,255,255,0.2)] font-semibold text-xs transition-all flex items-center gap-1.5 shrink-0 cursor-pointer"
+                data-hover-grow className="h-9 px-4 rounded-full bg-card/75 backdrop-blur-3xl shadow-sm text-[var(--text-main)] hover:bg-[var(--hover-fill)] font-semibold text-xs transition-all flex items-center gap-1.5 shrink-0 cursor-pointer"
               >
                 <Upload size={14} />
                 <span>Alterar texto</span>
@@ -575,10 +610,8 @@ export function EditAudiobookScreen() {
           ) : (
             <motion.button
               type="button"
-              whileHover={{ scale: 1.06 }}
-              whileTap={{ scale: 0.94 }}
               onClick={() => editBookTranscriptInputRef.current?.click()}
-              className="h-9 px-4 rounded-full bg-card/75 backdrop-blur-3xl border border-[var(--text-main)]/10 shadow-sm text-[var(--text-main)] hover:bg-white/15 hover:border-white/25 hover:shadow-[0_0_12px_rgba(255,255,255,0.2)] font-semibold text-xs transition-all flex items-center gap-1.5 shrink-0 cursor-pointer"
+              data-hover-grow className="h-9 px-4 rounded-full bg-card/75 backdrop-blur-3xl shadow-sm text-[var(--text-main)] hover:bg-[var(--hover-fill)] font-semibold text-xs transition-all flex items-center gap-1.5 shrink-0 cursor-pointer"
             >
               <Upload size={14} />
               <span>Carregar texto</span>
@@ -595,14 +628,14 @@ export function EditAudiobookScreen() {
         <div className="relative w-full">
           <textarea 
             value={editBookDescription}
-            onChange={(e) => setEditBookDescription(e.target.value.slice(0, 1500))}
-            maxLength={1500}
+            onChange={(e) => setEditBookDescription(e.target.value.slice(0, 2000))}
+            maxLength={2000}
             rows={8}
-            className="w-full h-[232px] p-5 pb-7 rounded-3xl bg-card/75 border border-[var(--text-main)]/10 text-[var(--text-main)] text-sm leading-relaxed shadow-sm backdrop-blur-3xl focus:outline-none focus:border-winblue/60 focus:ring-2 focus:ring-winblue/30 focus:shadow-[0_0_15px_rgba(var(--winblue-rgb),0.35)] transition-all resize-none custom-scrollbar"
+            className="w-full h-[232px] p-5 pb-7 rounded-3xl bg-card/75 text-[var(--text-main)] text-sm leading-relaxed shadow-sm backdrop-blur-3xl focus:outline-none focus:bg-winblue/15 transition-all resize-none custom-scrollbar"
             placeholder="Sinopse da obra"
           />
           <span className="absolute bottom-2.5 right-3.5 text-[10px] text-[var(--text-muted)] pointer-events-none select-none">
-            {editBookDescription.length}/1500
+            {editBookDescription.length}/2000
           </span>
         </div>
       </div>
@@ -623,19 +656,17 @@ export function EditAudiobookScreen() {
               value={pronOrigInput}
               onChange={(e) => setPronOrigInput(e.target.value)}
               placeholder="Palavra ou termo no texto (ex: Nietzsche)"
-              className="flex-1 w-full h-10 px-4 rounded-full bg-card/75 border border-[var(--text-main)]/10 text-[var(--text-main)] text-sm font-medium shadow-sm backdrop-blur-3xl focus:outline-none focus:border-winblue/60 transition-all placeholder:text-[var(--text-muted)]/70"
+              className="flex-1 w-full h-10 px-4 rounded-full bg-card/75 text-[var(--text-main)] text-sm font-medium shadow-sm backdrop-blur-3xl focus:outline-none focus:bg-winblue/15 transition-all placeholder:text-[var(--text-muted)]/70"
             />
             <input
               type="text"
               value={pronRepInput}
               onChange={(e) => setPronRepInput(e.target.value)}
               placeholder="Pronúncia fonética para a IA (ex: Nitche)"
-              className="flex-1 w-full h-10 px-4 rounded-full bg-card/75 border border-[var(--text-main)]/10 text-[var(--text-main)] text-sm font-medium shadow-sm backdrop-blur-3xl focus:outline-none focus:border-winblue/60 transition-all placeholder:text-[var(--text-muted)]/70"
+              className="flex-1 w-full h-10 px-4 rounded-full bg-card/75 text-[var(--text-main)] text-sm font-medium shadow-sm backdrop-blur-3xl focus:outline-none focus:bg-winblue/15 transition-all placeholder:text-[var(--text-muted)]/70"
             />
             <motion.button
               type="button"
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
               onClick={() => {
                 const orig = pronOrigInput.trim();
                 const rep = pronRepInput.trim();
@@ -651,7 +682,7 @@ export function EditAudiobookScreen() {
                 setPronRepInput('');
                 showToast(`Regra adicionada: "${orig}" → "${rep}"`);
               }}
-              className="w-full sm:w-auto h-10 px-5 rounded-full bg-winblue/20 hover:bg-winblue/30 text-winblue border border-winblue/45 hover:border-winblue/75 shadow-md flex items-center justify-center gap-1.5 text-xs font-bold transition-all shrink-0 cursor-pointer"
+              data-hover-grow className="w-full sm:w-auto h-10 px-5 rounded-full bg-card/75 backdrop-blur-3xl hover:bg-[var(--hover-fill)] text-[var(--text-main)] shadow-md flex items-center justify-center gap-1.5 text-xs font-bold transition-all shrink-0 cursor-pointer"
             >
               <Plus size={14} />
               <span>Adicionar regra</span>
@@ -678,7 +709,7 @@ export function EditAudiobookScreen() {
                 {editBookPronunciationMap.map((item, idx) => (
                   <div
                     key={`${item.original}-${idx}`}
-                    className="h-8 pl-3.5 pr-2 rounded-full bg-card/75 border border-[var(--text-main)]/10 flex items-center gap-2 text-xs font-semibold text-[var(--text-main)] shrink-0 shadow-xs"
+                    className="h-8 pl-3.5 pr-2 rounded-full bg-card/75 flex items-center gap-2 text-xs font-semibold text-[var(--text-main)] shrink-0 shadow-xs"
                   >
                     <span>{item.original}</span>
                     <span className="text-[var(--text-muted)] font-normal">→</span>
@@ -689,7 +720,7 @@ export function EditAudiobookScreen() {
                         setEditBookPronunciationMap(prev => prev.filter((_, i) => i !== idx));
                         showToast(`Regra removida: "${item.original}"`);
                       }}
-                      className="w-5 h-5 rounded-full hover:bg-black/10 dark:hover:bg-white/10 flex items-center justify-center text-[var(--text-muted)] hover:text-red-500 transition-colors ml-0.5 cursor-pointer"
+                      className="w-5 h-5 rounded-full hover:bg-black/10 dark:hover:bg-[var(--hover-fill)] flex items-center justify-center text-[var(--text-muted)] hover:text-red-500 transition-colors ml-0.5 cursor-pointer"
                       title="Remover regra"
                     >
                       <Trash2 size={11} />
@@ -718,7 +749,7 @@ export function EditAudiobookScreen() {
             return (
               <React.Fragment key={cap.id || `cap-${i}`}>
                 <div 
-                  className="flex items-center justify-between py-2 px-4 sm:px-5 rounded-full bg-card/40 border border-[var(--text-main)]/5 mb-1.5 transition-all"
+                  className="flex items-center justify-between py-2 px-4 sm:px-5 rounded-full bg-card/40 mb-1.5 transition-all"
                 >
                   <div className="flex items-center gap-3.5 flex-1 w-full">
                     <span className="w-6 text-center text-xs text-[var(--text-muted)] shrink-0 font-medium">
@@ -735,16 +766,14 @@ export function EditAudiobookScreen() {
                           return next;
                         });
                       }}
-                      className="h-10 px-4 rounded-full bg-card/75 border border-[var(--text-main)]/10 text-[var(--text-main)] text-sm font-medium shadow-sm backdrop-blur-3xl focus:outline-none focus:border-winblue/60 focus:ring-2 focus:ring-winblue/30 focus:shadow-[0_0_15px_rgba(var(--winblue-rgb),0.35)] transition-all flex-1"
+                      className="h-10 px-4 rounded-full bg-card/75 text-[var(--text-main)] text-sm font-medium shadow-sm backdrop-blur-3xl focus:outline-none focus:bg-winblue/15 transition-all flex-1"
                       placeholder={`Capítulo ${i + 1}`}
                     />
                   </div>
                   <div className="flex items-center gap-2.5 ml-3 shrink-0">
                     {/* Ícone de texto para pré-visualização de trecho do capítulo */}
-                    <motion.button
+                    <motion.button data-popup-trigger
                       type="button"
-                      whileHover={{ scale: 1.15 }}
-                      whileTap={{ scale: 0.92 }}
                       animate={previewChapterAnchor && (previewChapter?.id ? previewChapter.id === cap.id : previewChapter?.title === cap.title) ? { scale: 1.22, opacity: 0, pointerEvents: 'none' } : { scale: 1, opacity: 1, pointerEvents: 'auto' }}
                       transition={{ type: "spring", stiffness: 500, damping: 30 }}
                       onClick={(e) => {
@@ -752,7 +781,7 @@ export function EditAudiobookScreen() {
                         setPreviewChapterAnchor(e.currentTarget);
                         setPreviewChapter(cap);
                       }}
-                      className="w-7 h-7 rounded-full bg-card/75 border border-[var(--text-main)]/15 text-[var(--text-main)] hover:text-white hover:bg-white/20 hover:border-white/35 hover:shadow-[0_0_12px_rgba(255,255,255,0.3)] transition-all cursor-pointer shadow-sm flex items-center justify-center shrink-0 [&_svg]:text-inherit"
+                      className="w-7 h-7 rounded-full bg-card/75 text-[var(--text-main)] hover:text-white hover:bg-[var(--hover-fill)] transition-all cursor-pointer shadow-sm flex items-center justify-center shrink-0 [&_svg]:text-inherit"
                       title="Ler trecho do capítulo"
                     >
                       <FileText size={13} />
@@ -760,50 +789,13 @@ export function EditAudiobookScreen() {
 
                     {/* Excluir marcação de capítulo (une conteúdo ao capítulo anterior) - Oculto se for o único capítulo */}
                     {editBookChapters.length > 1 && (
-                      <motion.button
+                      <motion.button data-popup-trigger
                         type="button"
-                        whileHover={{ scale: 1.15 }}
-                        whileTap={{ scale: 0.92 }}
-                        onClick={() => {
-                          if (editBookChapters.length <= 1) {
-                            showToast("O livro deve conter ao menos um capítulo inicial.");
-                            return;
-                          }
-                          setEditBookChapters(prev => {
-                            if (prev.length <= 1) return prev;
-                            const next = [...prev];
-                            if (i > 0) {
-                              const prevCap = next[i - 1];
-                              const appendedContent = (next[i].content || next[i].snippet || '').trim();
-                              const mergedContent = prevCap.content 
-                                ? `${prevCap.content}\n\n${appendedContent}` 
-                                : appendedContent;
-                              const mergedSnippet = prevCap.snippet || mergedContent.slice(0, 500);
-                              next[i - 1] = {
-                                ...prevCap,
-                                content: mergedContent,
-                                snippet: mergedSnippet
-                              };
-                              next.splice(i, 1);
-                            } else {
-                              const nextCap = next[1];
-                              const prependedContent = (next[0].content || next[0].snippet || '').trim();
-                              const mergedContent = nextCap.content 
-                                ? `${prependedContent}\n\n${nextCap.content}` 
-                                : prependedContent;
-                              const mergedSnippet = next[0].snippet || mergedContent.slice(0, 500);
-                              next[1] = {
-                                ...nextCap,
-                                content: mergedContent,
-                                snippet: mergedSnippet
-                              };
-                              next.splice(0, 1);
-                            }
-                            return next;
-                          });
-                          showToast("Marcação excluída. Conteúdo integrado ao capítulo anterior.");
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setConfirmRemoveChapter({ index: i, anchor: e.currentTarget });
                         }}
-                        className="w-7 h-7 rounded-full bg-card/75 border border-red-500/20 shadow-sm flex items-center justify-center text-red-500 hover:bg-red-500/15 hover:border-red-500/40 hover:shadow-[0_0_12px_rgba(239,68,68,0.25)] transition-all cursor-pointer shrink-0"
+                        className="w-7 h-7 rounded-full bg-card/75 shadow-sm flex items-center justify-center text-red-500 hover:bg-red-500/15 transition-all cursor-pointer shrink-0"
                         title="Excluir marcação de capítulo (unir ao anterior)"
                       >
                         <Trash2 size={13} />
@@ -814,17 +806,15 @@ export function EditAudiobookScreen() {
 
                 {/* Banner inteligente para divisão de capítulos longos (> 6.000 palavras / 45 min) */}
                 {isLongChapter && (
-                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 px-4 py-2.5 mb-2 ml-4 sm:ml-9 rounded-2xl bg-amber-500/10 border border-amber-500/25 text-amber-700 dark:text-amber-300 text-xs">
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 pl-5 pr-2 py-1.5 mb-2 ml-4 sm:ml-9 rounded-full bg-amber-500/10 text-amber-700 dark:text-amber-300 text-xs">
                     <div className="flex items-center gap-2">
                       <span className="font-semibold">Capítulo extenso (~{wordCount.toLocaleString()} palavras / ~45+ min).</span>
                       <span className="text-[var(--text-muted)] hidden md:inline">Dividir em partes menores garante síntese 100% estável.</span>
                     </div>
                     <motion.button
                       type="button"
-                      whileHover={{ scale: 1.05 }}
-                      whileTap={{ scale: 0.95 }}
                       onClick={() => handleSplitLongChapter(i)}
-                      className="h-7 px-3.5 rounded-full bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-800 dark:text-amber-200 font-bold text-[11px] flex items-center gap-1.5 transition-all shrink-0 cursor-pointer shadow-sm"
+                      className="h-7 px-3.5 rounded-full bg-amber-500/20 hover:bg-amber-500/30 text-amber-800 dark:text-amber-200 font-bold text-[11px] flex items-center gap-1.5 transition-all shrink-0 cursor-pointer shadow-sm"
                     >
                       <Scissors size={12} />
                       <span>Dividir automaticamente</span>
@@ -835,6 +825,28 @@ export function EditAudiobookScreen() {
             );
           })}
         </div>
+
+        {/* CONFIRMAR EXCLUSÃO DE MARCAÇÃO: nasce da lixeira do capítulo */}
+        <AnimatePresence>
+          {confirmRemoveChapter && editBookChapters[confirmRemoveChapter.index] && (() => {
+            const { index, anchor } = confirmRemoveChapter;
+            const cap = editBookChapters[index];
+            const close = () => setConfirmRemoveChapter(null);
+            return (
+              <AnchoredPopup key="confirm-remove-chapter" anchor={anchor} width={300} estimatedHeight={170} onClose={close}>
+                <ConfirmPanel
+                  title="Excluir a marcação?"
+                  description={index > 0
+                    ? `O texto de "${cap.title}" passa a fazer parte do capítulo anterior. Nada do livro é apagado.`
+                    : `O texto de "${cap.title}" passa a fazer parte do capítulo seguinte. Nada do livro é apagado.`}
+                  confirmLabel="Excluir marcação"
+                  onConfirm={() => { close(); removerMarcacao(index); }}
+                  onCancel={close}
+                />
+              </AnchoredPopup>
+            );
+          })()}
+        </AnimatePresence>
 
         {/* POP-UP MORPHING: PRÉ-VISUALIZAÇÃO DE TRECHO DO CAPÍTULO */}
         {typeof document !== 'undefined' && createPortal(
@@ -860,34 +872,18 @@ export function EditAudiobookScreen() {
                   }}
                   style={getButtonCoverPopupStyle(previewChapterAnchor, 380, 260, 'right')}
                   onClick={(e) => e.stopPropagation()}
-                  className="bg-card/95 backdrop-blur-3xl border border-[var(--button-secondary-bg)] rounded-[24px] shadow-2xl p-4 z-[9999] flex flex-col text-left overflow-hidden text-[var(--text-main)] space-y-3"
+                  className="bg-card/95 backdrop-blur-3xl rounded-[24px] shadow-2xl p-4 z-[9999] flex flex-col text-left overflow-hidden text-[var(--text-main)] space-y-3"
                 >
                   <div className="flex items-center justify-between pb-0.5">
                     <div className="min-w-0 pr-2">
-                      <h4 className="text-xl font-bold text-[var(--text-main)] truncate">{previewChapter.title}</h4>
+                      <h4 className="text-sm font-bold text-[var(--text-main)] truncate">{previewChapter.title}</h4>
                     </div>
                   </div>
 
-                  <div className="max-h-56 overflow-y-auto custom-scrollbar p-3 rounded-2xl bg-black/5 dark:bg-white/5 border border-[var(--text-main)]/5 text-xs text-[var(--text-main)]/90 leading-relaxed whitespace-pre-line select-text font-serif">
+                  <div className="max-h-56 overflow-y-auto custom-scrollbar p-3 rounded-2xl bg-black/5 dark:bg-white/10 text-xs text-[var(--text-main)]/90 leading-relaxed whitespace-pre-line select-text font-serif">
                     {previewChapter.snippet || previewChapter.content?.slice(0, 1000) || "Nenhum trecho de texto detectado para este capítulo."}
                   </div>
 
-                  <div className="flex items-center justify-end gap-2 pt-1">
-                    <motion.button
-                      type="button"
-                      whileHover={{ scale: 1.05 }}
-                      whileTap={{ scale: 0.95 }}
-                      onClick={() => {
-                        clearButtonCoverAnchorCache(previewChapterAnchor);
-                        setPreviewChapterAnchor(null);
-                        setPreviewChapter(null);
-                      }}
-                      className="h-8 px-4 rounded-full bg-card/75 backdrop-blur-3xl border border-[var(--text-main)]/10 text-xs font-semibold hover:bg-white/15 hover:border-white/25 hover:shadow-[0_0_12px_rgba(255,255,255,0.2)] text-[var(--text-main)] transition-all cursor-pointer flex items-center justify-center gap-1.5"
-                    >
-                      <X size={13} className="shrink-0" />
-<span>Fechar</span>
-                    </motion.button>
-                  </div>
                 </motion.div>
               </>
             )}

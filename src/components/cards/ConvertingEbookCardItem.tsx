@@ -137,14 +137,14 @@ const ConvertingEbookCardItemBase: React.FC<ConvertingEbookCardItemProps> = ({
       exit={CARD_EXIT}
       transition={cardTransition()}
       style={{ borderColor: ambientStyle.borderColor }}
-      className={`p-5 sm:p-6 rounded-3xl backdrop-blur-3xl border ${isError ? 'border-red-500/50' : ''} relative isolate overflow-hidden group transition-[border-color,box-shadow,background-color] w-full select-none`}
+      className={`p-5 sm:p-6 rounded-3xl backdrop-blur-3xl ${isError ? 'border border-red-500/50' : ''} relative isolate overflow-hidden group transition-[border-color,box-shadow,background-color] w-full select-none`}
     >
       {/* Fundo animado com os tons da capa (efeito do player em tela cheia) */}
       <CoverAmbientBackground color={accentColor} cover={coverUrl} isDark={resolvedTheme === 'dark'} />
 
       <div className="flex flex-row items-stretch gap-5 sm:gap-6 w-full">
         {/* Capa com proporção de livro e cantos arredondados, tamanho adequado à altura reduzida */}
-        <div className="relative w-20 h-28 sm:w-24 sm:h-32 rounded-2xl overflow-hidden shrink-0 shadow-lg border border-white/10 bg-black/10 dark:bg-white/5">
+        <div className="relative w-20 h-28 sm:w-24 sm:h-32 rounded-2xl overflow-hidden shrink-0 shadow-lg bg-black/10 dark:bg-white/10">
           <img 
             src={coverUrl} 
             alt={file.title || 'Capa do Audiobook'} 
@@ -170,13 +170,11 @@ const ConvertingEbookCardItemBase: React.FC<ConvertingEbookCardItemProps> = ({
               {isError && (
                 <motion.button
                   type="button"
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
                   onClick={(e) => {
                     e.stopPropagation();
                     onRetry?.(file);
                   }}
-                  className="h-8 px-3.5 rounded-full bg-card/75 backdrop-blur-3xl border border-[var(--text-main)]/15 text-[var(--text-main)] hover:text-white hover:bg-white/20 hover:border-white/35 hover:shadow-[0_0_14px_rgba(255,255,255,0.35)] flex items-center gap-1.5 text-xs font-semibold transition-all cursor-pointer shadow-sm [&_svg]:text-inherit"
+                  className="h-8 px-3.5 rounded-full bg-card/75 backdrop-blur-3xl text-[var(--text-main)] hover:text-white hover:bg-[var(--hover-fill)] flex items-center gap-1.5 text-xs font-semibold transition-all cursor-pointer shadow-sm [&_svg]:text-inherit"
                   title="Tentar novamente"
                 >
                   <RotateCcw size={13} />
@@ -185,15 +183,13 @@ const ConvertingEbookCardItemBase: React.FC<ConvertingEbookCardItemProps> = ({
               )}
 
               {/* Botão de Cancelamento / Excluir Circular */}
-              <motion.button
+              <motion.button data-popup-trigger
                 type="button"
-                whileHover={{ scale: 1.15 }}
-                whileTap={{ scale: 0.92 }}
                 onClick={(e) => {
                   e.stopPropagation();
                   onCancel(e.currentTarget);
                 }}
-                className={`${isError ? 'h-8 px-3.5 gap-1.5 text-xs font-semibold' : 'w-8 h-8'} rounded-full flex items-center justify-center bg-card/75 border border-red-500/25 text-red-500 hover:bg-red-500/20 hover:border-red-500/40 hover:shadow-[0_0_14px_rgba(239,68,68,0.4)] transition-all cursor-pointer shadow-sm shrink-0`}
+                className={`${isError ? 'h-8 px-3.5 gap-1.5 text-xs font-semibold' : 'w-8 h-8'} rounded-full flex items-center justify-center bg-card/75 text-red-500 hover:bg-red-500/20 transition-all cursor-pointer shadow-sm shrink-0`}
                 title={isError ? "Cancelar este livro" : "Cancelar geração"}
               >
                 <X size={isError ? 13 : 15} />
@@ -243,7 +239,7 @@ const ConvertingEbookCardItemBase: React.FC<ConvertingEbookCardItemProps> = ({
 
               {/* Barra de Progressão na mesma cor do destaque com tonalidade diferente e leve brilho */}
               <div 
-                className="h-3 sm:h-3.5 w-full rounded-full overflow-hidden p-0.5 border border-black/5 dark:border-white/10"
+                className="h-3 sm:h-3.5 w-full rounded-full overflow-hidden p-0.5"
                 style={{ background: progressStyle.trackBg }}
               >
                 <motion.div
@@ -277,33 +273,33 @@ ${details}` : message).then(() => {
       setTimeout(() => setCopied(false), 1600);
     }).catch(() => {});
   };
-  const btn = "h-7 px-3 rounded-full bg-red-500/10 border border-red-500/25 text-red-400 hover:bg-red-500/20 hover:border-red-400/45 hover:shadow-[0_0_12px_rgba(239,68,68,0.25)] text-[11px] font-semibold flex items-center gap-1.5 transition-all cursor-pointer shrink-0 [&_svg]:text-inherit";
+  const btn = "h-7 px-3 rounded-full bg-red-500/10 text-red-400 hover:bg-red-500/20 text-[11px] font-semibold flex items-center gap-1.5 transition-all cursor-pointer shrink-0 [&_svg]:text-inherit";
   return (
-    <div className="w-full min-w-0 mt-3 px-3.5 py-3 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-400 shadow-sm">
+    <div className="w-full min-w-0 mt-3 px-3.5 py-3 rounded-2xl bg-red-500/10 text-red-400 shadow-sm">
       <div className="flex items-start gap-2.5">
         <AlertCircle size={16} className="shrink-0 text-red-500 mt-0.5" />
         <p className="flex-1 min-w-0 text-xs sm:text-sm font-semibold leading-relaxed break-words select-text cursor-text">{message}</p>
       </div>
       <div className="flex flex-wrap items-center gap-2 mt-2.5 pl-[26px]">
         {onSkipText && (
-          <motion.button type="button" whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} onClick={onSkipText} className={btn} title="Termina o audiobook sem o texto sincronizado, sem narrar de novo">
+          <motion.button type="button" onClick={onSkipText} className={btn} title="Termina o audiobook sem o texto sincronizado, sem narrar de novo">
             <SkipForward size={13} />
             <span>Seguir sem o texto</span>
           </motion.button>
         )}
         {onSkipTranslation && (
-          <motion.button type="button" whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} onClick={onSkipTranslation} className={btn} title="Narra no idioma do livro, com uma voz desse idioma">
+          <motion.button type="button" onClick={onSkipTranslation} className={btn} title="Narra no idioma do livro, com uma voz desse idioma">
             <SkipForward size={13} />
             <span>Seguir sem traduzir</span>
           </motion.button>
         )}
         {details && (
-          <motion.button type="button" whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} onClick={() => setOpen(o => !o)} className={btn} aria-expanded={open}>
+          <motion.button type="button" onClick={() => setOpen(o => !o)} className={btn} aria-expanded={open}>
             <ChevronDown size={13} className={`transition-transform ${open ? 'rotate-180' : ''}`} />
             <span>{open ? 'Ocultar detalhes' : 'Ver detalhes'}</span>
           </motion.button>
         )}
-        <motion.button type="button" whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} onClick={copy} className={btn}>
+        <motion.button type="button" onClick={copy} className={btn}>
           {copied ? <Check size={13} /> : <Copy size={13} />}
           <span>{copied ? 'Copiado' : 'Copiar erro'}</span>
         </motion.button>

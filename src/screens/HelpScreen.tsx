@@ -28,9 +28,8 @@ export function HelpScreen() {
             <motion.button
               key={topic.id}
               type="button"
-              whileTap={{ scale: 0.985 }}
               onClick={() => openHelpTopic(topic.id)}
-              className={`relative isolate w-full h-[88px] px-6 rounded-[32px] overflow-hidden bg-gradient-to-r ${topic.gradient} border border-white/15 shadow-lg hover:shadow-xl hover:border-white/30 transition-[box-shadow,border-color] text-left rtl:text-right flex flex-col justify-center cursor-pointer group`}
+              className={`relative isolate w-full h-[88px] px-6 rounded-[32px] overflow-hidden bg-gradient-to-r ${topic.gradient} shadow-lg hover:shadow-xl transition-[box-shadow,border-color] text-left rtl:text-right flex flex-col justify-center cursor-pointer group`}
             >
               <span
                 aria-hidden="true"

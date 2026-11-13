@@ -33,7 +33,7 @@ export function EditTextScreen() {
             <span className="text-xs font-semibold text-[var(--text-muted)]">
               Cor da capa
             </span>
-            <div className="grid grid-cols-6 gap-x-3 gap-y-3.5 justify-items-center px-2.5 py-3 rounded-2xl bg-card/60 backdrop-blur-md border border-[var(--text-main)]/10 shadow-sm w-full">
+            <div className="grid grid-cols-6 gap-x-3 gap-y-3.5 justify-items-center px-2.5 py-3 rounded-2xl bg-card/60 backdrop-blur-md shadow-sm w-full">
               {COVER_COLOR_PICKER.map(c => {
                 const isSelected = editTextColor.toLowerCase() === c.hex.toLowerCase();
                 return (
@@ -45,8 +45,8 @@ export function EditTextScreen() {
                     style={{ backgroundColor: c.hex }}
                     className={`w-3.5 h-3.5 rounded-full flex items-center justify-center transition-all duration-150 cursor-pointer ${
                               isSelected 
-                                ? 'ring-2 ring-winblue ring-offset-[1.5px] ring-offset-black/50 shadow-[0_0_10px_rgba(var(--winblue-rgb),0.5)] hover:shadow-[0_0_14px_rgba(var(--winblue-rgb),0.75)]' 
-                                : 'opacity-85 hover:opacity-100 hover:ring-2 hover:ring-white/90 hover:ring-offset-[1.5px] hover:ring-offset-black/40 hover:shadow-[0_0_12px_rgba(255,255,255,0.75)]'
+                                ? 'ring-2 ring-winblue ring-offset-[1.5px] ring-offset-black/50' 
+                                : 'opacity-85 hover:opacity-100'
                             }`}
                   >
                     {isSelected && (
@@ -69,7 +69,7 @@ export function EditTextScreen() {
               type="text"
               value={editTextTitle}
               onChange={(e) => setEditTextTitle(e.target.value)}
-              className="w-full h-11 px-4 rounded-2xl bg-card/75 border border-[var(--text-main)]/10 text-[var(--text-main)] text-sm font-semibold shadow-sm backdrop-blur-3xl focus:outline-none focus:border-winblue/60 focus:ring-2 focus:ring-winblue/30 focus:shadow-[0_0_15px_rgba(var(--winblue-rgb),0.35)] transition-all"
+              className="w-full h-11 px-4 rounded-2xl bg-card/75 text-[var(--text-main)] text-sm font-semibold shadow-sm backdrop-blur-3xl focus:outline-none focus:bg-winblue/15 transition-all"
               placeholder="Título do texto"
             />
           </div>
@@ -82,7 +82,7 @@ export function EditTextScreen() {
               type="text"
               value={editTextAuthor}
               onChange={(e) => setEditTextAuthor(e.target.value)}
-              className="w-full h-11 px-4 rounded-2xl bg-card/75 border border-[var(--text-main)]/10 text-[var(--text-main)] text-sm font-semibold shadow-sm backdrop-blur-3xl focus:outline-none focus:border-winblue/60 focus:ring-2 focus:ring-winblue/30 focus:shadow-[0_0_15px_rgba(var(--winblue-rgb),0.35)] transition-all"
+              className="w-full h-11 px-4 rounded-2xl bg-card/75 text-[var(--text-main)] text-sm font-semibold shadow-sm backdrop-blur-3xl focus:outline-none focus:bg-winblue/15 transition-all"
               placeholder="Autor"
             />
           </div>
@@ -96,7 +96,7 @@ export function EditTextScreen() {
                 type="text"
                 value={editTextGenre}
                 onChange={(e) => setEditTextGenre(e.target.value)}
-                className="w-full h-11 px-4 rounded-2xl bg-card/75 border border-[var(--text-main)]/10 text-[var(--text-main)] text-sm font-semibold shadow-sm backdrop-blur-3xl focus:outline-none focus:border-winblue/60 focus:ring-2 focus:ring-winblue/30 focus:shadow-[0_0_15px_rgba(var(--winblue-rgb),0.35)] transition-all"
+                className="w-full h-11 px-4 rounded-2xl bg-card/75 text-[var(--text-main)] text-sm font-semibold shadow-sm backdrop-blur-3xl focus:outline-none focus:bg-winblue/15 transition-all"
                 placeholder="Ex: Fantasia, Ficção Científica, Romance..."
               />
             </div>
@@ -109,7 +109,7 @@ export function EditTextScreen() {
                 type="text"
                 value={editTextTone}
                 onChange={(e) => setEditTextTone(e.target.value)}
-                className="w-full h-11 px-4 rounded-2xl bg-card/75 border border-[var(--text-main)]/10 text-[var(--text-main)] text-sm font-semibold shadow-sm backdrop-blur-3xl focus:outline-none focus:border-winblue/60 focus:ring-2 focus:ring-winblue/30 focus:shadow-[0_0_15px_rgba(var(--winblue-rgb),0.35)] transition-all"
+                className="w-full h-11 px-4 rounded-2xl bg-card/75 text-[var(--text-main)] text-sm font-semibold shadow-sm backdrop-blur-3xl focus:outline-none focus:bg-winblue/15 transition-all"
                 placeholder="Ex: Épico, Reflexivo, Dramático, Neutro..."
               />
             </div>
@@ -124,10 +124,10 @@ export function EditTextScreen() {
             Conteúdo do texto
           </label>
           <div className="flex items-center gap-2.5 text-xs text-[var(--text-muted)] font-medium">
-            <span className="px-3 py-1 rounded-full bg-card/75 border border-[var(--text-main)]/10 shadow-xs">
+            <span className="px-3 py-1 rounded-full bg-card/75 shadow-xs">
               {editTextContent.trim().split(/\s+/).filter(Boolean).length} palavras
             </span>
-            <span className="px-3 py-1 rounded-full bg-card/75 border border-[var(--text-main)]/10 shadow-xs">
+            <span className="px-3 py-1 rounded-full bg-card/75 shadow-xs">
               {editTextContent.length.toLocaleString('pt-BR')} caracteres
             </span>
           </div>
@@ -137,7 +137,7 @@ export function EditTextScreen() {
           <textarea 
             value={editTextContent}
             onChange={(e) => setEditTextContent(e.target.value)}
-            className="w-full h-[540px] p-5 rounded-3xl bg-card/75 border border-[var(--text-main)]/10 text-[var(--text-main)] text-sm leading-relaxed shadow-sm backdrop-blur-3xl focus:outline-none focus:border-winblue/60 focus:ring-2 focus:ring-winblue/30 focus:shadow-[0_0_20px_rgba(var(--winblue-rgb),0.25)] transition-all resize-y custom-scrollbar font-normal"
+            className="w-full h-[540px] p-5 rounded-3xl bg-card/75 text-[var(--text-main)] text-sm leading-relaxed shadow-sm backdrop-blur-3xl focus:outline-none focus:bg-winblue/15 transition-all resize-y custom-scrollbar font-normal"
             placeholder="Digite ou edite o conteúdo do seu texto aqui..."
             rows={22}
           />
@@ -148,20 +148,16 @@ export function EditTextScreen() {
       <div className="flex items-center justify-end gap-3 pt-2">
         <motion.button
           type="button"
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
           onClick={handleCancelTextEdits}
-          className="h-10 px-5 rounded-full bg-card/75 backdrop-blur-3xl border border-[var(--text-main)]/10 text-xs font-semibold text-[var(--text-main)] shadow-xl hover:bg-white/15 hover:border-white/25 hover:shadow-[0_0_15px_rgba(255,255,255,0.25)] transition-all cursor-pointer inline-flex items-center gap-1.5"
+          className="h-10 px-5 rounded-full bg-card/75 backdrop-blur-3xl text-xs font-semibold text-[var(--text-main)] shadow-xl hover:bg-[var(--hover-fill)] transition-all cursor-pointer inline-flex items-center gap-1.5"
         >
           <X size={13} className="shrink-0" />
           <span>Cancelar</span>
         </motion.button>
         <motion.button
           type="button"
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
           onClick={handleSaveTextEdits}
-          className="h-10 px-6 rounded-full bg-winblue/20 border border-winblue/45 shadow-xl backdrop-blur-3xl hover:bg-winblue/30 hover:border-winblue/75 hover:shadow-[0_20px_25px_-5px_rgba(0,0,0,0.25),0_0_22px_rgba(var(--winblue-rgb),0.45)] text-winblue text-xs font-bold transition-all flex items-center gap-2 cursor-pointer"
+          className="h-10 px-6 rounded-full bg-winblue/20 shadow-xl backdrop-blur-3xl hover:bg-winblue/30 text-winblue text-xs font-bold transition-all flex items-center gap-2 cursor-pointer"
         >
           <Check size={15} />
           <span>Salvar alterações</span>

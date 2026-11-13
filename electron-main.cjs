@@ -1,4 +1,4 @@
-const { app, BrowserWindow, shell, ipcMain, dialog } = require('electron');
+const { app, BrowserWindow, shell, ipcMain, dialog, nativeImage } = require('electron');
 const { spawn } = require('child_process');
 const path = require('path');
 const fs = require('fs');
@@ -137,7 +137,29 @@ function stopServer() {
     }
 }
 
+// Ícone da janela, da barra de tarefas e do Alt+Tab. Carregado como imagem (no Windows o .ico, que tem uma
+// versão desenhada para cada tamanho; o PNG grande reduzido pelo Windows fica borrado): passando só o caminho, o Windows às vezes ficava sem ícone nenhum
+function iconeDaJanela() {
+    const pasta = path.join(__dirname, 'public');
+    for (const nome of (process.platform === 'win32' ? ['icon.ico', 'icon.png'] : ['icon.png'])) {
+        try {
+            const img = nativeImage.createFromPath(path.join(pasta, nome));
+            if (!img.isEmpty()) return img;
+        } catch (e) {}
+    }
+    return undefined;
+}
+
+// Identidade própria no Windows: a barra de tarefas agrupa e mostra o ícone do app, não o do Electron
+if (process.platform === 'win32') app.setAppUserModelId('com.thenauan.audiobookgenerator');
+
 app.whenReady().then(() => {
+    // Abre sempre a interface atual: depois de uma atualização, o cache podia mostrar a versão anterior
+    try { require('electron').session.defaultSession.clearCache(); } catch (e) {}
+    // macOS: o app roda pelo Electron, então o Dock mostraria o ícone do Electron
+    if (process.platform === 'darwin' && app.dock) {
+        try { const img = nativeImage.createFromPath(path.join(__dirname, 'public', 'icon.png')); if (!img.isEmpty()) app.dock.setIcon(img); } catch (e) {}
+    }
     mainWindow = new BrowserWindow({
         width: 1280,
         height: 800,
@@ -146,7 +168,7 @@ app.whenReady().then(() => {
         minHeight: 640,
         autoHideMenuBar: true,
         backgroundColor: '#161616',
-        icon: path.join(__dirname, 'public', process.platform === 'win32' ? 'icon.ico' : 'icon.png'),
+        icon: iconeDaJanela(),
         webPreferences: {
             nodeIntegration: false,
             contextIsolation: true,

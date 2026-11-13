@@ -232,7 +232,7 @@ export function getCoverAmbientStyle(
   isDark: boolean,
   isError: boolean = false
 ): React.CSSProperties {
-  const hex = coverHex || '#0086F0';
+  const hex = coverHex || '#007AFF';
   const { h, s } = hexToHsl(hex);
 
   const isLowSat = s < 12;
@@ -267,7 +267,7 @@ export function getCoverAmbientStyle(
 }
 
 export function getCoverProgressStyle(coverHex: string, isDark: boolean) {
-  const hex = coverHex || '#0086F0';
+  const hex = coverHex || '#007AFF';
   const { h, s } = hexToHsl(hex);
   const isLowSat = s < 12;
   const baseS = isLowSat ? s : Math.min(100, Math.max(35, s));
@@ -532,7 +532,7 @@ export interface CoverAmbientTones {
 }
 
 export function getCoverAmbientTones(coverHex: string): CoverAmbientTones {
-  const { h, s } = hexToHsl(coverHex || '#0086F0');
+  const { h, s } = hexToHsl(coverHex || '#007AFF');
   const sat = s < 12 ? s : Math.min(90, Math.max(40, s));
   return {
     tonePrimary: hslToHex(h, sat, 48),
